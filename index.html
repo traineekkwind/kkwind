@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>วิทยาลัยการอาชีพวังไกลกังวล - ระบบทำข้อสอบออนไลน์</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase JS Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Default Supabase Cloud Config -->
+    <script>
+        window.SUPABASE_URL = "https://ividsfcwvhngsojtzwjt.supabase.co";
+        window.SUPABASE_ANON_KEY = "sb_publishable_7uhXNfvOOImPUONxRwId4w_4uONoAnO";
+    </script>
+    <!-- SheetJS (XLSX) CDN สำหรับ Import & Export Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="./public/styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-['Prompt',sans-serif]">
+
+    <!-- ============================================================================== -->
+    <!-- 1. TOP NAVIGATION BAR -->
+    <!-- ============================================================================== -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-3 cursor-pointer" onclick="goToHome()">
+                <img src="./public/logo.png" alt="ตราประจำวิทยาลัยการอาชีพวังไกลกังวล" class="w-10 h-10 object-contain drop-shadow-sm">
+                <div>
+                    <h1 class="text-base font-bold text-slate-900 leading-tight">วิทยาลัยการอาชีพวังไกลกังวล</h1>
+                    <p class="text-[11px] text-slate-500 font-medium">ระบบทำข้อสอบออนไลน์</p>
+                </div>
+            </div>
+
+            <!-- User Info & Action Controls -->
+            <div class="flex items-center gap-3">
+                <!-- User Info Bar (แสดงเมื่อ Login เท่านั้น) -->
+                <div id="user-info-bar" class="hidden flex items-center gap-3">
+                    <span id="current-user-role-badge" class="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700">
+                        👨‍🎓 นักเรียน
+                    </span>
+                    <span id="current-user-name" class="text-sm font-semibold text-slate-700 max-w-[180px] truncate">
+                        สมชาย ใจดี
+                    </span>
+                    <button id="btn-logout" title="ออกจากระบบ" class="text-slate-400 hover:text-red-500 transition p-1.5 rounded-lg hover:bg-red-50">
+                        <i class="fas fa-arrow-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================================================== -->
+    <!-- 2. MAIN CONTAINER (DYNAMIC VIEWS) -->
+    <!-- ============================================================================== -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center">
+
+        <!-- ========================================================================== -->
+        <!-- VIEW 1: AUTHENTICATION / LOGIN (3 ROLES) -->
+        <!-- ========================================================================== -->
+        <section id="view-auth" class="max-w-lg w-full mx-auto my-auto animate-fade-in">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-xl shadow-slate-200/50">
+                <div class="text-center mb-6">
+                    <img src="./public/logo.png" alt="ตราประจำวิทยาลัยการอาชีพวังไกลกังวล" class="w-20 h-20 object-contain mx-auto mb-2 drop-shadow-sm">
+                    <h2 class="text-xl font-bold text-slate-900 leading-snug">วิทยาลัยการอาชีพวังไกลกังวล</h2>
+                    <p class="text-xs text-indigo-600 font-semibold mt-0.5">ระบบทำข้อสอบออนไลน์</p>
+                </div>
+
+                <!-- Role Selection 3 Tabs -->
+                <div class="grid grid-cols-3 border-b border-slate-200 mb-6 text-xs font-semibold">
+                    <button id="tab-login-student" class="pb-3 text-center border-b-2 border-indigo-600 text-indigo-600 font-bold transition">
+                        <i class="fas fa-graduation-cap block text-sm mb-1"></i> นักเรียน
+                    </button>
+                    <button id="tab-login-teacher" class="pb-3 text-center border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition">
+                        <i class="fas fa-chalkboard-user block text-sm mb-1"></i> อาจารย์
+                    </button>
+                    <button id="tab-login-admin" class="pb-3 text-center border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition">
+                        <i class="fas fa-gears block text-sm mb-1"></i> แอดมิน
+                    </button>
+                </div>
+
+                <!-- 1.1 Form Student Login with Student ID & Citizen ID Password -->
+                <form id="form-login-student" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">รหัสนักเรียน หรือ ชื่อ-นามสกุล *</label>
+                        <div class="relative">
+                            <i class="far fa-id-card absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                            <input type="text" id="student-login-id-input" required placeholder="กรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition font-medium">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">รหัสผ่าน (เลขบัตรประชาชน 13 หลัก) *</label>
+                        <div class="relative">
+                            <i class="fas fa-shield-halved absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                            <input type="password" id="student-login-pass-input" maxlength="13" required placeholder="กรอกเลขประจำตัวประชาชน 13 หลัก" class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition font-mono tracking-wider">
+                            <button type="button" onclick="toggleStudentPasswordVisibility()" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 transition" title="แสดง/ซ่อนรหัสผ่าน">
+                                <i id="student-pass-eye-icon" class="fas fa-eye text-xs"></i>
+                            </button>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1.5">
+                            <i class="fas fa-circle-info text-indigo-500"></i> ใช้เลขประจำตัวประชาชน 13 หลักเป็นรหัสผ่านเข้าสอบ
+                        </p>
+                    </div>
+
+                    <button type="submit" class="w-full mt-2 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition shadow-md shadow-indigo-100 flex items-center justify-center gap-2">
+                        <i class="fas fa-arrow-right-to-bracket text-xs"></i> เข้าสู่หน้าเลือกข้อสอบของฉัน
+                    </button>
+                </form>
+
+                <!-- 1.2 Form Teacher Login -->
+                <form id="form-login-teacher" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">ชื่ออาจารย์ผู้สอน *</label>
+                        <div class="relative">
+                            <i class="fas fa-chalkboard-user absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                            <input type="text" id="teacher-name-input" required placeholder="กรอกชื่อ-นามสกุลอาจารย์ผู้สอน" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition font-medium">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">รหัสผ่านอาจารย์ *</label>
+                        <div class="relative">
+                            <i class="fas fa-key absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                            <input type="password" id="teacher-password-input" required placeholder="กรอกรหัสผ่านอาจารย์" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition shadow-md shadow-emerald-100 flex items-center justify-center gap-2">
+                        <i class="fas fa-chalkboard-user text-xs"></i> เข้าสู่ห้องอาจารย์ (Teacher Portal)
+                    </button>
+                </form>
+
+                <!-- 1.3 Form Admin Login -->
+                <form id="form-login-admin" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">รหัสผ่านผู้ดูแลระบบ (Admin) *</label>
+                        <div class="relative">
+                            <i class="fas fa-shield-cat absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                            <input type="password" id="admin-password-input" required placeholder="กรอกรหัสผ่านผู้ดูแลระบบ" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py-3 px-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl text-sm transition shadow-md shadow-purple-100 flex items-center justify-center gap-2">
+                        <i class="fas fa-gears text-xs"></i> เข้าสู่แดชบอร์ดแอดมิน (Admin Portal)
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ========================================================================== -->
+        <!-- VIEW 2: STUDENT LOBBY (FILTERED EXAM SELECTION) -->
+        <!-- ========================================================================== -->
+        <section id="view-student-lobby" class="hidden max-w-5xl mx-auto w-full">
+            <div class="bg-gradient-to-r from-indigo-900 via-indigo-800 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white mb-8 shadow-xl shadow-indigo-900/10">
+                <div class="max-w-2xl">
+                    <div class="flex flex-wrap items-center gap-2 mb-3">
+                        <span class="px-3 py-1 bg-white/10 rounded-full text-xs font-medium text-indigo-200 border border-white/10">
+                            <i class="fas fa-shield-alt mr-1"></i> Anti-Cheating Monitoring
+                        </span>
+                        <span id="student-class-badge" class="px-3 py-1 bg-indigo-500/30 rounded-full text-xs font-bold text-amber-300 border border-indigo-400/30">
+                            ปวช.2 | เทคโนโลยีธุรกิจดิจิทัล | ห้อง 1
+                        </span>
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold mb-2">ยินดีต้อนรับสู่ห้องสอบออนไลน์</h2>
+                    <p class="text-indigo-100 text-sm leading-relaxed">
+                        ระบบได้คัดกรองชุดข้อสอบที่ตรงกับระดับชั้น แผนกวิชา และห้องเรียนของคุณเรียบร้อยแล้ว
+                    </p>
+                </div>
+            </div>
+
+            <div class="mb-6 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fas fa-layer-group text-indigo-600"></i> ชุดข้อสอบที่เปิดให้คุณเข้าสอบ
+                </h3>
+                <button onclick="loadStudentLobby()" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                    <i class="fas fa-rotate"></i> รีเฟรช
+                </button>
+            </div>
+
+            <div id="exam-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Dynamic Filtered Exam Cards Loaded Here -->
+            </div>
+        </section>
+
+        <!-- ========================================================================== -->
+        <!-- VIEW 3: LIVE ANTI-CHEATING EXAM ROOM -->
+        <!-- ========================================================================== -->
+        <section id="view-student-exam" class="hidden max-w-4xl mx-auto w-full">
+            <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span id="exam-room-course-badge" class="px-2.5 py-0.5 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            วิชา
+                        </span>
+                        <h3 id="exam-room-title" class="font-bold text-slate-900 text-base md:text-lg">ชื่อชุดข้อสอบ</h3>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 mt-1">
+                        <p class="text-xs text-slate-500">
+                            ผู้เข้าสอบ: <span id="exam-room-student" class="font-semibold text-slate-700">ชื่อนักเรียน</span>
+                        </p>
+                        <span id="exam-autosave-badge" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> บันทึกคำตอบอัตโนมัติ
+                        </span>
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                            <i class="fas fa-shuffle text-[9px]"></i> สลับข้อ & ตัวเลือกเฉพาะบุคคล
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <div id="exam-room-tab-badge" class="px-3 py-1.5 text-xs font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1.5">
+                        <i class="fas fa-eye text-amber-500"></i> สลับจอ: 0/3
+                    </div>
+                    <div class="px-4 py-2 rounded-xl bg-slate-900 text-white font-mono font-bold text-base flex items-center gap-2 shadow-inner">
+                        <i class="far fa-clock text-indigo-400 text-sm"></i>
+                        <span id="exam-room-timer">00:00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Question Pills Navigator -->
+            <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm mb-6">
+                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">ข้ามไปยังข้อ:</div>
+                <div id="exam-nav-buttons" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- Main Question Card -->
+            <div id="exam-question-card" class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm mb-6"></div>
+        </section>
+
+        <!-- ========================================================================== -->
+        <!-- VIEW 4: EXAM RESULT & INTEGRITY AUDIT VIEW -->
+        <!-- ========================================================================== -->
+        <section id="view-student-result" class="hidden max-w-xl mx-auto w-full my-auto animate-fade-in">
+            <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-2xl text-center">
+                <div class="w-20 h-20 rounded-3xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-5 text-3xl shadow-inner">
+                    <i class="fas fa-trophy"></i>
+                </div>
+
+                <h2 class="text-2xl font-black text-slate-900 mb-1">ส่งข้อสอบเรียบร้อยแล้ว</h2>
+                <p id="result-exam-title" class="text-xs font-medium text-slate-500 mb-6">ชื่อชุดข้อสอบ</p>
+
+                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-6">
+                    <div class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">คะแนนรวมที่ทำได้</div>
+                    <div id="result-score-display" class="text-4xl sm:text-5xl font-black text-indigo-600 mb-2">0.00 / 0.00</div>
+                    <div class="text-sm font-semibold text-slate-600">
+                        คิดเป็นร้อยละ: <span id="result-percentage-display" class="text-indigo-700 font-bold">0%</span>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">สถานะความซื่อสัตย์ในการสอบ</div>
+                    <span id="result-status-badge" class="px-4 py-1.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-300">
+                        ✅ ผ่านการตรวจสอบความซื่อสัตย์
+                    </span>
+                </div>
+
+                <div id="result-cheat-audit-box" class="mb-8"></div>
+
+                <button onclick="loadStudentLobby()" class="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2">
+                    <i class="fas fa-arrow-left text-xs"></i> กลับสู่หน้าเลือกข้อสอบ
+                </button>
+            </div>
+        </section>
+
+        <!-- ========================================================================== -->
+        <!-- VIEW 5: TEACHER PORTAL (จัดการรายวิชา, จัดการข้อสอบ, ตรวจผล, EXCEL) -->
+        <!-- ========================================================================== -->
+        <section id="view-teacher" class="hidden max-w-6xl mx-auto w-full">
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="text-2xl font-black text-slate-900 flex items-center gap-2">
+                        <i class="fas fa-chalkboard-user text-emerald-600"></i> ห้องอาจารย์ผู้สอน: <span id="teacher-portal-name" class="text-emerald-700">อาจารย์</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">สร้างรายวิชา, ออกข้อสอบตามระดับชั้น/ห้องเรียน, นำเข้า-ส่งออก Excel และตรวจคะแนน</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- Real-Time Cheating Alert Toggle Controls -->
+                    <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                        <button id="btn-toggle-live-alerts" onclick="toggleLiveAlerts()" class="px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-600 text-white shadow-sm" title="เปิด/ปิดการแจ้งเตือนสลับจอแบบเรียลไทม์">
+                            <span id="live-alert-pulse-dot" class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                            <i class="fas fa-tower-broadcast"></i>
+                            <span id="live-alert-status-text">แจ้งเตือนสลับจอ: เปิด</span>
+                        </button>
+                        <button id="btn-toggle-alert-sound" onclick="toggleAlertSound()" title="เปิด/ปิดเสียงเตือน" class="p-2 text-slate-600 hover:text-emerald-700 rounded-xl hover:bg-white transition text-xs font-bold flex items-center gap-1">
+                            <i id="live-alert-sound-icon" class="fas fa-volume-high"></i>
+                        </button>
+                    </div>
+
+                    <button onclick="document.getElementById('modal-create-course').classList.remove('hidden')" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5">
+                        <i class="fas fa-folder-plus"></i> สร้างรายวิชาใหม่
+                    </button>
+                    <button onclick="openCreateExamModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-emerald-100 flex items-center gap-1.5">
+                        <i class="fas fa-file-circle-plus"></i> สร้างชุดข้อสอบใหม่
+                    </button>
+                </div>
+            </div>
+
+            <!-- Real-Time Floating Notification Toast Container -->
+            <div id="live-cheat-alerts-container" class="fixed top-20 right-4 sm:right-6 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none"></div>
+
+            <!-- Teacher Navigation 6 Tabs -->
+            <div class="flex border-b border-slate-200 mb-6 text-sm font-medium gap-5 overflow-x-auto">
+                <button id="teacher-tab-btn-courses" class="pb-3 border-b-2 border-emerald-600 text-emerald-600 font-bold transition flex items-center gap-2 whitespace-nowrap">
+                    <i class="fas fa-book-bookmark"></i> รายวิชาของฉัน
+                </button>
+                <button id="teacher-tab-btn-exams" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2 whitespace-nowrap">
+                    <i class="fas fa-folder-open"></i> รายการชุดข้อสอบ & เป้าหมาย
+                </button>
+                <button id="teacher-tab-btn-submissions" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2 whitespace-nowrap">
+                    <i class="fas fa-users-viewfinder"></i> ผลการสอบ & ส่งออก Excel
+                </button>
+                <button id="teacher-tab-btn-students" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2 whitespace-nowrap">
+                    <i class="fas fa-users-gear text-indigo-600"></i> จัดการรายชื่อนักเรียน
+                </button>
+                <button id="teacher-tab-btn-add-question" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2 whitespace-nowrap">
+                    <i class="fas fa-plus"></i> เพิ่มโจทย์รายข้อ
+                </button>
+                <button id="teacher-tab-btn-excel-import" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2 whitespace-nowrap text-emerald-700">
+                    <i class="fas fa-file-excel text-emerald-600"></i> นำเข้าข้อสอบจาก Excel
+                </button>
+            </div>
+
+            <!-- Tab 1: Manage Courses -->
+            <div id="teacher-content-courses" class="space-y-4">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-base font-bold text-slate-900">รายวิชาที่สอนทั้งหมด</h3>
+                    <span id="teacher-courses-count-badge" class="text-xs px-2.5 py-1 bg-slate-100 text-slate-600 font-bold rounded-lg">0 รายวิชา</span>
+                </div>
+                <div id="teacher-courses-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+
+            <!-- Tab 2: Manage Exams List -->
+            <div id="teacher-content-exams" class="hidden space-y-4">
+                <div id="teacher-exams-list-container" class="space-y-3"></div>
+            </div>
+
+            <!-- Tab 3: Submissions & Anti-Cheat Audit (with EXCEL EXPORT) -->
+            <div id="teacher-content-submissions" class="hidden space-y-6">
+                <!-- Stats Overview Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-400 font-medium">จำนวนผู้ส่งข้อสอบทั้งหมด</div>
+                            <div id="teacher-stat-total-submissions" class="text-2xl font-black text-slate-800">0</div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xl">
+                            <i class="fas fa-triangle-exclamation"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-400 font-medium">พบพฤติกรรมสงสัยทุจริต</div>
+                            <div id="teacher-stat-flagged-cheats" class="text-2xl font-black text-red-600">0</div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                            <i class="fas fa-chart-pie"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-400 font-medium">คะแนนเฉลี่ยร้อยละ</div>
+                            <div id="teacher-stat-avg-score" class="text-2xl font-black text-emerald-600">0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Cheating Alerts Activity Stream Box -->
+                <div id="teacher-live-cheat-feed-card" class="bg-red-50/60 rounded-2xl p-4 border border-red-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
+                            <h4 class="font-bold text-xs text-red-800 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fas fa-tower-broadcast text-red-600"></i> บันทึกเหตุการณ์สลับหน้าจอสด (Real-Time Cheating Feed)
+                            </h4>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="live-cheat-feed-count" class="text-[11px] font-bold text-red-600 px-2.5 py-0.5 bg-red-100 rounded-full">0 กิจกรรม</span>
+                            <button onclick="clearLiveFeedLogs()" class="text-[11px] text-slate-400 hover:text-red-600 transition" title="ล้างประวัติสด">ล้างประวัติ</button>
+                        </div>
+                    </div>
+                    <div id="live-cheat-feed-list" class="space-y-2 max-h-48 overflow-y-auto pr-1 text-xs">
+                        <p class="text-slate-400 text-xs italic py-2 text-center">ระบบกำลังมอนิเตอร์สด... (หากมีนักเรียนสลับหน้าจอ จะปรากฏขึ้นที่นี่ทันที)</p>
+                    </div>
+                </div>
+
+                <!-- Submissions Table & Export Button -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h4 class="font-bold text-sm text-slate-800">ตารางคะแนนและรายงานความซื่อสัตย์</h4>
+                            <p class="text-xs text-slate-400">ตรวจสอบคำตอบและดาวน์โหลดรายงานคะแนนพร้อมข้อมูลระดับชั้น/ห้องเรียน</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <!-- EXPORT EXCEL BUTTON -->
+                            <button onclick="exportTeacherScoresToExcel()" class="px-4 py-2 btn-excel text-xs font-bold rounded-xl transition shadow-md shadow-emerald-100 flex items-center gap-2">
+                                <i class="fas fa-file-excel"></i> ส่งออกคะแนนเป็น Excel (.xlsx)
+                            </button>
+                            <button onclick="loadTeacherSubmissions()" class="px-3 py-2 text-xs font-semibold text-slate-600 hover:text-emerald-700 bg-slate-100 hover:bg-emerald-50 rounded-xl transition">
+                                <i class="fas fa-rotate"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b border-slate-100">
+                                <tr>
+                                    <th class="py-3 px-4">ชื่อนักเรียน</th>
+                                    <th class="py-3 px-4">ระดับชั้น / แผนก / ห้อง</th>
+                                    <th class="py-3 px-4">ชุดข้อสอบ</th>
+                                    <th class="py-3 px-4">คะแนน</th>
+                                    <th class="py-3 px-4 text-center">สลับหน้าจอ</th>
+                                    <th class="py-3 px-4 text-center">สถานะ Anti-Cheat</th>
+                                    <th class="py-3 px-4">เวลาที่ส่ง</th>
+                                    <th class="py-3 px-4 text-right">การจัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="teacher-submissions-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Student Management (จัดการรายชื่อนักเรียน & รหัสผ่านเลขบัตรประชาชน) -->
+            <div id="teacher-content-students" class="hidden space-y-5">
+                <!-- Top Action Bar & Stats -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fas fa-users text-indigo-600"></i> ทะเบียนรายชื่อนักเรียน
+                                <span id="teacher-students-count-badge" class="text-xs px-2.5 py-0.5 bg-indigo-50 text-indigo-700 font-bold rounded-lg border border-indigo-100">0 คน</span>
+                            </h3>
+                            <p class="text-xs text-slate-400">เพิ่มรายชื่อนักเรียนทีละคน หรือนำเข้าจากไฟล์ Excel (รหัสผ่านเข้าสอบคือนเลขบัตรประชาชน 13 หลัก)</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button onclick="downloadStudentExcelTemplate()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5" title="ดาวน์โหลดเทมเพลตสำหรับนำเข้ารายชื่อ">
+                                <i class="fas fa-download text-slate-500"></i> เทมเพลต Excel
+                            </button>
+                            <button onclick="openStudentExcelImportModal()" class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm">
+                                <i class="fas fa-file-excel text-emerald-600"></i> นำเข้าจาก Excel
+                            </button>
+                            <button onclick="openAddStudentModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-md shadow-indigo-100">
+                                <i class="fas fa-user-plus"></i> เพิ่มนักเรียนรายคน
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search & Filter Controls -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-2 border-t border-slate-100">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="teacher-student-search-input" oninput="loadTeacherStudentsList()" placeholder="ค้นหาชื่อ, รหัสนักเรียน..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <select id="teacher-student-filter-year" onchange="loadTeacherStudentsList()" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                                <option value="ทั้งหมด">ระดับชั้น: ทั้งหมด</option>
+                                <option value="ปวช.1">ปวช.1</option>
+                                <option value="ปวช.2">ปวช.2</option>
+                                <option value="ปวช.3">ปวช.3</option>
+                                <option value="ปวส.1">ปวส.1</option>
+                                <option value="ปวส.2">ปวส.2</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select id="teacher-student-filter-dept" onchange="loadTeacherStudentsList()" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                                <option value="ทั้งหมด">แผนกวิชา: ทั้งหมด</option>
+                                <option value="เทคโนโลยีธุรกิจดิจิทัล">เทคโนโลยีธุรกิจดิจิทัล</option>
+                                <option value="การบัญชี">การบัญชี</option>
+                                <option value="การตลาด">การตลาด</option>
+                                <option value="ช่างไฟฟ้ากำลัง">ช่างไฟฟ้ากำลัง</option>
+                                <option value="ช่างยนต์">ช่างยนต์</option>
+                                <option value="ช่างเชื่อม">ช่างเชื่อม</option>
+                                <option value="ช่างอิเล็กทรอนิกส์">ช่างอิเล็กทรอนิกส์</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select id="teacher-student-filter-room" onchange="loadTeacherStudentsList()" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                                <option value="ทั้งหมด">ห้องเรียน: ทั้งหมด</option>
+                                <option value="ห้อง 1">ห้อง 1</option>
+                                <option value="ห้อง 2">ห้อง 2</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Students Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
+                                <tr>
+                                    <th class="py-3 px-4 text-center w-12">#</th>
+                                    <th class="py-3 px-4">รหัสนักเรียน</th>
+                                    <th class="py-3 px-4">ชื่อ - นามสกุล</th>
+                                    <th class="py-3 px-4">เลขบัตรประชาชน (รหัสผ่าน)</th>
+                                    <th class="py-3 px-4">ระดับชั้น / แผนก / ห้อง</th>
+                                    <th class="py-3 px-4 text-center">วันที่ลงทะเบียน</th>
+                                    <th class="py-3 px-4 text-right">การจัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="teacher-students-table-body" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 5: Add Single Question Form -->
+            <div id="teacher-content-add-question" class="hidden max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm">
+                <h3 class="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+                    <i class="fas fa-circle-question text-emerald-600"></i> เพิ่มโจทย์ใหม่พร้อมเฉลยลับ
+                </h3>
+                <p class="text-xs text-slate-500 mb-6">คำถามจะถูกบันทึกลงตาราง questions และเฉลยจะถูกแยกเก็บในตาราง exam_answers ที่มีความลับสูง</p>
+
+                <form id="form-teacher-add-question" class="space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">เลือกชุดข้อสอบ *</label>
+                            <button type="button" onclick="populateTeacherExamSelects(true)" class="text-[11px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1">
+                                <i class="fas fa-rotate"></i> โหลดรายการใหม่
+                            </button>
+                        </div>
+                        <select id="teacher-add-question-exam-select" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="">-- กำลังโหลดรายการชุดข้อสอบ... --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">โจทย์คำถาม *</label>
+                        <textarea id="teacher-add-question-text" rows="3" required placeholder="พิมพ์ข้อความคำถามที่นี่..." class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">ตัวเลือก A *</label>
+                            <input type="text" id="teacher-add-opt-a" required placeholder="กรอกข้อความตัวเลือก A" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">ตัวเลือก B *</label>
+                            <input type="text" id="teacher-add-opt-b" required placeholder="กรอกข้อความตัวเลือก B" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">ตัวเลือก C</label>
+                            <input type="text" id="teacher-add-opt-c" placeholder="กรอกข้อความตัวเลือก C" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">ตัวเลือก D</label>
+                            <input type="text" id="teacher-add-opt-d" placeholder="กรอกข้อความตัวเลือก D" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">🔒 เฉลยที่ถูกต้อง (ลับ) *</label>
+                            <select id="teacher-add-correct-option" required class="w-full px-3.5 py-2.5 bg-green-50 text-green-800 border border-green-300 rounded-xl text-sm font-bold focus:ring-2 focus:ring-green-500">
+                                <option value="A">ตัวเลือก A</option>
+                                <option value="B">ตัวเลือก B</option>
+                                <option value="C">ตัวเลือก C</option>
+                                <option value="D">ตัวเลือก D</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">คะแนนเต็มข้อนี้ *</label>
+                            <input type="number" id="teacher-add-points" step="0.5" min="0.5" value="1.0" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 font-mono">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">คำอธิบายเฉลย</label>
+                        <input type="text" id="teacher-add-explanation" placeholder="เหตุผลที่ตัวเลือกนี้ถูกต้อง..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500">
+                    </div>
+
+                    <button type="submit" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition shadow-md shadow-emerald-100 flex items-center justify-center gap-2">
+                        <i class="fas fa-save text-xs"></i> บันทึกโจทย์และเฉลยความลับ
+                    </button>
+                </form>
+            </div>
+
+            <!-- Tab 5: EXCEL IMPORT FOR QUESTIONS -->
+            <div id="teacher-content-excel-import" class="hidden max-w-3xl mx-auto space-y-6">
+                <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fas fa-file-excel text-emerald-600 text-xl"></i> นำเข้าข้อสอบจากไฟล์ Excel (.xlsx / .csv)
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-1">อัปโหลดโจทย์พร้อมตัวเลือกและเฉลยความลับเข้าสู่ระบบทีละหลายสิบข้อในคลิกเดียว</p>
+                        </div>
+                        <!-- DOWNLOAD TEMPLATE BUTTON -->
+                        <button onclick="downloadExcelQuestionTemplate()" class="px-4 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold rounded-xl transition flex items-center gap-2">
+                            <i class="fas fa-download text-emerald-600"></i> ดาวน์โหลดเทมเพลต Excel
+                        </button>
+                    </div>
+
+                    <!-- Select Target Exam -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider">เลือกชุดข้อสอบที่จะนำเข้า *</label>
+                            <button type="button" onclick="populateTeacherExamSelects(true)" class="text-[11px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1">
+                                <i class="fas fa-rotate"></i> โหลดรายการใหม่
+                            </button>
+                        </div>
+                        <select id="excel-target-exam-select" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500">
+                            <option value="">-- กำลังโหลดรายการชุดข้อสอบ... --</option>
+                        </select>
+                    </div>
+
+                    <!-- Drop Zone / File Picker -->
+                    <div id="excel-drop-zone" class="drop-zone p-8 rounded-2xl text-center bg-slate-50 hover:bg-slate-100/70 transition cursor-pointer mb-6" onclick="document.getElementById('excel-file-input').click()">
+                        <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelFileUpload(event)">
+                        <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3 text-2xl">
+                            <i class="fas fa-cloud-arrow-up"></i>
+                        </div>
+                        <h4 class="font-bold text-slate-800 text-sm mb-1">คลิกเพื่อเลือกไฟล์ Excel หรือลากไฟล์มาวางที่นี่</h4>
+                        <p class="text-xs text-slate-400">รองรับไฟล์ .xlsx, .xls, และ .csv</p>
+                    </div>
+
+                    <!-- Preview Container -->
+                    <div id="excel-preview-container" class="hidden space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                <i class="fas fa-list-check text-emerald-600"></i> ตัวอย่างข้อมูลที่จะนำเข้า (<span id="excel-preview-count">0</span> ข้อ)
+                            </h4>
+                            <button onclick="clearExcelPreview()" class="text-xs text-red-500 hover:text-red-700">ยกเลิก / เลือกไฟล์ใหม่</button>
+                        </div>
+
+                        <div class="max-h-60 overflow-y-auto border border-slate-200 rounded-xl">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-100 text-slate-600 font-semibold sticky top-0">
+                                    <tr>
+                                        <th class="p-2.5">#</th>
+                                        <th class="p-2.5">คำถาม</th>
+                                        <th class="p-2.5">ตัวเลือก (A/B/C/D)</th>
+                                        <th class="p-2.5 text-center">เฉลย</th>
+                                        <th class="p-2.5 text-center">คะแนน</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="excel-preview-tbody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+
+                        <button id="btn-confirm-excel-import" onclick="executeExcelImport()" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition shadow-md shadow-emerald-100 flex items-center justify-center gap-2">
+                            <i class="fas fa-check"></i> ยืนยันการนำเข้าข้อสอบเข้าสู่ฐานข้อมูล
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================================== -->
+        <!-- VIEW 6: ADMIN PORTAL (SUPABASE CONFIGURATION & SYSTEM CONTROL) -->
+        <!-- ========================================================================== -->
+        <section id="view-admin" class="hidden max-w-4xl mx-auto w-full space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-black text-slate-900 flex items-center gap-2">
+                        <i class="fas fa-gears text-purple-600"></i> แดชบอร์ดผู้ดูแลระบบสูงสุด (Admin Portal)
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">จัดการการเชื่อมต่อฐานข้อมูล Supabase และตรวจสอบสถานะระบบ</p>
+                </div>
+                <span class="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full border border-purple-200">
+                    System Master
+                </span>
+            </div>
+
+            <!-- SUPABASE CONFIGURATION CARD (ONLY IN ADMIN PORTAL!) -->
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">
+                <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+                    <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">การตั้งค่าการเชื่อมต่อ Supabase API</h3>
+                        <p class="text-xs text-slate-500">ตัวแปรและกุญแจ API นี้ถูกจำกัดให้เข้าถึงและแก้ไขได้เฉพาะผู้ดูแลระบบเท่านั้น</p>
+                    </div>
+                </div>
+
+                <form id="form-admin-supabase-config" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Supabase Project URL *</label>
+                        <input type="url" id="admin-config-url" required placeholder="https://your-project-id.supabase.co" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Supabase Anon / Publishable Key *</label>
+                        <input type="password" id="admin-config-key" required placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-purple-500">
+                    </div>
+
+                    <div class="flex gap-3 pt-2">
+                        <button type="submit" class="py-2.5 px-6 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition shadow-md shadow-purple-100 flex items-center gap-2">
+                            <i class="fas fa-save"></i> บันทึกการเชื่อมต่อ Supabase
+                        </button>
+                        <button type="button" onclick="testSupabaseConnection()" class="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition flex items-center gap-2">
+                            <i class="fas fa-plug"></i> ทดสอบการเชื่อมต่อ
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Quick Links for Admin -->
+            <div class="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-3xl p-6 text-white flex items-center justify-between">
+                <div>
+                    <h4 class="font-bold text-base mb-1">ต้องการเข้าดูหน้าห้องอาจารย์ผู้สอนหรือไม่?</h4>
+                    <p class="text-xs text-purple-200">ในฐานะแอดมิน คุณสามารถสลับไปจัดการข้อสอบหรือนำเข้า Excel ได้ทันที</p>
+                </div>
+                <button onclick="switchAdminToTeacher()" class="px-4 py-2 bg-white text-purple-900 hover:bg-purple-50 font-bold text-xs rounded-xl transition shadow-sm">
+                    ไปยัง Teacher Portal
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- ============================================================================== -->
+    <!-- 3. MODALS & POPUPS -->
+    <!-- ============================================================================== -->
+
+    <!-- 3.1 ANTI-CHEAT WARNING MODAL -->
+    <div id="modal-cheat-warning" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-8 text-center border-4 border-red-500 shadow-2xl warning-pulse">
+            <div class="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-2xl">
+                <i class="fas fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-xl font-extrabold text-red-700 mb-2">⚠️ คำเตือนการทุจริต!</h3>
+            <p id="cheat-warning-reason" class="text-sm font-semibold text-slate-800 mb-2">ตรวจพบการสลับหน้าจอ / แท็บเบราว์เซอร์</p>
+            <p id="cheat-warning-count" class="text-xs text-slate-500 mb-6">จำนวนครั้งที่สลับหน้าจอ: 1 ครั้ง</p>
+
+            <div class="bg-red-50 p-3.5 rounded-xl border border-red-200 text-xs text-red-800 mb-6 text-left">
+                <i class="fas fa-info-circle mr-1"></i> เหตุการณ์นี้ถูกบันทึกไว้ในประวัติการสอบของท่านเรียบร้อยแล้ว หากทำผิดซ้ำเกินกำหนด คะแนนสอบของท่านอาจถูกระงับ
+            </div>
+
+            <button onclick="closeCheatWarningModal()" class="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition shadow-md shadow-red-200">
+                รับทราบและกลับเข้าสู่การสอบ
+            </button>
+        </div>
+    </div>
+
+    <!-- 3.2 INSPECTION MODAL (ดูคำตอบเทียบเฉลย) -->
+    <div id="modal-inspect" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white max-w-3xl w-full max-h-[90vh] flex flex-col rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <h3 id="inspect-student-name" class="font-bold text-slate-900 text-base">รายงานการตรวจข้อสอบ</h3>
+                <button onclick="closeInspectModal()" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg">
+                    <i class="fas fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div id="inspect-content" class="p-6 overflow-y-auto flex-1 space-y-4"></div>
+            <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                <button onclick="closeInspectModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl">
+                    ปิดหน้าต่าง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3.3 CREATE NEW COURSE MODAL -->
+    <div id="modal-create-course" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fas fa-book-bookmark text-indigo-600"></i> สร้างรายวิชาใหม่
+                </h3>
+                <button onclick="document.getElementById('modal-create-course').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="form-create-course" class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">รหัสวิชา *</label>
+                    <input type="text" id="create-course-code" required placeholder="กรอกรหัสวิชา" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">ชื่อรายวิชา *</label>
+                    <input type="text" id="create-course-name" required placeholder="กรอกชื่อรายวิชา" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <!-- กำหนดระดับชั้นและแผนกประจำวิชา -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">ระดับชั้นประจำวิชา *</label>
+                        <select id="create-course-year" required class="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            <option value="ทั้งหมด">ทั้งหมด (ทุกชั้น)</option>
+                            <option value="ปวช.1">ปวช.1</option>
+                            <option value="ปวช.2" selected>ปวช.2</option>
+                            <option value="ปวช.3">ปวช.3</option>
+                            <option value="ปวส.1">ปวส.1</option>
+                            <option value="ปวส.2">ปวส.2</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">แผนกวิชาประจำวิชา *</label>
+                        <select id="create-course-dept" required class="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            <option value="ทั้งหมด">ทั้งหมด (ทุกแผนก)</option>
+                            <option value="เทคโนโลยีธุรกิจดิจิทัล" selected>เทคโนโลยีธุรกิจดิจิทัล</option>
+                            <option value="การบัญชี">การบัญชี</option>
+                            <option value="การตลาด">การตลาด</option>
+                            <option value="ช่างไฟฟ้ากำลัง">ช่างไฟฟ้ากำลัง</option>
+                            <option value="ช่างยนต์">ช่างยนต์</option>
+                            <option value="ช่างเชื่อม">ช่างเชื่อม</option>
+                            <option value="ช่างอิเล็กทรอนิกส์">ช่างอิเล็กทรอนิกส์</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">คำอธิบายรายวิชา</label>
+                    <textarea id="create-course-desc" rows="2" placeholder="รายละเอียดหลักสูตรหรือคำอธิบายรายวิชา..." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+
+                <div class="flex gap-2 pt-3">
+                    <button type="button" onclick="document.getElementById('modal-create-course').classList.add('hidden')" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium">ยกเลิก</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-100">บันทึกรายวิชา</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3.4 CREATE NEW EXAM MODAL (WITH COURSE & CLASSROOM TARGETING) -->
+    <div id="modal-create-exam" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white max-w-lg w-full rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fas fa-file-circle-plus text-emerald-600"></i> สร้างชุดข้อสอบ & กำหนดห้องเรียน
+                </h3>
+                <button onclick="document.getElementById('modal-create-exam').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="form-create-exam" class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">สังกัดรายวิชา *</label>
+                    <select id="create-exam-course-select" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"></select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">ชื่อชุดข้อสอบ *</label>
+                    <input type="text" id="create-exam-title" required placeholder="กรอกชื่อชุดข้อสอบ" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <!-- Targeting Classroom Controls -->
+                <div class="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-100 space-y-2.5">
+                    <div class="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                        <i class="fas fa-bullseye text-emerald-600"></i> กำหนดกลุ่มเป้าหมายนักเรียนที่มีสิทธิ์สอบ:
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">ระดับชั้น/ปี</label>
+                            <select id="create-exam-target-year" class="w-full px-2 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs">
+                                <option value="ทั้งหมด">ทั้งหมด</option>
+                                <option value="ปวช.1">ปวช.1</option>
+                                <option value="ปวช.2">ปวช.2</option>
+                                <option value="ปวช.3">ปวช.3</option>
+                                <option value="ปวส.1">ปวส.1</option>
+                                <option value="ปวส.2">ปวส.2</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">แผนกวิชา</label>
+                            <select id="create-exam-target-dept" class="w-full px-2 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs">
+                                <option value="ทั้งหมด">ทั้งหมด</option>
+                                <option value="เทคโนโลยีธุรกิจดิจิทัล">เทคโนโลยีธุรกิจดิจิทัล</option>
+                                <option value="การบัญชี">การบัญชี</option>
+                                <option value="การตลาด">การตลาด</option>
+                                <option value="ช่างไฟฟ้ากำลัง">ช่างไฟฟ้ากำลัง</option>
+                                <option value="ช่างยนต์">ช่างยนต์</option>
+                                <option value="ช่างเชื่อม">ช่างเชื่อม</option>
+                                <option value="ช่างอิเล็กทรอนิกส์">ช่างอิเล็กทรอนิกส์</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">ห้องเรียน</label>
+                            <select id="create-exam-target-room" class="w-full px-2 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs">
+                                <option value="ทั้งหมด">ทั้งหมด</option>
+                                <option value="ห้อง 1">ห้อง 1</option>
+                                <option value="ห้อง 2">ห้อง 2</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">คำอธิบาย</label>
+                    <textarea id="create-exam-desc" rows="2" placeholder="คำแนะนำสำหรับผู้เข้าสอบ..." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">เวลาสอบ (นาที) *</label>
+                        <input type="number" id="create-exam-duration" min="5" value="30" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">อนุญาตสลับจอ (ครั้ง)</label>
+                        <input type="number" id="create-exam-max-switches" min="0" value="3" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 font-mono">
+                    </div>
+                </div>
+
+                <div class="flex gap-2 pt-3">
+                    <button type="button" onclick="document.getElementById('modal-create-exam').classList.add('hidden')" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium">ยกเลิก</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-100">สร้างข้อสอบ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3.4.1 ADD / EDIT STUDENT MODAL -->
+    <div id="modal-student-form" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white max-w-lg w-full rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xl animate-fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="modal-student-form-title" class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fas fa-user-plus text-indigo-600"></i> เพิ่มข้อมูลนักเรียนใหม่
+                </h3>
+                <button type="button" onclick="closeStudentModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="form-manage-student" onsubmit="saveStudentFromForm(event)" class="space-y-3.5">
+                <input type="hidden" id="student-form-mode" value="create">
+                <input type="hidden" id="student-form-id" value="">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">รหัสนักเรียน *</label>
+                        <input type="text" id="student-form-code" required placeholder="กรอกรหัสนักเรียน" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">ชื่อ - นามสกุล *</label>
+                        <input type="text" id="student-form-name" required placeholder="กรอกชื่อ-นามสกุล" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                        🔒 เลขบัตรประชาชน 13 หลัก (ใช้เป็นรหัสผ่านเข้าสอบ) *
+                    </label>
+                    <div class="relative">
+                        <i class="fas fa-id-card-clip absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+                        <input type="text" id="student-form-citizen-id" maxlength="13" minlength="13" required placeholder="กรอกเลขประจำตัวประชาชน 13 หลัก" class="w-full pl-10 pr-4 py-2.5 bg-indigo-50/50 border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 font-mono tracking-wider text-indigo-900 font-semibold">
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">ใช้เลข 13 หลักนี้เป็นรหัสผ่านในการเข้าทำข้อสอบ</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">ระดับชั้น *</label>
+                        <select id="student-form-year" required class="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            <option value="ปวช.1">ปวช.1</option>
+                            <option value="ปวช.2" selected>ปวช.2</option>
+                            <option value="ปวช.3">ปวช.3</option>
+                            <option value="ปวส.1">ปวส.1</option>
+                            <option value="ปวส.2">ปวส.2</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">แผนกวิชา *</label>
+                        <select id="student-form-dept" required class="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            <option value="เทคโนโลยีธุรกิจดิจิทัล" selected>เทคโนโลยีธุรกิจดิจิทัล</option>
+                            <option value="การบัญชี">การบัญชี</option>
+                            <option value="การตลาด">การตลาด</option>
+                            <option value="ช่างไฟฟ้ากำลัง">ช่างไฟฟ้ากำลัง</option>
+                            <option value="ช่างยนต์">ช่างยนต์</option>
+                            <option value="ช่างเชื่อม">ช่างเชื่อม</option>
+                            <option value="ช่างอิเล็กทรอนิกส์">ช่างอิเล็กทรอนิกส์</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">ห้องเรียน *</label>
+                        <select id="student-form-room" required class="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            <option value="ห้อง 1" selected>ห้อง 1</option>
+                            <option value="ห้อง 2">ห้อง 2</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 pt-3">
+                    <button type="button" onclick="closeStudentModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition">ยกเลิก</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-100 transition">บันทึกข้อมูล</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3.4.2 STUDENT EXCEL BULK IMPORT MODAL -->
+    <div id="modal-student-excel-import" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white max-w-2xl w-full rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xl animate-fade-in space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fas fa-file-excel text-emerald-600"></i> นำเข้ารายชื่อนักเรียนจาก Excel
+                </h3>
+                <button type="button" onclick="document.getElementById('modal-student-excel-import').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="flex items-center justify-between p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 text-xs">
+                <span class="text-emerald-800">กรุณาใช้ฟอร์แมตตามเทมเพลตมาตรฐานของระบบ</span>
+                <button onclick="downloadStudentExcelTemplate()" class="text-emerald-700 font-bold hover:underline flex items-center gap-1">
+                    <i class="fas fa-download"></i> ดาวน์โหลดเทมเพลต Excel
+                </button>
+            </div>
+
+            <!-- Drop Zone for Student Excel -->
+            <div id="student-excel-dropzone" onclick="document.getElementById('student-excel-file-input').click()" class="drop-zone p-6 rounded-2xl text-center bg-slate-50 hover:bg-slate-100 transition cursor-pointer border-2 border-dashed border-slate-200">
+                <input type="file" id="student-excel-file-input" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleStudentExcelUpload(event)">
+                <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-2 text-xl">
+                    <i class="fas fa-cloud-arrow-up"></i>
+                </div>
+                <h4 class="font-bold text-slate-800 text-xs mb-0.5">คลิกเพื่อเลือกไฟล์รายชื่อนักเรียน หรือลากไฟล์มาวาง</h4>
+                <p class="text-[11px] text-slate-400">รองรับ .xlsx, .xls, .csv</p>
+            </div>
+
+            <!-- Preview Container -->
+            <div id="student-excel-preview-container" class="hidden space-y-3">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-slate-800">พบรายชื่อที่พร้อมนำเข้า: <span id="student-excel-preview-count" class="text-emerald-600">0</span> คน</span>
+                    <button type="button" onclick="clearStudentExcelPreview()" class="text-red-500 hover:text-red-700">ล้างข้อมูล / เลือกใหม่</button>
+                </div>
+
+                <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-600 font-semibold sticky top-0">
+                            <tr>
+                                <th class="p-2">#</th>
+                                <th class="p-2">รหัสนักเรียน</th>
+                                <th class="p-2">ชื่อ - นามสกุล</th>
+                                <th class="p-2">เลขบัตรประชาชน</th>
+                                <th class="p-2">ชั้น/แผนก/ห้อง</th>
+                            </tr>
+                        </thead>
+                        <tbody id="student-excel-preview-tbody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+
+                <button type="button" onclick="executeStudentExcelImport()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition shadow-md shadow-emerald-100 flex items-center justify-center gap-2">
+                    <i class="fas fa-check"></i> นำเข้ารายชื่อนักเรียนทั้งหมดเข้าสู่ระบบ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3.5 SUBMISSION & GRADING SPINNER MODAL -->
+    <div id="modal-loading" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white rounded-3xl p-8 text-center max-w-xs w-full shadow-2xl border border-slate-100">
+            <i class="fas fa-shield-halved fa-spin text-4xl text-indigo-600 mb-4"></i>
+            <h4 class="font-bold text-slate-800 text-base mb-1" id="loading-modal-title">กำลังประมวลผล...</h4>
+            <p class="text-xs text-slate-500" id="loading-modal-desc">กรุณารอสักครู่ ระบบกำลังทำงานอย่างปลอดภัย</p>
+        </div>
+    </div>
+
+    <!-- 3.6 CUSTOM IN-APP CONFIRMATION MODAL (No Browser Native Popups!) -->
+    <div id="modal-custom-confirm" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-8 text-center border border-slate-200 shadow-2xl animate-fade-in">
+            <div id="custom-confirm-icon-box" class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
+                <i id="custom-confirm-icon" class="fas fa-arrow-right-from-bracket"></i>
+            </div>
+            <h3 id="custom-confirm-title" class="text-xl font-bold text-slate-900 mb-2">ยืนยันการทำรายการ</h3>
+            <p id="custom-confirm-message" class="text-sm text-slate-600 mb-6 leading-relaxed whitespace-pre-line">คุณต้องการดำเนินการต่อใช่หรือไม่?</p>
+            <div class="flex gap-3">
+                <button id="custom-confirm-btn-cancel" type="button" class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition">
+                    ยกเลิก
+                </button>
+                <button id="custom-confirm-btn-ok" type="button" class="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition">
+                    ตกลง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3.7 CUSTOM IN-APP ALERT MODAL -->
+    <div id="modal-custom-alert" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-8 text-center border border-slate-200 shadow-2xl animate-fade-in">
+            <div id="custom-alert-icon-box" class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
+                <i id="custom-alert-icon" class="fas fa-circle-exclamation"></i>
+            </div>
+            <h3 id="custom-alert-title" class="text-xl font-bold text-slate-900 mb-2">แจ้งเตือน</h3>
+            <p id="custom-alert-message" class="text-sm text-slate-600 mb-6 leading-relaxed whitespace-pre-line">ข้อความแจ้งเตือน</p>
+            <button id="custom-alert-btn-ok" type="button" class="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md transition">
+                ตกลง
+            </button>
+        </div>
+    </div>
+
+    <!-- Application Main Script -->
+    <script src="./public/app.js"></script>
+</body>
+</html>
