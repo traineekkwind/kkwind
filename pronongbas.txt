@@ -1,0 +1,27 @@
+[ผู้ใช้งาน (User)] 
+      │  
+      │  1. สแกน Location QR + ส่งรูปภาพ/ข้อความอาการเสีย
+      ▼
+[LINE Official Account] 
+      │  
+      │  2. ส่ง Webhook Payload (JSON)
+      ▼
+[เซิร์ฟเวอร์หลังบ้าน (Node.js / Express Server)]
+      │
+      ├───────────────────────┬───────────────────────┐
+      │ 3. ส่งรูป+ข้อความ      │ 4. บันทึกข้อมูล        │ 5. ส่งข้อมูล Real-time
+      ▼                       ▼                       ▼
+[Gemini 2.5 Flash API]    [Database (MySQL)]    [Web Admin Dashboard]
+      │                                                (Socket.io)
+      │ (ส่งผลวิเคราะห์กลับ)
+      ▼
+[เซิร์ฟเวอร์หลังบ้าน (Node.js / Express Server)]
+      │
+      ├───────────────────────────────────────────────┐
+      │ 6. ส่งการ์ดแจ้งเตือน (Embed)                  │ 7. ส่งข้อความตอบกลับ (Reply)
+      ▼                                               ▼
+[Discord Webhook (กลุ่มช่าง IT)]               [LINE Chat ผู้ใช้งาน]
+                                                      │
+                                                      │ 8. ช่างซ่อมเสร็จ & กด [ปิดงาน]
+                                                      ▼
+                                           [Push Notification ไปยัง LINE ผู้ใช้]
