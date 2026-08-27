@@ -909,9 +909,9 @@ window.startExam = async function(examId) {
 
         showCustomConfirm({
             title: 'พร้อมเริ่มทำข้อสอบหรือไม่?',
-            message: `ชุดข้อสอบ: ${exam.title}\nรายวิชา: ${exam.course?.course_name || 'ทั่วไป'}\nเวลาทำข้อสอบ: ${exam.duration_minutes} นาที (${questions.length} ข้อ)\n\n⚠️ คำเตือน: ระบบจะเข้าสู่โหมดเต็มหน้าจอและตรวจจับการสลับแท็บตลอดการสอบ`,
-            icon: 'fas fa-play',
-            confirmText: 'เริ่มทำข้อสอบทันที',
+            message: `ชุดข้อสอบ: ${exam.title}\nรายวิชา: ${exam.course?.course_name || 'ทั่วไป'}\nเวลาทำข้อสอบ: ${exam.duration_minutes} นาที (${questions.length} ข้อ)\n\n⚠️ กฎความปลอดภัยห้องสอบ:\n1. กรุณาปิดหน้าต่างแชทลอย (Messenger / LINE Bubbles) และการแจ้งเตือนทั้งหมด\n2. ห้ามสลับหน้าจอ ห้ามย่อจอ หรือเปิดแอปอื่นเด็ดขาด\n3. การแตะเปิดแชทลอยระหว่างสอบจะถูกบันทึกเป็นการทุจริตทันที`,
+            icon: 'fas fa-shield-halved',
+            confirmText: 'รับทราบและเริ่มสอบทันที',
             cancelText: 'ยังไม่พร้อม',
             confirmClass: 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-100',
             onConfirm: async () => {
@@ -1257,6 +1257,10 @@ function startAntiCheatMonitor() {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+    }
+    
     // Exam Interaction Lockdown
     document.addEventListener('contextmenu', preventContextMenu);
     document.addEventListener('copy', preventCopy);
@@ -1276,14 +1280,14 @@ function startAntiCheatMonitor() {
         if (isHidden || !hasDocFocus) {
             if (!focusLostStartTime) {
                 focusLostStartTime = Date.now();
-            } else if (Date.now() - focusLostStartTime >= 350) {
-                // หลุดโฟกัสเกิน 350ms (กำลังแตะหรือแชทใน Messenger Bubble หรือแถบแจ้งเตือน)
+            } else if (Date.now() - focusLostStartTime >= 300) {
+                // หลุดโฟกัสเกิน 300ms (กำลังแตะหรือแชทใน Messenger Bubble หรือแถบแจ้งเตือน)
                 registerTabSwitch('ตรวจพบการเปิดหน้าต่างแชทลอย (Messenger Bubble) / แถบแจ้งเตือน / สลับโฟกัสออกจากข้อสอบ');
             }
         } else {
             focusLostStartTime = 0;
         }
-    }, 250);
+    }, 200);
 }
 
 function stopAntiCheatMonitor() {
@@ -1293,6 +1297,10 @@ function stopAntiCheatMonitor() {
     if (focusWatchdogInterval) {
         clearInterval(focusWatchdogInterval);
         focusWatchdogInterval = null;
+    }
+
+    if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
     }
 
     document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -1311,6 +1319,17 @@ function stopAntiCheatMonitor() {
     document.removeEventListener('paste', preventCopy);
     document.removeEventListener('keydown', preventExamShortcuts);
     document.removeEventListener('selectstart', preventSelectStart);
+}
+
+function handleVisualViewportResize() {
+    if (!state.antiCheat.isMonitoring) return;
+    if (window.visualViewport) {
+        const heightRatio = window.visualViewport.height / window.innerHeight;
+        const isInputFocused = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+        if (heightRatio < 0.70 && !isInputFocused) {
+            registerTabSwitch('ตรวจพบการเปิดแป้นพิมพ์ภายนอกหน้าต่างสอบ (แชทลอย Messenger/LINE)');
+        }
+    }
 }
 
 function handleWindowResize() {
