@@ -13,6 +13,16 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- 2. TABLES DEFINITIONS
 -- ==============================================================================
 
+-- 2.0 ตารางข้อมูลอาจารย์ผู้สอน (Teachers)
+CREATE TABLE IF NOT EXISTS public.teachers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    teacher_code VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    department VARCHAR(100) DEFAULT 'เทคโนโลยีธุรกิจดิจิทัล',
+    password VARCHAR(255) NOT NULL DEFAULT 'teacher1234',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
 -- 2.1 ตารางรายวิชาของครูผู้สอน (Courses)
 CREATE TABLE IF NOT EXISTS public.courses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -148,6 +158,7 @@ CREATE INDEX IF NOT EXISTS idx_anticheat_lookup ON public.anti_cheat_logs(studen
 -- ==============================================================================
 -- 4. ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
+ALTER TABLE public.teachers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;
@@ -155,6 +166,19 @@ ALTER TABLE public.exam_answers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.student_submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exam_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.anti_cheat_logs ENABLE ROW LEVEL SECURITY;
+
+-- 4.0 ตาราง teachers
+DROP POLICY IF EXISTS "Public teachers are viewable by everyone" ON public.teachers;
+CREATE POLICY "Public teachers are viewable by everyone" ON public.teachers FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow insert teachers" ON public.teachers;
+CREATE POLICY "Allow insert teachers" ON public.teachers FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow update teachers" ON public.teachers;
+CREATE POLICY "Allow update teachers" ON public.teachers FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Allow delete teachers" ON public.teachers;
+CREATE POLICY "Allow delete teachers" ON public.teachers FOR DELETE USING (true);
 
 -- 4.1 ตาราง courses
 DROP POLICY IF EXISTS "Public courses are viewable by everyone" ON public.courses;
