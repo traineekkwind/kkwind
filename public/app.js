@@ -1218,6 +1218,12 @@ window.nextQuestion = function() {
 // ==============================================================================
 // 5. ANTI-CHEATING MONITOR ENGINE & LOCKDOWN
 // ==============================================================================
+// 5. ANTI-CHEATING MONITOR ENGINE & LOCKDOWN (WITH MOBILE BUBBLE DETECTOR)
+// ==============================================================================
+
+let focusWatchdogInterval = null;
+let focusLostStartTime = 0;
+let lastCheatWarningTime = 0;
 
 function isSplitScreenDetected() {
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
@@ -1237,28 +1243,68 @@ function isSplitScreenDetected() {
 
 function startAntiCheatMonitor() {
     state.antiCheat.isMonitoring = true;
+    focusLostStartTime = 0;
 
+    // Standard Window & Document Lifecycle Events
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
     window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
     window.addEventListener('resize', handleWindowResize);
+    document.addEventListener('focusout', handleDocumentFocusOut);
+    document.addEventListener('focusin', handleDocumentFocusIn);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    
+    // Exam Interaction Lockdown
     document.addEventListener('contextmenu', preventContextMenu);
     document.addEventListener('copy', preventCopy);
     document.addEventListener('cut', preventCopy);
     document.addEventListener('paste', preventCopy);
     document.addEventListener('keydown', preventExamShortcuts);
     document.addEventListener('selectstart', preventSelectStart);
+
+    // 📱 Active Mobile & Overlay Watchdog (ตรวจจับ Messenger Bubble, Line Popup, Notification Shade)
+    if (focusWatchdogInterval) clearInterval(focusWatchdogInterval);
+    focusWatchdogInterval = setInterval(() => {
+        if (!state.antiCheat.isMonitoring) return;
+
+        const isHidden = document.hidden || document.visibilityState !== 'visible';
+        const hasDocFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+
+        if (isHidden || !hasDocFocus) {
+            if (!focusLostStartTime) {
+                focusLostStartTime = Date.now();
+            } else if (Date.now() - focusLostStartTime >= 350) {
+                // หลุดโฟกัสเกิน 350ms (กำลังแตะหรือแชทใน Messenger Bubble หรือแถบแจ้งเตือน)
+                registerTabSwitch('ตรวจพบการเปิดหน้าต่างแชทลอย (Messenger Bubble) / แถบแจ้งเตือน / สลับโฟกัสออกจากข้อสอบ');
+            }
+        } else {
+            focusLostStartTime = 0;
+        }
+    }, 250);
 }
 
 function stopAntiCheatMonitor() {
     state.antiCheat.isMonitoring = false;
+    focusLostStartTime = 0;
+
+    if (focusWatchdogInterval) {
+        clearInterval(focusWatchdogInterval);
+        focusWatchdogInterval = null;
+    }
 
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('blur', handleWindowBlur);
+    window.removeEventListener('focus', handleWindowFocus);
     window.removeEventListener('pagehide', handlePageHide);
+    window.removeEventListener('pageshow', handlePageShow);
     window.removeEventListener('resize', handleWindowResize);
+    document.removeEventListener('focusout', handleDocumentFocusOut);
+    document.removeEventListener('focusin', handleDocumentFocusIn);
     document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.removeEventListener('contextmenu', preventContextMenu);
     document.removeEventListener('copy', preventCopy);
     document.removeEventListener('cut', preventCopy);
@@ -1277,8 +1323,39 @@ function handleWindowResize() {
 
 function handlePageHide() {
     if (!state.antiCheat.isMonitoring) return;
-    state.antiCheat.tabSwitches++;
-    triggerCheatWarning('ตรวจพบการสลับแอปพลิเคชันหรือออกจากหน้าจอเบราว์เซอร์');
+    registerTabSwitch('ตรวจพบการสลับแอปพลิเคชันหรือออกจากหน้าจอเบราว์เซอร์');
+}
+
+function handlePageShow() {
+    if (!state.antiCheat.isMonitoring) return;
+    if (focusLostStartTime && Date.now() - focusLostStartTime >= 300) {
+        registerTabSwitch('ตรวจพบการกลับเข้าสู่ห้องสอบหลังสลับไปแอปอื่น');
+    }
+    focusLostStartTime = 0;
+}
+
+function handleDocumentFocusOut(e) {
+    if (!state.antiCheat.isMonitoring) return;
+    // หากโฟกัสหลุดออกจาก document โดยไม่ได้ย้ายไปยัง element ภายในเว็บ
+    if (!e.relatedTarget && typeof document.hasFocus === 'function' && !document.hasFocus()) {
+        registerTabSwitch('ตรวจพบการคลิกออกนอกหน้าต่างข้อสอบ หรือเปิดหน้าต่างแชทลอย');
+    }
+}
+
+function handleDocumentFocusIn() {
+    if (!state.antiCheat.isMonitoring) return;
+    if (focusLostStartTime && Date.now() - focusLostStartTime >= 350) {
+        registerTabSwitch('ตรวจพบการกลับเข้าสู่ห้องสอบหลังสลับโฟกัส');
+    }
+    focusLostStartTime = 0;
+}
+
+function handleWindowFocus() {
+    if (!state.antiCheat.isMonitoring) return;
+    if (focusLostStartTime && Date.now() - focusLostStartTime >= 350) {
+        registerTabSwitch('ตรวจพบการสลับกลับมาจากหน้าต่างอื่น / แชทลอย');
+    }
+    focusLostStartTime = 0;
 }
 
 function preventContextMenu(e) {
@@ -1327,8 +1404,6 @@ function preventSelectStart(e) {
     }
 }
 
-let lastCheatWarningTime = 0;
-
 function registerTabSwitch(reason) {
     if (!state.antiCheat.isMonitoring) return;
     const now = Date.now();
@@ -1349,13 +1424,13 @@ function handleVisibilityChange() {
 
 function handleWindowBlur() {
     if (!state.antiCheat.isMonitoring) return;
-    registerTabSwitch('ตรวจพบการคลิกออกจากหน้าต่างข้อสอบ');
+    registerTabSwitch('ตรวจพบการคลิกออกจากหน้าต่างข้อสอบ / เปิดแชทลอย');
 }
 
 function handleFullscreenChange() {
     if (!state.antiCheat.isMonitoring) return;
 
-    if (!document.fullscreenElement) {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
         state.antiCheat.fullscreenExits++;
         registerTabSwitch('ตรวจพบการออกจากโหมดเต็มหน้าจอ');
     }
