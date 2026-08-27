@@ -88,6 +88,20 @@ function initSupabase() {
 async function syncLocalDataToSupabase() {
     if (!isSupabaseConfigured() || !state.supabaseClient) return;
     try {
+        // 0. Sync teachers from local to Supabase
+        const localTeachers = getLocalTeachers();
+        if (localTeachers.length > 0) {
+            for (const t of localTeachers) {
+                await state.supabaseClient.from('teachers').upsert({
+                    id: t.id,
+                    teacher_code: t.teacher_code || t.code,
+                    name: t.name,
+                    department: t.department || t.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
+                    password: t.password || 'teacher1234'
+                }, { onConflict: 'id' });
+            }
+        }
+
         // 1. Sync courses from local to Supabase
         const localCourses = getLocalCourses();
         if (localCourses.length > 0) {
@@ -278,6 +292,34 @@ function deleteLocalStudent(studentId) {
     const list = getLocalStudents().filter(s => s.id !== studentId);
     localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(list));
     broadcastAppEvent('student_roster_updated', { studentId });
+}
+
+function getLocalTeachers() {
+    try {
+        const raw = localStorage.getItem('EXAM_LOCAL_TEACHERS');
+        if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return [];
+}
+
+function saveLocalTeacher(teacher) {
+    const list = getLocalTeachers();
+    const idx = list.findIndex(t => t.id === teacher.id || (t.teacher_code && t.teacher_code === teacher.teacher_code));
+    if (idx >= 0) {
+        list[idx] = { ...list[idx], ...teacher, updated_at: new Date().toISOString() };
+    } else {
+        teacher.id = teacher.id || generatePseudoUUID();
+        teacher.created_at = teacher.created_at || new Date().toISOString();
+        list.unshift(teacher);
+    }
+    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(list));
+    broadcastAppEvent('teacher_roster_updated', teacher);
+}
+
+function deleteLocalTeacher(teacherId) {
+    const list = getLocalTeachers().filter(t => t.id !== teacherId);
+    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(list));
+    broadcastAppEvent('teacher_roster_updated', { teacherId });
 }
 
 // ==============================================================================
@@ -668,34 +710,93 @@ function setupAuthEvents() {
         });
     }
 
-    // 3.2 ฟอร์มอาจารย์ (ระบุชื่ออาจารย์ได้)
+    // 3.2 ฟอร์มอาจารย์ (ระบุชื่ออาจารย์/รหัสอาจารย์ และ รหัสผ่านประจำตัว)
     if (formTeacher) {
         formTeacher.addEventListener('submit', (e) => {
             e.preventDefault();
-            const teacherName = document.getElementById('teacher-name-input').value.trim() || 'อาจารย์ผู้สอน';
+            const loginInput = document.getElementById('teacher-name-input').value.trim();
             const password = document.getElementById('teacher-password-input').value;
 
-            if (password === 'teacher1234' || password === 'teacher' || password === 'admin1234') {
-                const teacherId = generateTeacherUUID(teacherName);
+            if (!loginInput) {
+                showToast('กรุณากรอกชื่อ-นามสกุล หรือ รหัสอาจารย์', 'warning');
+                return;
+            }
 
-                state.currentUser = {
-                    role: 'teacher',
-                    id: teacherId,
-                    name: teacherName
-                };
-                try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
+            const registeredTeachers = getLocalTeachers();
 
-                const portalNameEl = document.getElementById('teacher-portal-name');
-                if (portalNameEl) portalNameEl.textContent = teacherName;
+            if (registeredTeachers && registeredTeachers.length > 0) {
+                // ตรวจสอบกับรายชื่ออาจารย์ที่แอดมินลงทะเบียนไว้
+                const matchedTeacher = registeredTeachers.find(t => 
+                    (t.name.trim().toLowerCase() === loginInput.toLowerCase() || 
+                     (t.teacher_code && t.teacher_code.trim().toLowerCase() === loginInput.toLowerCase())) &&
+                    t.password === password
+                );
 
-                showToast(`ยินดีต้อนรับ ${teacherName}`, 'success');
-                loadTeacherDashboard();
-            } else {
+                if (matchedTeacher) {
+                    state.currentUser = {
+                        role: 'teacher',
+                        id: matchedTeacher.id,
+                        name: matchedTeacher.name,
+                        code: matchedTeacher.teacher_code,
+                        dept: matchedTeacher.department || 'เทคโนโลยีธุรกิจดิจิทัล'
+                    };
+                    try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
+
+                    const portalNameEl = document.getElementById('teacher-portal-name');
+                    if (portalNameEl) portalNameEl.textContent = `${matchedTeacher.name} (${matchedTeacher.department || 'อาจารย์ผู้สอน'})`;
+
+                    showToast(`ยินดีต้อนรับ ${matchedTeacher.name}`, 'success');
+                    loadTeacherDashboard();
+                    return;
+                }
+
+                // เช็คว่าชื่ออาจารย์มีในระบบแต่รหัสผ่านผิดหรือไม่
+                const teacherExists = registeredTeachers.find(t => 
+                    t.name.trim().toLowerCase() === loginInput.toLowerCase() || 
+                    (t.teacher_code && t.teacher_code.trim().toLowerCase() === loginInput.toLowerCase())
+                );
+
+                if (teacherExists) {
+                    showCustomAlert({
+                        title: 'รหัสผ่านไม่ถูกต้อง',
+                        message: `พบข้อมูลอาจารย์ "${teacherExists.name}" ในระบบ\nแต่รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง`,
+                        icon: 'fas fa-lock'
+                    });
+                    return;
+                }
+
                 showCustomAlert({
-                    title: 'รหัสผ่านไม่ถูกต้อง',
-                    message: 'รหัสผ่านสำหรับอาจารย์ไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง',
-                    icon: 'fas fa-lock'
+                    title: 'ไม่พบบัญชีอาจารย์ในระบบ',
+                    message: `ไม่พบชื่อหรือรหัสอาจารย์ "${loginInput}" ในระบบ\nกรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อเพิ่มรายชื่ออาจารย์เข้าสู่ระบบ`,
+                    icon: 'fas fa-user-xmark'
                 });
+                return;
+            } else {
+                // กรณีระบบยังไม่มีการลงทะเบียนอาจารย์เลย ให้ใช้ค่าเริ่มต้น
+                if (password === 'teacher1234' || password === 'teacher' || password === 'admin1234') {
+                    const teacherId = generateTeacherUUID(loginInput);
+
+                    state.currentUser = {
+                        role: 'teacher',
+                        id: teacherId,
+                        name: loginInput,
+                        code: 'T001',
+                        dept: 'เทคโนโลยีธุรกิจดิจิทัล'
+                    };
+                    try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
+
+                    const portalNameEl = document.getElementById('teacher-portal-name');
+                    if (portalNameEl) portalNameEl.textContent = loginInput;
+
+                    showToast(`ยินดีต้อนรับ ${loginInput}`, 'success');
+                    loadTeacherDashboard();
+                } else {
+                    showCustomAlert({
+                        title: 'รหัสผ่านไม่ถูกต้อง',
+                        message: 'รหัสผ่านสำหรับอาจารย์ไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง',
+                        icon: 'fas fa-lock'
+                    });
+                }
             }
         });
     }
@@ -909,9 +1010,9 @@ window.startExam = async function(examId) {
 
         showCustomConfirm({
             title: 'พร้อมเริ่มทำข้อสอบหรือไม่?',
-            message: `ชุดข้อสอบ: ${exam.title}\nรายวิชา: ${exam.course?.course_name || 'ทั่วไป'}\nเวลาทำข้อสอบ: ${exam.duration_minutes} นาที (${questions.length} ข้อ)\n\n⚠️ คำเตือน: ระบบจะเข้าสู่โหมดเต็มหน้าจอและตรวจจับการสลับแท็บตลอดการสอบ`,
-            icon: 'fas fa-play',
-            confirmText: 'เริ่มทำข้อสอบทันที',
+            message: `ชุดข้อสอบ: ${exam.title}\nรายวิชา: ${exam.course?.course_name || 'ทั่วไป'}\nเวลาทำข้อสอบ: ${exam.duration_minutes} นาที (${questions.length} ข้อ)\n\n⚠️ กฎความปลอดภัยห้องสอบ:\n1. กรุณาปิดหน้าต่างแชทลอย (Messenger / LINE Bubbles) และการแจ้งเตือนทั้งหมด\n2. ห้ามสลับหน้าจอ ห้ามย่อจอ หรือเปิดแอปอื่นเด็ดขาด\n3. การแตะเปิดแชทลอยระหว่างสอบจะถูกบันทึกเป็นการทุจริตทันที`,
+            icon: 'fas fa-shield-halved',
+            confirmText: 'รับทราบและเริ่มสอบทันที',
             cancelText: 'ยังไม่พร้อม',
             confirmClass: 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-100',
             onConfirm: async () => {
@@ -1218,6 +1319,12 @@ window.nextQuestion = function() {
 // ==============================================================================
 // 5. ANTI-CHEATING MONITOR ENGINE & LOCKDOWN
 // ==============================================================================
+// 5. ANTI-CHEATING MONITOR ENGINE & LOCKDOWN (WITH MOBILE BUBBLE DETECTOR)
+// ==============================================================================
+
+let focusWatchdogInterval = null;
+let focusLostStartTime = 0;
+let lastCheatWarningTime = 0;
 
 function isSplitScreenDetected() {
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
@@ -1237,34 +1344,93 @@ function isSplitScreenDetected() {
 
 function startAntiCheatMonitor() {
     state.antiCheat.isMonitoring = true;
+    focusLostStartTime = 0;
 
+    // Standard Window & Document Lifecycle Events
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
     window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
     window.addEventListener('resize', handleWindowResize);
+    document.addEventListener('focusout', handleDocumentFocusOut);
+    document.addEventListener('focusin', handleDocumentFocusIn);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+    }
+    
+    // Exam Interaction Lockdown
     document.addEventListener('contextmenu', preventContextMenu);
     document.addEventListener('copy', preventCopy);
     document.addEventListener('cut', preventCopy);
     document.addEventListener('paste', preventCopy);
     document.addEventListener('keydown', preventExamShortcuts);
     document.addEventListener('selectstart', preventSelectStart);
+
+    // 📱 Active Mobile & Overlay Watchdog (ตรวจจับ Messenger Bubble, Line Popup, Notification Shade)
+    if (focusWatchdogInterval) clearInterval(focusWatchdogInterval);
+    focusWatchdogInterval = setInterval(() => {
+        if (!state.antiCheat.isMonitoring) return;
+
+        const isHidden = document.hidden || document.visibilityState !== 'visible';
+        const hasDocFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+
+        if (isHidden || !hasDocFocus) {
+            if (!focusLostStartTime) {
+                focusLostStartTime = Date.now();
+            } else if (Date.now() - focusLostStartTime >= 300) {
+                // หลุดโฟกัสเกิน 300ms (กำลังแตะหรือแชทใน Messenger Bubble หรือแถบแจ้งเตือน)
+                registerTabSwitch('ตรวจพบการเปิดหน้าต่างแชทลอย (Messenger Bubble) / แถบแจ้งเตือน / สลับโฟกัสออกจากข้อสอบ');
+            }
+        } else {
+            focusLostStartTime = 0;
+        }
+    }, 200);
 }
 
 function stopAntiCheatMonitor() {
     state.antiCheat.isMonitoring = false;
+    focusLostStartTime = 0;
+
+    if (focusWatchdogInterval) {
+        clearInterval(focusWatchdogInterval);
+        focusWatchdogInterval = null;
+    }
+
+    if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
+    }
 
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('blur', handleWindowBlur);
+    window.removeEventListener('focus', handleWindowFocus);
     window.removeEventListener('pagehide', handlePageHide);
+    window.removeEventListener('pageshow', handlePageShow);
     window.removeEventListener('resize', handleWindowResize);
+    document.removeEventListener('focusout', handleDocumentFocusOut);
+    document.removeEventListener('focusin', handleDocumentFocusIn);
     document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.removeEventListener('contextmenu', preventContextMenu);
     document.removeEventListener('copy', preventCopy);
     document.removeEventListener('cut', preventCopy);
     document.removeEventListener('paste', preventCopy);
     document.removeEventListener('keydown', preventExamShortcuts);
     document.removeEventListener('selectstart', preventSelectStart);
+}
+
+function handleVisualViewportResize() {
+    if (!state.antiCheat.isMonitoring) return;
+    if (window.visualViewport) {
+        const heightRatio = window.visualViewport.height / window.innerHeight;
+        const isInputFocused = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+        if (heightRatio < 0.70 && !isInputFocused) {
+            registerTabSwitch('ตรวจพบการเปิดแป้นพิมพ์ภายนอกหน้าต่างสอบ (แชทลอย Messenger/LINE)');
+        }
+    }
 }
 
 function handleWindowResize() {
@@ -1277,8 +1443,39 @@ function handleWindowResize() {
 
 function handlePageHide() {
     if (!state.antiCheat.isMonitoring) return;
-    state.antiCheat.tabSwitches++;
-    triggerCheatWarning('ตรวจพบการสลับแอปพลิเคชันหรือออกจากหน้าจอเบราว์เซอร์');
+    registerTabSwitch('ตรวจพบการสลับแอปพลิเคชันหรือออกจากหน้าจอเบราว์เซอร์');
+}
+
+function handlePageShow() {
+    if (!state.antiCheat.isMonitoring) return;
+    if (focusLostStartTime && Date.now() - focusLostStartTime >= 300) {
+        registerTabSwitch('ตรวจพบการกลับเข้าสู่ห้องสอบหลังสลับไปแอปอื่น');
+    }
+    focusLostStartTime = 0;
+}
+
+function handleDocumentFocusOut(e) {
+    if (!state.antiCheat.isMonitoring) return;
+    // หากโฟกัสหลุดออกจาก document โดยไม่ได้ย้ายไปยัง element ภายในเว็บ
+    if (!e.relatedTarget && typeof document.hasFocus === 'function' && !document.hasFocus()) {
+        registerTabSwitch('ตรวจพบการคลิกออกนอกหน้าต่างข้อสอบ หรือเปิดหน้าต่างแชทลอย');
+    }
+}
+
+function handleDocumentFocusIn() {
+    if (!state.antiCheat.isMonitoring) return;
+    if (focusLostStartTime && Date.now() - focusLostStartTime >= 350) {
+        registerTabSwitch('ตรวจพบการกลับเข้าสู่ห้องสอบหลังสลับโฟกัส');
+    }
+    focusLostStartTime = 0;
+}
+
+function handleWindowFocus() {
+    if (!state.antiCheat.isMonitoring) return;
+    if (focusLostStartTime && Date.now() - focusLostStartTime >= 350) {
+        registerTabSwitch('ตรวจพบการสลับกลับมาจากหน้าต่างอื่น / แชทลอย');
+    }
+    focusLostStartTime = 0;
 }
 
 function preventContextMenu(e) {
@@ -1327,8 +1524,6 @@ function preventSelectStart(e) {
     }
 }
 
-let lastCheatWarningTime = 0;
-
 function registerTabSwitch(reason) {
     if (!state.antiCheat.isMonitoring) return;
     const now = Date.now();
@@ -1349,13 +1544,13 @@ function handleVisibilityChange() {
 
 function handleWindowBlur() {
     if (!state.antiCheat.isMonitoring) return;
-    registerTabSwitch('ตรวจพบการคลิกออกจากหน้าต่างข้อสอบ');
+    registerTabSwitch('ตรวจพบการคลิกออกจากหน้าต่างข้อสอบ / เปิดแชทลอย');
 }
 
 function handleFullscreenChange() {
     if (!state.antiCheat.isMonitoring) return;
 
-    if (!document.fullscreenElement) {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
         state.antiCheat.fullscreenExits++;
         registerTabSwitch('ตรวจพบการออกจากโหมดเต็มหน้าจอ');
     }
@@ -2025,6 +2220,16 @@ async function loadTeacherCourses() {
         }
     }
 
+    // 🔒 Teacher Isolation: แสดงเฉพาะรายวิชาของอาจารย์ท่านนี้เท่านั้น (เว้นแต่ Admin)
+    if (state.currentUser?.role === 'teacher') {
+        const currentTeacherId = state.currentUser.id;
+        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
+        courses = courses.filter(c => 
+            (c.teacher_id && c.teacher_id === currentTeacherId) || 
+            (c.teacher_name && c.teacher_name.trim().toLowerCase() === currentTeacherName)
+        );
+    }
+
     state.courses = courses;
     if (badgeCount) badgeCount.textContent = `${courses.length} รายวิชา`;
 
@@ -2033,7 +2238,7 @@ async function loadTeacherCourses() {
             <div class="col-span-full bg-white p-8 rounded-3xl border border-slate-100 text-center">
                 <i class="fas fa-book-open text-4xl text-slate-300 mb-3"></i>
                 <h4 class="font-bold text-slate-700">คุณยังไม่มีรายวิชาในระบบ</h4>
-                <p class="text-xs text-slate-400 mt-1 mb-4">กดปุ่มสร้างรายวิชาใหม่เพื่อเริ่มต้นเปิดสอนและสร้างชุดข้อสอบ</p>
+                <p class="text-xs text-slate-400 mt-1 mb-4">กดปุ่มสร้างรายวิชาใหม่เพื่อเริ่มต้นเปิดสอนและสร้างชุดข้อสอบของคุณ</p>
                 <button onclick="document.getElementById('modal-create-course').classList.remove('hidden')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-sm">
                     <i class="fas fa-plus mr-1"></i> สร้างรายวิชาแรกของคุณ
                 </button>
@@ -2126,8 +2331,18 @@ async function loadTeacherSubmissions() {
         }
     }
 
+    // 🔒 Teacher Isolation: แสดงเฉพาะผลคะแนนในวิชาและชุดข้อสอบของอาจารย์ท่านนี้เท่านั้น (เว้นแต่ Admin)
+    if (state.currentUser?.role === 'teacher') {
+        const myExamIds = (state.localExams || getLocalExams()).map(e => e.id);
+        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
+        subs = (subs || []).filter(sub => 
+            myExamIds.includes(sub.exam_id) || 
+            (sub.exam?.teacher_name && sub.exam.teacher_name.trim().toLowerCase() === currentTeacherName)
+        );
+    }
+
     if (!subs || subs.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-400">ยังไม่มีข้อมูลการส่งข้อสอบของนักเรียน</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-400">ยังไม่มีข้อมูลการส่งข้อสอบในรายวิชาของคุณ</td></tr>`;
         if (statTotal) statTotal.textContent = '0';
         if (statFlagged) statFlagged.textContent = '0';
         if (statAvg) statAvg.textContent = '0%';
@@ -2967,7 +3182,7 @@ window.closeInspectModal = function() {
     if (modal) modal.classList.add('hidden');
 };
 
-// 7.8 จัดการชุดข้อสอบในห้องอาจารย์
+// 7.8 จัดการชุดข้อสอบในห้องอาจารย์ (พร้อมสวิตช์เปิด/ปิดสอบทันที & แยกสิทธิ์ครูแต่ละท่าน)
 async function loadTeacherExamsList() {
     const container = document.getElementById('teacher-exams-list-container');
     if (!container) return;
@@ -2990,13 +3205,23 @@ async function loadTeacherExamsList() {
         }
     }
 
+    // 🔒 Teacher Isolation: แสดงเฉพาะชุดข้อสอบของอาจารย์ท่านนี้เท่านั้น (เว้นแต่ Admin)
+    if (state.currentUser?.role === 'teacher') {
+        const myCourseIds = (state.courses || []).map(c => c.id);
+        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
+        exams = exams.filter(e => 
+            (e.teacher_name && e.teacher_name.trim().toLowerCase() === currentTeacherName) ||
+            (e.course_id && myCourseIds.includes(e.course_id))
+        );
+    }
+
     state.localExams = exams;
 
     if (exams.length === 0) {
         container.innerHTML = `
             <div class="bg-white p-8 rounded-3xl border border-slate-100 text-center">
                 <i class="fas fa-folder-open text-4xl text-slate-300 mb-3"></i>
-                <h4 class="font-bold text-slate-700">ยังไม่มีชุดข้อสอบ</h4>
+                <h4 class="font-bold text-slate-700">ยังไม่มีชุดข้อสอบของคุณ</h4>
                 <p class="text-xs text-slate-400 mt-1 mb-4">กดปุ่มสร้างชุดข้อสอบใหม่ด้านบนเพื่อเริ่มต้น</p>
                 <button onclick="openCreateExamModal()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-sm">
                     <i class="fas fa-plus mr-1"></i> สร้างชุดข้อสอบใหม่
@@ -3012,6 +3237,7 @@ async function loadTeacherExamsList() {
         const courseCode = matchedCourse?.course_code || 'ทั่วไป';
         const courseName = matchedCourse?.course_name || 'วิชาทั่วไป';
         const targetTag = `${exam.target_year || 'ทุกชั้น'} | ${exam.target_department || 'ทุกแผนก'} | ${exam.target_room || 'ทุกห้อง'}`;
+        const isActive = exam.is_active !== false;
 
         return `
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap items-center justify-between gap-4">
@@ -3020,8 +3246,8 @@ async function loadTeacherExamsList() {
                         <span class="px-2.5 py-0.5 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700">
                             [${escapeHtml(courseCode)}] ${escapeHtml(courseName)}
                         </span>
-                        <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${exam.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
-                            ${exam.is_active ? 'เปิดสอบ' : 'ปิดสอบ'}
+                        <span class="px-2.5 py-0.5 text-xs font-bold rounded-full ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
+                            ${isActive ? '🟢 เปิดสอบอยู่' : '⚪ ปิดสอบอยู่'}
                         </span>
                         <h4 class="font-bold text-gray-800 text-base">${escapeHtml(exam.title)}</h4>
                     </div>
@@ -3034,15 +3260,21 @@ async function loadTeacherExamsList() {
                     
                     <div class="flex items-center gap-4 text-xs text-gray-400 mt-2">
                         <span><i class="far fa-clock"></i> ${exam.duration_minutes} นาที</span>
-                        <span><i class="far fa-question-circle"></i> กำหนดไว้</span>
+                        <span><i class="far fa-user-tie text-emerald-600"></i> ${escapeHtml(exam.teacher_name || 'อาจารย์ผู้สอน')}</span>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2">
-                    <button onclick="openAddQuestionForExam('${exam.id}')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- ปุ่มสลับ เปิด/ปิดสอบ ทันที -->
+                    <button onclick="toggleExamActive('${exam.id}')" class="px-3.5 py-2 ${isActive ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="คลิกเพื่อสลับเปิดหรือปิดสอบ">
+                        <i class="fas ${isActive ? 'fa-toggle-on text-emerald-600 text-sm' : 'fa-toggle-off text-slate-400 text-sm'}"></i>
+                        <span>${isActive ? 'กดเพื่อปิดสอบ' : 'กดเพื่อเปิดสอบ'}</span>
+                    </button>
+
+                    <button onclick="openAddQuestionForExam('${exam.id}')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
                         <i class="fas fa-plus"></i> เพิ่มโจทย์
                     </button>
-                    <button onclick="openExcelImportForExam('${exam.id}')" class="px-3 py-2 btn-excel rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                    <button onclick="openExcelImportForExam('${exam.id}')" class="px-3 py-2 btn-excel rounded-xl text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
                         <i class="fas fa-file-excel"></i> นำเข้า Excel
                     </button>
                     <button onclick="deleteExam('${exam.id}', '${escapeHtml(exam.title)}')" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-medium transition flex items-center gap-1.5" title="ลบชุดข้อสอบ">
@@ -3055,6 +3287,31 @@ async function loadTeacherExamsList() {
 
     populateTeacherExamSelects();
 }
+
+window.toggleExamActive = async function(examId) {
+    const exams = getLocalExams();
+    const exam = exams.find(e => e.id === examId);
+    if (!exam) return;
+
+    const newStatus = !(exam.is_active !== false);
+    exam.is_active = newStatus;
+    saveLocalExam(exam);
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            await state.supabaseClient
+                .from('exams')
+                .update({ is_active: newStatus })
+                .eq('id', examId);
+        } catch (e) {
+            console.warn('[toggleExamActive] Supabase update error:', e);
+        }
+    }
+
+    broadcastAppEvent('exam_updated', exam);
+    showToast(`ชุดข้อสอบ "${exam.title}" เปลี่ยนสถานะเป็น ${newStatus ? '🟢 เปิดสอบแล้ว' : '⚪ ปิดสอบแล้ว'}`, 'success');
+    await loadTeacherExamsList();
+};
 
 window.deleteExam = function(examId, examTitle) {
     showCustomConfirm({
@@ -3149,6 +3406,16 @@ window.populateTeacherExamSelects = async function(showToastFeedback = false) {
         exams = state.localExams;
     }
 
+    // 🔒 Teacher Isolation: แสดงเฉพาะชุดข้อสอบของตนเอง
+    if (state.currentUser?.role === 'teacher') {
+        const myCourseIds = (state.courses || []).map(c => c.id);
+        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
+        exams = exams.filter(e => 
+            (e.teacher_name && e.teacher_name.trim().toLowerCase() === currentTeacherName) ||
+            (e.course_id && myCourseIds.includes(e.course_id))
+        );
+    }
+
     selects.forEach(select => {
         if (!select) return;
         const currentVal = select.value;
@@ -3211,7 +3478,7 @@ window.openExcelImportForExam = async function(examId) {
 };
 
 // ==============================================================================
-// 8. ADMIN PORTAL (SUPABASE CONFIGURATION ONLY)
+// 8. ADMIN PORTAL (SUPABASE CONFIGURATION & TEACHER MANAGEMENT)
 // ==============================================================================
 
 function loadAdminDashboard() {
@@ -3225,7 +3492,233 @@ function loadAdminDashboard() {
     if (keyInput) keyInput.value = creds.key;
 
     setupAdminConfigForm();
+    loadAdminTeachersList();
 }
+
+// 8.1 จัดการรายชื่ออาจารย์ผู้สอนในหน้าแอดมิน (Admin Teacher Management)
+async function loadAdminTeachersList() {
+    const tableBody = document.getElementById('admin-teachers-table-body');
+    const badgeCount = document.getElementById('admin-teachers-count-badge');
+    if (!tableBody) return;
+
+    let teachers = getLocalTeachers();
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            const { data, error } = await state.supabaseClient
+                .from('teachers')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (!error && Array.isArray(data) && data.length > 0) {
+                teachers = data;
+                localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(teachers));
+            }
+        } catch (err) {
+            console.warn('[loadAdminTeachersList] Remote fetch skipped, using local cache:', err);
+        }
+    }
+
+    if (badgeCount) badgeCount.textContent = `${teachers.length} อาจารย์`;
+
+    if (teachers.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center py-8 text-slate-400">
+                    <i class="fas fa-user-xmark text-2xl text-slate-300 mb-2 block"></i>
+                    ยังไม่มีรายชื่ออาจารย์ในระบบ คลิกปุ่ม "+ เพิ่มอาจารย์ใหม่" ด้านบนเพื่อเริ่มต้น
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tableBody.innerHTML = teachers.map((t, idx) => `
+        <tr class="border-b border-slate-100 hover:bg-slate-50/70 transition">
+            <td class="py-3 px-3 text-slate-400 font-mono">${idx + 1}</td>
+            <td class="py-3 px-3 font-bold text-slate-800 flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                    ${escapeHtml((t.name || 'อ').charAt(0))}
+                </div>
+                <span>${escapeHtml(t.name)}</span>
+            </td>
+            <td class="py-3 px-3 text-slate-600 font-mono">
+                <span class="px-2 py-0.5 bg-slate-100 rounded text-[11px] font-semibold text-slate-700">
+                    ${escapeHtml(t.teacher_code || t.code || '-')}
+                </span>
+            </td>
+            <td class="py-3 px-3 text-slate-600">
+                ${escapeHtml(t.department || t.dept || 'เทคโนโลยีธุรกิจดิจิทัล')}
+            </td>
+            <td class="py-3 px-3 font-mono text-slate-600">
+                <div class="flex items-center gap-1.5">
+                    <span id="teacher-pass-display-${t.id}">••••••••</span>
+                    <button type="button" onclick="toggleTeacherPasswordRow('${t.id}', '${escapeHtml(t.password || 'teacher1234')}')" class="text-slate-400 hover:text-indigo-600 text-xs p-1" title="แสดง/ซ่อนรหัสผ่าน">
+                        <i id="teacher-pass-icon-${t.id}" class="fas fa-eye text-[11px]"></i>
+                    </button>
+                </div>
+            </td>
+            <td class="py-3 px-3 text-right">
+                <div class="flex items-center justify-end gap-1.5">
+                    <button onclick="openTeacherModal('${t.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="แก้ไขข้อมูล">
+                        <i class="fas fa-pen-to-square"></i>
+                    </button>
+                    <button onclick="deleteTeacher('${t.id}', '${escapeHtml(t.name)}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="ลบอาจารย์">
+                        <i class="fas fa-trash-can"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+window.toggleTeacherPasswordRow = function(teacherId, realPassword) {
+    const textEl = document.getElementById(`teacher-pass-display-${teacherId}`);
+    const iconEl = document.getElementById(`teacher-pass-icon-${teacherId}`);
+    if (!textEl) return;
+
+    if (textEl.textContent === '••••••••') {
+        textEl.textContent = realPassword;
+        if (iconEl) iconEl.className = 'fas fa-eye-slash text-[11px] text-indigo-600';
+    } else {
+        textEl.textContent = '••••••••';
+        if (iconEl) iconEl.className = 'fas fa-eye text-[11px] text-slate-400';
+    }
+};
+
+window.openTeacherModal = function(teacherId) {
+    const modal = document.getElementById('modal-teacher-form');
+    if (!modal) return;
+
+    const title = document.getElementById('teacher-modal-title');
+    const modeInput = document.getElementById('teacher-form-mode');
+    const idInput = document.getElementById('teacher-form-id');
+    const nameInput = document.getElementById('teacher-form-name');
+    const codeInput = document.getElementById('teacher-form-code');
+    const deptSelect = document.getElementById('teacher-form-dept');
+    const passInput = document.getElementById('teacher-form-password');
+
+    if (teacherId) {
+        const teachers = getLocalTeachers();
+        const teacher = teachers.find(t => t.id === teacherId);
+        if (teacher) {
+            if (title) title.innerHTML = '<i class="fas fa-user-pen text-indigo-600"></i> แก้ไขข้อมูลอาจารย์';
+            if (modeInput) modeInput.value = 'edit';
+            if (idInput) idInput.value = teacher.id;
+            if (nameInput) nameInput.value = teacher.name || '';
+            if (codeInput) codeInput.value = teacher.teacher_code || teacher.code || '';
+            if (deptSelect) deptSelect.value = teacher.department || teacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล';
+            if (passInput) passInput.value = teacher.password || '';
+        }
+    } else {
+        if (title) title.innerHTML = '<i class="fas fa-user-plus text-indigo-600"></i> เพิ่มข้อมูลอาจารย์ผู้สอน';
+        if (modeInput) modeInput.value = 'create';
+        if (idInput) idInput.value = '';
+        if (nameInput) nameInput.value = '';
+        if (codeInput) codeInput.value = '';
+        if (deptSelect) deptSelect.value = 'เทคโนโลยีธุรกิจดิจิทัล';
+        if (passInput) passInput.value = 'teacher1234';
+    }
+
+    modal.classList.remove('hidden');
+};
+
+window.closeTeacherModal = function() {
+    const modal = document.getElementById('modal-teacher-form');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.toggleTeacherFormPassword = function() {
+    const passInput = document.getElementById('teacher-form-password');
+    const icon = document.getElementById('teacher-form-pass-icon');
+    if (!passInput) return;
+
+    if (passInput.type === 'password') {
+        passInput.type = 'text';
+        if (icon) icon.className = 'fas fa-eye-slash text-indigo-600';
+    } else {
+        passInput.type = 'password';
+        if (icon) icon.className = 'fas fa-eye';
+    }
+};
+
+window.saveTeacherFromForm = async function(event) {
+    event.preventDefault();
+    const mode = document.getElementById('teacher-form-mode')?.value || 'create';
+    const id = document.getElementById('teacher-form-id')?.value || generatePseudoUUID();
+    const name = document.getElementById('teacher-form-name')?.value.trim();
+    const code = document.getElementById('teacher-form-code')?.value.trim();
+    const dept = document.getElementById('teacher-form-dept')?.value || 'เทคโนโลยีธุรกิจดิจิทัล';
+    const password = document.getElementById('teacher-form-password')?.value.trim();
+
+    if (!name || !code || !password) {
+        showToast('กรุณากรอกข้อมูลอาจารย์ให้ครบถ้วน', 'warning');
+        return;
+    }
+
+    const allTeachers = getLocalTeachers();
+    if (mode === 'create') {
+        const existCode = allTeachers.find(t => (t.teacher_code || t.code) === code);
+        if (existCode) {
+            showCustomAlert({
+                title: 'รหัสอาจารย์ซ้ำ',
+                message: `มีรหัสอาจารย์ / Username "${code}" (${existCode.name}) อยู่ในระบบแล้ว`,
+                icon: 'fas fa-triangle-exclamation'
+            });
+            return;
+        }
+    }
+
+    const teacherObj = {
+        id: id,
+        teacher_code: code,
+        name: name,
+        department: dept,
+        password: password,
+        updated_at: new Date().toISOString()
+    };
+
+    saveLocalTeacher(teacherObj);
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            await state.supabaseClient.from('teachers').upsert({
+                id: teacherObj.id,
+                teacher_code: teacherObj.teacher_code,
+                name: teacherObj.name,
+                department: teacherObj.department,
+                password: teacherObj.password
+            }, { onConflict: 'id' });
+        } catch (dbErr) {
+            console.warn('[saveTeacher] Supabase sync notice:', dbErr);
+        }
+    }
+
+    showToast(`บันทึกข้อมูล "${name}" เรียบร้อยแล้ว`, 'success');
+    closeTeacherModal();
+    loadAdminTeachersList();
+};
+
+window.deleteTeacher = function(teacherId, teacherName) {
+    showCustomConfirm({
+        title: 'ยืนยันการลบอาจารย์',
+        message: `คุณต้องการลบรายชื่ออาจารย์ "${teacherName}" ใช่หรือไม่?\n(อาจารย์ท่านนี้จะไม่สามารถเข้าสู่ระบบได้อีก)`,
+        icon: 'fas fa-user-xmark',
+        confirmText: 'ลบข้อมูลอาจารย์',
+        cancelText: 'ยกเลิก',
+        confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
+        onConfirm: async () => {
+            deleteLocalTeacher(teacherId);
+            if (isSupabaseConfigured() && state.supabaseClient) {
+                try {
+                    await state.supabaseClient.from('teachers').delete().eq('id', teacherId);
+                } catch (e) {}
+            }
+            showToast(`ลบข้อมูลอาจารย์ "${teacherName}" เรียบร้อยแล้ว`, 'info');
+            loadAdminTeachersList();
+        }
+    });
+};
 
 function setupAdminConfigForm() {
     const form = document.getElementById('form-admin-supabase-config');
