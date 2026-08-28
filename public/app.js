@@ -2302,17 +2302,7 @@ window.deleteCourse = async function(courseId, courseName) {
     });
 };
 
-// 7.2 โหลดตารางผลสอบอาจารย์ (พร้อมข้อมูลระดับชั้น/แผนก/ห้อง)
-async function loadTeacherSubmissions() {
-    const tableBody = document.getElementById('teacher-submissions-table-body');
-    const statTotal = document.getElementById('teacher-stat-total-submissions');
-    const statFlagged = document.getElementById('teacher-stat-flagged-cheats');
-    const statAvg = document.getElementById('teacher-stat-avg-score');
-
-    if (!tableBody) return;
-
-    let subs = getLocalSubmissions();
-
+// 7.2 ฟังก์ชันเติมรายการชุดข้อสอบในตัวกรองผลสอบ
 function populateTeacherSubmissionExamFilter() {
     const select = document.getElementById('teacher-sub-filter-exam');
     if (!select) return;
@@ -2337,7 +2327,7 @@ function populateTeacherSubmissionExamFilter() {
     }
 }
 
-// 7.2 โหลดตารางผลสอบอาจารย์ (พร้อมตัวกรองแยกชุดข้อสอบ/ระดับชั้น/แผนก/ห้องเรียน)
+// 7.2.1 โหลดตารางผลสอบอาจารย์ (พร้อมตัวกรองแยกชุดข้อสอบ/ระดับชั้น/แผนก/ห้องเรียน)
 async function loadTeacherSubmissions() {
     const tableBody = document.getElementById('teacher-submissions-table-body');
     const statTotal = document.getElementById('teacher-stat-total-submissions');
