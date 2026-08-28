@@ -18,7 +18,7 @@
     <!-- SheetJS (XLSX) CDN สำหรับ Import & Export Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="./public/styles.css?v=2.5.3">
+    <link rel="stylesheet" href="./public/styles.css?v=2.5.4">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-['Prompt',sans-serif]">
 
@@ -409,11 +409,11 @@
 
                     <!-- Filter Controls (แยกชุดข้อสอบ, ระดับชั้น, แผนก, และห้องเรียน) -->
                     <div class="p-4 bg-slate-50/70 border-b border-slate-100">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5">
-                            <!-- 1. ค้นหาชื่อนักเรียน -->
-                            <div class="relative">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-2.5 items-center">
+                            <!-- 1. ค้นหาชื่อนักเรียน หรือ รหัส -->
+                            <div class="relative md:col-span-2">
                                 <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-                                <input type="text" id="teacher-sub-filter-search" oninput="loadTeacherSubmissions()" placeholder="ค้นหาชื่อ, รหัส..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                                <input type="text" id="teacher-sub-filter-search" oninput="loadTeacherSubmissions()" placeholder="ค้นหาชื่อ, รหัสนักเรียน, เลขบัตร..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
                             </div>
 
                             <!-- 2. เลือกชุดข้อสอบ -->
@@ -451,16 +451,19 @@
                                 </select>
                             </div>
 
-                            <!-- 5. เลือกห้องเรียน -->
-                            <div>
-                                <select id="teacher-sub-filter-room" onchange="loadTeacherSubmissions()" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
-                                    <option value="ทั้งหมด">ห้องเรียน: ทั้งหมด</option>
+                            <!-- 5. เลือกห้องเรียน & ปุ่มรีเซ็ต -->
+                            <div class="flex items-center gap-1.5">
+                                <select id="teacher-sub-filter-room" onchange="loadTeacherSubmissions()" class="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                                    <option value="ทั้งหมด">ห้อง: ทั้งหมด</option>
                                     <option value="ห้อง 1">ห้อง 1</option>
                                     <option value="ห้อง 2">ห้อง 2</option>
                                     <option value="ห้อง 3">ห้อง 3</option>
                                     <option value="ห้อง 4">ห้อง 4</option>
                                     <option value="ห้อง 5">ห้อง 5</option>
                                 </select>
+                                <button type="button" onclick="resetTeacherSubmissionFilters()" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition whitespace-nowrap" title="ล้างตัวกรองทั้งหมด">
+                                    <i class="fas fa-rotate-left"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1292,6 +1295,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.5.3"></script>
+    <script src="./public/app.js?v=2.5.4"></script>
 </body>
 </html>
