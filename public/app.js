@@ -3265,6 +3265,12 @@ async function loadTeacherExamsList() {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
+                    <!-- ปุ่มดูข้อสอบ (ตรวจดูโจทย์และเฉลย) -->
+                    <button onclick="viewTeacherExam('${exam.id}')" class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm border border-indigo-200" title="คลิกเพื่อตรวจดูโจทย์และเฉลยของชุดข้อสอบนี้">
+                        <i class="fas fa-eye text-indigo-600"></i>
+                        <span>ดูข้อสอบ</span>
+                    </button>
+
                     <!-- ปุ่มสลับ เปิด/ปิดสอบ ทันที -->
                     <button onclick="toggleExamActive('${exam.id}')" class="px-3.5 py-2 ${isActive ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="คลิกเพื่อสลับเปิดหรือปิดสอบ">
                         <i class="fas ${isActive ? 'fa-toggle-on text-emerald-600 text-sm' : 'fa-toggle-off text-slate-400 text-sm'}"></i>
@@ -3311,6 +3317,209 @@ window.toggleExamActive = async function(examId) {
     broadcastAppEvent('exam_updated', exam);
     showToast(`ชุดข้อสอบ "${exam.title}" เปลี่ยนสถานะเป็น ${newStatus ? '🟢 เปิดสอบแล้ว' : '⚪ ปิดสอบแล้ว'}`, 'success');
     await loadTeacherExamsList();
+};
+
+window.viewTeacherExam = async function(examId) {
+    const exam = (state.localExams || getLocalExams()).find(e => e.id === examId) || 
+                 getLocalExams().find(e => e.id === examId);
+    if (!exam) {
+        showToast('ไม่พบข้อมูลชุดข้อสอบ', 'error');
+        return;
+    }
+
+    let questions = getLocalQuestions(examId);
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            const { data: dbQ, error } = await state.supabaseClient
+                .from('questions')
+                .select('*')
+                .eq('exam_id', examId)
+                .order('order_seq', { ascending: true });
+
+            if (!error && Array.isArray(dbQ) && dbQ.length > 0) {
+                const localMap = new Map(questions.map(q => [q.id, q]));
+                questions = dbQ.map(q => {
+                    const localQ = localMap.get(q.id);
+                    return {
+                        ...q,
+                        correct: localQ?.correct || localQ?.correct_option_id || q.correct_option_id || 'A'
+                    };
+                });
+            }
+        } catch (err) {
+            console.warn('[viewTeacherExam] Supabase fetch notice:', err);
+        }
+    }
+
+    renderTeacherExamViewModal(exam, questions);
+};
+
+window.closeTeacherExamViewModal = function() {
+    const modal = document.getElementById('modal-teacher-exam-view');
+    if (modal) modal.classList.add('hidden');
+};
+
+function renderTeacherExamViewModal(exam, questions) {
+    const modal = document.getElementById('modal-teacher-exam-view');
+    if (!modal) return;
+
+    const matchedCourse = state.courses?.find(c => c.id === exam.course_id);
+    const courseCode = matchedCourse?.course_code || 'ทั่วไป';
+    const courseName = matchedCourse?.course_name || 'วิชาทั่วไป';
+    const isActive = exam.is_active !== false;
+
+    // Header Badges & Info
+    const courseBadge = document.getElementById('teacher-exam-view-course-badge');
+    const statusBadge = document.getElementById('teacher-exam-view-status-badge');
+    const titleEl = document.getElementById('teacher-exam-view-title');
+    const metaEl = document.getElementById('teacher-exam-view-meta');
+    const contentEl = document.getElementById('teacher-exam-view-content');
+
+    const totalPoints = (questions || []).reduce((sum, q) => sum + (Number(q.points) || 1), 0);
+
+    if (courseBadge) courseBadge.textContent = `[${courseCode}] ${courseName}`;
+    if (statusBadge) {
+        statusBadge.textContent = isActive ? '🟢 เปิดสอบอยู่' : '⚪ ปิดสอบอยู่';
+        statusBadge.className = `px-2.5 py-0.5 text-xs font-bold rounded-full ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`;
+    }
+    if (titleEl) titleEl.textContent = exam.title;
+    if (metaEl) {
+        metaEl.innerHTML = `
+            <span><i class="far fa-clock text-indigo-500"></i> เวลาสอบ: <strong>${exam.duration_minutes} นาที</strong></span>
+            <span><i class="fas fa-list-check text-emerald-500"></i> จำนวนข้อสอบ: <strong>${questions.length} ข้อ</strong> (${totalPoints} คะแนน)</span>
+            <span><i class="fas fa-bullseye text-amber-500"></i> เป้าหมาย: <strong>${exam.target_year || 'ทุกชั้น'} ${exam.target_department || 'ทุกแผนก'} ${exam.target_room || 'ทุกห้อง'}</strong></span>
+            <span><i class="fas fa-shield-halved text-purple-500"></i> อนุญาตสลับจอ: <strong>${exam.max_tab_switches_allowed || 3} ครั้ง</strong></span>
+        `;
+    }
+
+    // Bind footer action buttons
+    const btnAddQ = document.getElementById('teacher-exam-view-btn-add-q');
+    const btnImport = document.getElementById('teacher-exam-view-btn-import-excel');
+    if (btnAddQ) {
+        btnAddQ.onclick = () => {
+            closeTeacherExamViewModal();
+            openAddQuestionForExam(exam.id);
+        };
+    }
+    if (btnImport) {
+        btnImport.onclick = () => {
+            closeTeacherExamViewModal();
+            openExcelImportForExam(exam.id);
+        };
+    }
+
+    // Render questions list
+    if (!questions || questions.length === 0) {
+        contentEl.innerHTML = `
+            <div class="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-3">
+                <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto text-2xl">
+                    <i class="fas fa-clipboard-question"></i>
+                </div>
+                <h4 class="font-bold text-slate-800 text-base">ยังไม่มีคำถามในชุดข้อสอบนี้</h4>
+                <p class="text-xs text-slate-500 max-w-sm mx-auto">คุณสามารถเพิ่มคำถามแบบรายข้อ หรือนำเข้าข้อสอบหลายข้อพร้อมกันจากไฟล์ Excel (.xlsx) ได้ทันที</p>
+                <div class="flex items-center justify-center gap-2 pt-2">
+                    <button onclick="closeTeacherExamViewModal(); openAddQuestionForExam('${exam.id}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
+                        <i class="fas fa-plus"></i> เพิ่มโจทย์ข้อแรก
+                    </button>
+                    <button onclick="closeTeacherExamViewModal(); openExcelImportForExam('${exam.id}')" class="px-4 py-2 btn-excel text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
+                        <i class="fas fa-file-excel"></i> นำเข้า Excel
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        contentEl.innerHTML = questions.map((q, idx) => {
+            let options = q.options;
+            if (typeof options === 'string') {
+                try { options = JSON.parse(options); } catch (e) { options = []; }
+            }
+
+            const correctAns = q.correct || q.correct_option_id || 'A';
+            const points = q.points || 1.0;
+            const choiceLetters = ['A', 'B', 'C', 'D'];
+
+            return `
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black">
+                                ${idx + 1}
+                            </span>
+                            <span class="text-xs font-bold text-slate-700">ข้อที่ ${idx + 1}</span>
+                            <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                                ${points} คะแนน
+                            </span>
+                        </div>
+                        <button onclick="deleteTeacherQuestion('${q.id}', '${exam.id}', ${idx + 1})" class="text-slate-400 hover:text-red-600 p-1 rounded-lg text-xs transition flex items-center gap-1" title="ลบข้อนี้">
+                            <i class="fas fa-trash-can"></i> <span class="hidden sm:inline">ลบข้อนี้</span>
+                        </button>
+                    </div>
+
+                    <p class="text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-line">
+                        ${escapeHtml(q.question_text)}
+                    </p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        ${(options || []).map((opt, optIdx) => {
+                            const optId = opt.id || choiceLetters[optIdx] || 'A';
+                            const isCorrect = String(optId).trim().toUpperCase() === String(correctAns).trim().toUpperCase();
+
+                            return `
+                                <div class="p-3 rounded-xl border text-xs transition flex items-center justify-between ${
+                                    isCorrect 
+                                        ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 font-bold shadow-xs' 
+                                        : 'bg-slate-50/60 border-slate-200 text-slate-700'
+                                }">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-5 h-5 rounded-md flex items-center justify-center font-bold text-[11px] ${
+                                            isCorrect ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                                        }">
+                                            ${escapeHtml(optId)}
+                                        </span>
+                                        <span>${escapeHtml(opt.text || '')}</span>
+                                    </div>
+                                    ${isCorrect ? `
+                                        <span class="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-bold flex items-center gap-1">
+                                            <i class="fas fa-check text-[9px]"></i> เฉลย
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    modal.classList.remove('hidden');
+}
+
+window.deleteTeacherQuestion = async function(questionId, examId, qIndex) {
+    showCustomConfirm({
+        title: 'ยืนยันการลบคำถาม',
+        message: `คุณต้องการลบคำถามข้อที่ ${qIndex} ใช่หรือไม่?\n(ข้อมูลจะไม่สามารถกู้คืนได้)`,
+        icon: 'fas fa-trash-can',
+        confirmText: 'ลบคำถาม',
+        cancelText: 'ยกเลิก',
+        confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
+        onConfirm: async () => {
+            const allQ = getLocalQuestions().filter(q => q.id !== questionId);
+            localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify(allQ));
+
+            if (isSupabaseConfigured() && state.supabaseClient) {
+                try {
+                    await state.supabaseClient.from('questions').delete().eq('id', questionId);
+                    await state.supabaseClient.from('exam_answers').delete().eq('question_id', questionId);
+                } catch (e) {}
+            }
+
+            showToast(`ลบคำถามข้อที่ ${qIndex} เรียบร้อยแล้ว`, 'info');
+            await viewTeacherExam(examId);
+            await loadTeacherExamsList();
+        }
+    });
 };
 
 window.deleteExam = function(examId, examTitle) {
