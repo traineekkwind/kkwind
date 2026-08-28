@@ -2375,25 +2375,83 @@ async function loadTeacherSubmissions() {
     const deptFilter = document.getElementById('teacher-sub-filter-dept')?.value || 'ทั้งหมด';
     const roomFilter = document.getElementById('teacher-sub-filter-room')?.value || 'ทั้งหมด';
 
+    // Roster lookup map for resolving student code / citizen id
+    const localStudents = getLocalStudents();
+    const studentRosterMap = new Map();
+    localStudents.forEach(st => {
+        if (st.id) studentRosterMap.set(st.id, st);
+        if (st.code) studentRosterMap.set(String(st.code).toLowerCase(), st);
+        if (st.citizen_id) studentRosterMap.set(String(st.citizen_id), st);
+        if (st.name) studentRosterMap.set(st.name.trim().toLowerCase(), st);
+    });
+
     let filtered = subs || [];
 
     if (searchVal) {
-        filtered = filtered.filter(s => 
-            (s.student_name && s.student_name.toLowerCase().includes(searchVal)) ||
-            (s.student_id && String(s.student_id).toLowerCase().includes(searchVal))
-        );
+        filtered = filtered.filter(s => {
+            const name = (s.student_name || '').toLowerCase();
+            const id = String(s.student_id || '').toLowerCase();
+            const code = String(s.student_code || s.code || '').toLowerCase();
+            const citizen = String(s.student_citizen_id || s.citizen_id || '').toLowerCase();
+
+            // Check linked student from roster
+            const linked = studentRosterMap.get(s.student_id) || 
+                           studentRosterMap.get(name) || 
+                           studentRosterMap.get(code) || 
+                           studentRosterMap.get(citizen);
+
+            const linkedCode = String(linked?.code || '').toLowerCase();
+            const linkedCitizen = String(linked?.citizen_id || '').toLowerCase();
+            const linkedName = String(linked?.name || '').toLowerCase();
+
+            return name.includes(searchVal) || 
+                   id.includes(searchVal) || 
+                   code.includes(searchVal) || 
+                   citizen.includes(searchVal) ||
+                   linkedCode.includes(searchVal) ||
+                   linkedCitizen.includes(searchVal) ||
+                   linkedName.includes(searchVal);
+        });
     }
+
     if (examFilter !== 'ทั้งหมด') {
         filtered = filtered.filter(s => s.exam_id === examFilter);
     }
+
     if (yearFilter !== 'ทั้งหมด') {
-        filtered = filtered.filter(s => (s.student_year || s.exam?.target_year || '').includes(yearFilter));
+        const cleanTargetYear = yearFilter.replace(/\s+/g, '').toLowerCase();
+        filtered = filtered.filter(s => {
+            const sYear = (s.student_year || s.year || '').replace(/\s+/g, '').toLowerCase();
+            const eYear = (s.exam?.target_year || '').replace(/\s+/g, '').toLowerCase();
+            const linked = studentRosterMap.get(s.student_id) || studentRosterMap.get((s.student_name || '').trim().toLowerCase());
+            const lYear = (linked?.year || '').replace(/\s+/g, '').toLowerCase();
+
+            return sYear.includes(cleanTargetYear) || eYear.includes(cleanTargetYear) || lYear.includes(cleanTargetYear);
+        });
     }
+
     if (deptFilter !== 'ทั้งหมด') {
-        filtered = filtered.filter(s => (s.student_department || s.exam?.target_department || '').includes(deptFilter));
+        const targetDept = deptFilter.trim().toLowerCase();
+        filtered = filtered.filter(s => {
+            const sDept = (s.student_department || s.dept || '').trim().toLowerCase();
+            const eDept = (s.exam?.target_department || '').trim().toLowerCase();
+            const linked = studentRosterMap.get(s.student_id) || studentRosterMap.get((s.student_name || '').trim().toLowerCase());
+            const lDept = (linked?.dept || '').trim().toLowerCase();
+
+            return sDept.includes(targetDept) || eDept.includes(targetDept) || lDept.includes(targetDept);
+        });
     }
+
     if (roomFilter !== 'ทั้งหมด') {
-        filtered = filtered.filter(s => (s.student_room || s.exam?.target_room || '').includes(roomFilter));
+        const cleanTargetRoom = roomFilter.replace(/\s+/g, '').toLowerCase();
+        filtered = filtered.filter(s => {
+            const sRoom = (s.student_room || s.room || '').replace(/\s+/g, '').toLowerCase();
+            const eRoom = (s.exam?.target_room || '').replace(/\s+/g, '').toLowerCase();
+            const linked = studentRosterMap.get(s.student_id) || studentRosterMap.get((s.student_name || '').trim().toLowerCase());
+            const lRoom = (linked?.room || '').replace(/\s+/g, '').toLowerCase();
+
+            return sRoom.includes(cleanTargetRoom) || eRoom.includes(cleanTargetRoom) || lRoom.includes(cleanTargetRoom);
+        });
     }
 
     if (!filtered || filtered.length === 0) {
@@ -2401,10 +2459,13 @@ async function loadTeacherSubmissions() {
             <tr>
                 <td colspan="8" class="text-center py-10 text-slate-400">
                     <i class="fas fa-filter-circle-xmark text-3xl text-slate-300 mb-2 block"></i>
-                    ไม่พบข้อมูลผลการสอบตามเงื่อนไขตัวกรองที่เลือก
+                    ไม่พบข้อมูลผลการสอบตามเงื่อนไขตัวกรองที่ค้นหา
                     <div class="text-xs text-slate-400 mt-1">
-                        (ระดับชั้น: ${escapeHtml(yearFilter)} | แผนก: ${escapeHtml(deptFilter)} | ห้อง: ${escapeHtml(roomFilter)})
+                        (ค้นหา: ${escapeHtml(searchVal || '-')} | ระดับชั้น: ${escapeHtml(yearFilter)} | ห้อง: ${escapeHtml(roomFilter)})
                     </div>
+                    <button type="button" onclick="resetTeacherSubmissionFilters()" class="mt-3 px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition inline-flex items-center gap-1.5">
+                        <i class="fas fa-rotate-left"></i> ล้างตัวกรองทั้งหมด
+                    </button>
                 </td>
             </tr>
         `;
@@ -2480,6 +2541,23 @@ async function loadTeacherSubmissions() {
     }).join('');
 }
 
+window.resetTeacherSubmissionFilters = function() {
+    const searchInput = document.getElementById('teacher-sub-filter-search');
+    const examSelect = document.getElementById('teacher-sub-filter-exam');
+    const yearSelect = document.getElementById('teacher-sub-filter-year');
+    const deptSelect = document.getElementById('teacher-sub-filter-dept');
+    const roomSelect = document.getElementById('teacher-sub-filter-room');
+
+    if (searchInput) searchInput.value = '';
+    if (examSelect) examSelect.value = 'ทั้งหมด';
+    if (yearSelect) yearSelect.value = 'ทั้งหมด';
+    if (deptSelect) deptSelect.value = 'ทั้งหมด';
+    if (roomSelect) roomSelect.value = 'ทั้งหมด';
+
+    showToast('ล้างตัวกรองผลสอบทั้งหมดแล้ว', 'info');
+    loadTeacherSubmissions();
+};
+
 // 7.3 ส่งออกคะแนนนักเรียนเป็นไฟล์ Excel (.xlsx) ตามตัวกรองระดับชั้น/แผนก/ห้องเรียน
 window.exportTeacherScoresToExcel = async function() {
     if (!window.XLSX) {
@@ -2523,24 +2601,77 @@ window.exportTeacherScoresToExcel = async function() {
     const deptFilter = document.getElementById('teacher-sub-filter-dept')?.value || 'ทั้งหมด';
     const roomFilter = document.getElementById('teacher-sub-filter-room')?.value || 'ทั้งหมด';
 
+    const localStudents = getLocalStudents();
+    const studentRosterMap = new Map();
+    localStudents.forEach(st => {
+        if (st.id) studentRosterMap.set(st.id, st);
+        if (st.code) studentRosterMap.set(String(st.code).toLowerCase(), st);
+        if (st.citizen_id) studentRosterMap.set(String(st.citizen_id), st);
+        if (st.name) studentRosterMap.set(st.name.trim().toLowerCase(), st);
+    });
+
     let filtered = subs || [];
     if (searchVal) {
-        filtered = filtered.filter(s => 
-            (s.student_name && s.student_name.toLowerCase().includes(searchVal)) ||
-            (s.student_id && String(s.student_id).toLowerCase().includes(searchVal))
-        );
+        filtered = filtered.filter(s => {
+            const name = (s.student_name || '').toLowerCase();
+            const id = String(s.student_id || '').toLowerCase();
+            const code = String(s.student_code || s.code || '').toLowerCase();
+            const citizen = String(s.student_citizen_id || s.citizen_id || '').toLowerCase();
+
+            const linked = studentRosterMap.get(s.student_id) || 
+                           studentRosterMap.get(name) || 
+                           studentRosterMap.get(code) || 
+                           studentRosterMap.get(citizen);
+
+            const linkedCode = String(linked?.code || '').toLowerCase();
+            const linkedCitizen = String(linked?.citizen_id || '').toLowerCase();
+            const linkedName = String(linked?.name || '').toLowerCase();
+
+            return name.includes(searchVal) || 
+                   id.includes(searchVal) || 
+                   code.includes(searchVal) || 
+                   citizen.includes(searchVal) ||
+                   linkedCode.includes(searchVal) ||
+                   linkedCitizen.includes(searchVal) ||
+                   linkedName.includes(searchVal);
+        });
     }
+
     if (examFilter !== 'ทั้งหมด') {
         filtered = filtered.filter(s => s.exam_id === examFilter);
     }
     if (yearFilter !== 'ทั้งหมด') {
-        filtered = filtered.filter(s => (s.student_year || s.exam?.target_year || '').includes(yearFilter));
+        const cleanTargetYear = yearFilter.replace(/\s+/g, '').toLowerCase();
+        filtered = filtered.filter(s => {
+            const sYear = (s.student_year || s.year || '').replace(/\s+/g, '').toLowerCase();
+            const eYear = (s.exam?.target_year || '').replace(/\s+/g, '').toLowerCase();
+            const linked = studentRosterMap.get(s.student_id) || studentRosterMap.get((s.student_name || '').trim().toLowerCase());
+            const lYear = (linked?.year || '').replace(/\s+/g, '').toLowerCase();
+
+            return sYear.includes(cleanTargetYear) || eYear.includes(cleanTargetYear) || lYear.includes(cleanTargetYear);
+        });
     }
     if (deptFilter !== 'ทั้งหมด') {
-        filtered = filtered.filter(s => (s.student_department || s.exam?.target_department || '').includes(deptFilter));
+        const targetDept = deptFilter.trim().toLowerCase();
+        filtered = filtered.filter(s => {
+            const sDept = (s.student_department || s.dept || '').trim().toLowerCase();
+            const eDept = (s.exam?.target_department || '').trim().toLowerCase();
+            const linked = studentRosterMap.get(s.student_id) || studentRosterMap.get((s.student_name || '').trim().toLowerCase());
+            const lDept = (linked?.dept || '').trim().toLowerCase();
+
+            return sDept.includes(targetDept) || eDept.includes(targetDept) || lDept.includes(targetDept);
+        });
     }
     if (roomFilter !== 'ทั้งหมด') {
-        filtered = filtered.filter(s => (s.student_room || s.exam?.target_room || '').includes(roomFilter));
+        const cleanTargetRoom = roomFilter.replace(/\s+/g, '').toLowerCase();
+        filtered = filtered.filter(s => {
+            const sRoom = (s.student_room || s.room || '').replace(/\s+/g, '').toLowerCase();
+            const eRoom = (s.exam?.target_room || '').replace(/\s+/g, '').toLowerCase();
+            const linked = studentRosterMap.get(s.student_id) || studentRosterMap.get((s.student_name || '').trim().toLowerCase());
+            const lRoom = (linked?.room || '').replace(/\s+/g, '').toLowerCase();
+
+            return sRoom.includes(cleanTargetRoom) || eRoom.includes(cleanTargetRoom) || lRoom.includes(cleanTargetRoom);
+        });
     }
 
     if (!filtered || filtered.length === 0) {
