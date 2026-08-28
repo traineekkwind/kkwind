@@ -2313,13 +2313,50 @@ async function loadTeacherSubmissions() {
 
     let subs = getLocalSubmissions();
 
+function populateTeacherSubmissionExamFilter() {
+    const select = document.getElementById('teacher-sub-filter-exam');
+    if (!select) return;
+
+    let exams = state.localExams || getLocalExams();
+    if (state.currentUser?.role === 'teacher') {
+        const myCourseIds = (state.courses || []).map(c => c.id);
+        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
+        exams = exams.filter(e => 
+            (e.teacher_name && e.teacher_name.trim().toLowerCase() === currentTeacherName) ||
+            (e.course_id && myCourseIds.includes(e.course_id))
+        );
+    }
+
+    const currentVal = select.value;
+    select.innerHTML = `<option value="ทั้งหมด">ชุดข้อสอบ: ทั้งหมด</option>` + exams.map(e => `
+        <option value="${e.id}">[${escapeHtml(e.title)}] (${escapeHtml(e.target_year || 'ทุกชั้น')} ${escapeHtml(e.target_room || 'ทุกห้อง')})</option>
+    `).join('');
+
+    if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+        select.value = currentVal;
+    }
+}
+
+// 7.2 โหลดตารางผลสอบอาจารย์ (พร้อมตัวกรองแยกชุดข้อสอบ/ระดับชั้น/แผนก/ห้องเรียน)
+async function loadTeacherSubmissions() {
+    const tableBody = document.getElementById('teacher-submissions-table-body');
+    const statTotal = document.getElementById('teacher-stat-total-submissions');
+    const statFlagged = document.getElementById('teacher-stat-flagged-cheats');
+    const statAvg = document.getElementById('teacher-stat-avg-score');
+
+    if (!tableBody) return;
+
+    populateTeacherSubmissionExamFilter();
+
+    let subs = getLocalSubmissions();
+
     if (isSupabaseConfigured() && state.supabaseClient) {
         try {
             const { data, error } = await state.supabaseClient
                 .from('exam_results')
                 .select(`
                     *,
-                    exam:exams(title, max_tab_switches_allowed, course:courses(course_name))
+                    exam:exams(title, max_tab_switches_allowed, target_year, target_department, target_room, course:courses(course_name))
                 `)
                 .order('graded_at', { ascending: false });
 
@@ -2341,23 +2378,61 @@ async function loadTeacherSubmissions() {
         );
     }
 
-    if (!subs || subs.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-400">ยังไม่มีข้อมูลการส่งข้อสอบในรายวิชาของคุณ</td></tr>`;
+    // 🔍 Apply Filters: Search, Exam, Year, Department, Room
+    const searchVal = (document.getElementById('teacher-sub-filter-search')?.value || '').trim().toLowerCase();
+    const examFilter = document.getElementById('teacher-sub-filter-exam')?.value || 'ทั้งหมด';
+    const yearFilter = document.getElementById('teacher-sub-filter-year')?.value || 'ทั้งหมด';
+    const deptFilter = document.getElementById('teacher-sub-filter-dept')?.value || 'ทั้งหมด';
+    const roomFilter = document.getElementById('teacher-sub-filter-room')?.value || 'ทั้งหมด';
+
+    let filtered = subs || [];
+
+    if (searchVal) {
+        filtered = filtered.filter(s => 
+            (s.student_name && s.student_name.toLowerCase().includes(searchVal)) ||
+            (s.student_id && String(s.student_id).toLowerCase().includes(searchVal))
+        );
+    }
+    if (examFilter !== 'ทั้งหมด') {
+        filtered = filtered.filter(s => s.exam_id === examFilter);
+    }
+    if (yearFilter !== 'ทั้งหมด') {
+        filtered = filtered.filter(s => (s.student_year || s.exam?.target_year || '').includes(yearFilter));
+    }
+    if (deptFilter !== 'ทั้งหมด') {
+        filtered = filtered.filter(s => (s.student_department || s.exam?.target_department || '').includes(deptFilter));
+    }
+    if (roomFilter !== 'ทั้งหมด') {
+        filtered = filtered.filter(s => (s.student_room || s.exam?.target_room || '').includes(roomFilter));
+    }
+
+    if (!filtered || filtered.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-10 text-slate-400">
+                    <i class="fas fa-filter-circle-xmark text-3xl text-slate-300 mb-2 block"></i>
+                    ไม่พบข้อมูลผลการสอบตามเงื่อนไขตัวกรองที่เลือก
+                    <div class="text-xs text-slate-400 mt-1">
+                        (ระดับชั้น: ${escapeHtml(yearFilter)} | แผนก: ${escapeHtml(deptFilter)} | ห้อง: ${escapeHtml(roomFilter)})
+                    </div>
+                </td>
+            </tr>
+        `;
         if (statTotal) statTotal.textContent = '0';
         if (statFlagged) statFlagged.textContent = '0';
         if (statAvg) statAvg.textContent = '0%';
         return;
     }
 
-    const total = subs.length;
-    const flagged = subs.filter(d => d.is_flagged_cheating).length;
-    const avg = (subs.reduce((sum, d) => sum + Number(d.percentage || 0), 0) / total).toFixed(1);
+    const total = filtered.length;
+    const flagged = filtered.filter(d => d.is_flagged_cheating).length;
+    const avg = (filtered.reduce((sum, d) => sum + Number(d.percentage || 0), 0) / total).toFixed(1);
 
     if (statTotal) statTotal.textContent = total;
     if (statFlagged) statFlagged.textContent = flagged;
     if (statAvg) statAvg.textContent = `${avg}%`;
 
-    tableBody.innerHTML = subs.map(sub => {
+    tableBody.innerHTML = filtered.map(sub => {
         const isFlagged = sub.is_flagged_cheating;
         const examTitle = sub.exam_title || sub.exam?.title || 'ชุดข้อสอบ';
         const courseName = sub.course_name || sub.exam?.course?.course_name || '-';
@@ -2368,11 +2443,13 @@ async function loadTeacherSubmissions() {
         return `
             <tr class="border-b border-gray-100 hover:bg-gray-50/70 transition">
                 <td class="py-4 px-4 font-medium text-gray-800">
-                    ${escapeHtml(sub.student_name || 'นักเรียน')}
+                    <div class="font-bold text-slate-900">${escapeHtml(sub.student_name || 'นักเรียน')}</div>
                     <div class="text-xs text-gray-400 font-mono">${(sub.student_id || '').slice(0, 8)}...</div>
                 </td>
                 <td class="py-4 px-4 text-xs font-semibold text-indigo-700">
-                    ${escapeHtml(classInfo)}
+                    <span class="px-2.5 py-1 bg-indigo-50 border border-indigo-100/60 rounded-lg">
+                        ${escapeHtml(classInfo)}
+                    </span>
                 </td>
                 <td class="py-4 px-4 text-gray-600 text-xs">
                     <div class="font-bold text-slate-800">${escapeHtml(examTitle)}</div>
@@ -2404,7 +2481,7 @@ async function loadTeacherSubmissions() {
                 </td>
                 <td class="py-4 px-4 text-xs text-gray-400">${formattedDate}</td>
                 <td class="py-4 px-4 text-right">
-                    <button onclick="inspectStudentSubmission('${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}')" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium rounded-lg transition">
+                    <button onclick="inspectStudentSubmission('${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}')" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium rounded-lg transition shadow-xs">
                         <i class="fas fa-search mr-1"></i> ตรวจคำตอบ
                     </button>
                 </td>
@@ -2413,7 +2490,7 @@ async function loadTeacherSubmissions() {
     }).join('');
 }
 
-// 7.3 ส่งออกคะแนนนักเรียนเป็นไฟล์ Excel (.xlsx) พร้อมข้อมูลระดับชั้นและห้องเรียน
+// 7.3 ส่งออกคะแนนนักเรียนเป็นไฟล์ Excel (.xlsx) ตามตัวกรองระดับชั้น/แผนก/ห้องเรียน
 window.exportTeacherScoresToExcel = async function() {
     if (!window.XLSX) {
         showToast('ไลบรารี SheetJS ยังไม่พร้อมใช้งาน', 'warning');
@@ -2440,12 +2517,48 @@ window.exportTeacherScoresToExcel = async function() {
         }
     }
 
-    if (!subs || subs.length === 0) {
-        showToast('ยังไม่มีข้อมูลผลการสอบสำหรับส่งออกเป็น Excel', 'warning');
+    if (state.currentUser?.role === 'teacher') {
+        const myExamIds = (state.localExams || getLocalExams()).map(e => e.id);
+        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
+        subs = (subs || []).filter(sub => 
+            myExamIds.includes(sub.exam_id) || 
+            (sub.exam?.teacher_name && sub.exam.teacher_name.trim().toLowerCase() === currentTeacherName)
+        );
+    }
+
+    // Apply active filters to export
+    const searchVal = (document.getElementById('teacher-sub-filter-search')?.value || '').trim().toLowerCase();
+    const examFilter = document.getElementById('teacher-sub-filter-exam')?.value || 'ทั้งหมด';
+    const yearFilter = document.getElementById('teacher-sub-filter-year')?.value || 'ทั้งหมด';
+    const deptFilter = document.getElementById('teacher-sub-filter-dept')?.value || 'ทั้งหมด';
+    const roomFilter = document.getElementById('teacher-sub-filter-room')?.value || 'ทั้งหมด';
+
+    let filtered = subs || [];
+    if (searchVal) {
+        filtered = filtered.filter(s => 
+            (s.student_name && s.student_name.toLowerCase().includes(searchVal)) ||
+            (s.student_id && String(s.student_id).toLowerCase().includes(searchVal))
+        );
+    }
+    if (examFilter !== 'ทั้งหมด') {
+        filtered = filtered.filter(s => s.exam_id === examFilter);
+    }
+    if (yearFilter !== 'ทั้งหมด') {
+        filtered = filtered.filter(s => (s.student_year || s.exam?.target_year || '').includes(yearFilter));
+    }
+    if (deptFilter !== 'ทั้งหมด') {
+        filtered = filtered.filter(s => (s.student_department || s.exam?.target_department || '').includes(deptFilter));
+    }
+    if (roomFilter !== 'ทั้งหมด') {
+        filtered = filtered.filter(s => (s.student_room || s.exam?.target_room || '').includes(roomFilter));
+    }
+
+    if (!filtered || filtered.length === 0) {
+        showToast('ไม่พบข้อมูลผลการสอบตามเงื่อนไขที่เลือกเพื่อส่งออก Excel', 'warning');
         return;
     }
 
-    const excelRows = subs.map((d, index) => ({
+    const excelRows = filtered.map((d, index) => ({
         'ลำดับ': index + 1,
         'ชื่อ-นามสกุล': d.student_name || 'นักเรียน',
         'รหัสนักเรียน': d.student_id,
@@ -2469,9 +2582,15 @@ window.exportTeacherScoresToExcel = async function() {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'รายงานผลคะแนน');
 
     const dateStr = new Date().toISOString().slice(0, 10);
-    const fileName = `รายงานผลคะแนนสอบ_วังไกลกังวล_${dateStr}.xlsx`;
+    let nameParts = ['รายงานผลคะแนนสอบ'];
+    if (yearFilter !== 'ทั้งหมด') nameParts.push(yearFilter);
+    if (roomFilter !== 'ทั้งหมด') nameParts.push(roomFilter);
+    if (deptFilter !== 'ทั้งหมด') nameParts.push(deptFilter);
+    nameParts.push(dateStr);
+
+    const fileName = `${nameParts.join('_')}.xlsx`;
     XLSX.writeFile(workbook, fileName);
-    showToast('ดาวน์โหลดไฟล์ Excel เรียบร้อยแล้ว!', 'success');
+    showToast(`ดาวน์โหลดไฟล์ Excel (${filtered.length} รายการ) เรียบร้อยแล้ว!`, 'success');
 };
 
 // ==============================================================================
