@@ -18,7 +18,7 @@
     <!-- SheetJS (XLSX) CDN สำหรับ Import & Export Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="./public/styles.css?v=2.5.1">
+    <link rel="stylesheet" href="./public/styles.css?v=2.5.2">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-['Prompt',sans-serif]">
 
@@ -401,9 +401,67 @@
                             <button onclick="exportTeacherScoresToExcel()" class="px-4 py-2 btn-excel text-xs font-bold rounded-xl transition shadow-md shadow-emerald-100 flex items-center gap-2">
                                 <i class="fas fa-file-excel"></i> ส่งออกคะแนนเป็น Excel (.xlsx)
                             </button>
-                            <button onclick="loadTeacherSubmissions()" class="px-3 py-2 text-xs font-semibold text-slate-600 hover:text-emerald-700 bg-slate-100 hover:bg-emerald-50 rounded-xl transition">
+                            <button onclick="loadTeacherSubmissions()" class="px-3 py-2 text-xs font-semibold text-slate-600 hover:text-emerald-700 bg-slate-100 hover:bg-emerald-50 rounded-xl transition" title="รีเฟรชข้อมูล">
                                 <i class="fas fa-rotate"></i>
                             </button>
+                        </div>
+                    </div>
+
+                    <!-- Filter Controls (แยกชุดข้อสอบ, ระดับชั้น, แผนก, และห้องเรียน) -->
+                    <div class="p-4 bg-slate-50/70 border-b border-slate-100">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5">
+                            <!-- 1. ค้นหาชื่อนักเรียน -->
+                            <div class="relative">
+                                <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                                <input type="text" id="teacher-sub-filter-search" oninput="loadTeacherSubmissions()" placeholder="ค้นหาชื่อ, รหัส..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            </div>
+
+                            <!-- 2. เลือกชุดข้อสอบ -->
+                            <div>
+                                <select id="teacher-sub-filter-exam" onchange="loadTeacherSubmissions()" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                                    <option value="ทั้งหมด">ชุดข้อสอบ: ทั้งหมด</option>
+                                </select>
+                            </div>
+
+                            <!-- 3. เลือกระดับชั้น -->
+                            <div>
+                                <select id="teacher-sub-filter-year" onchange="loadTeacherSubmissions()" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                                    <option value="ทั้งหมด">ระดับชั้น: ทั้งหมด</option>
+                                    <option value="ปวช.1">ปวช.1</option>
+                                    <option value="ปวช.2">ปวช.2</option>
+                                    <option value="ปวช.3">ปวช.3</option>
+                                    <option value="ปวส.1">ปวส.1</option>
+                                    <option value="ปวส.2">ปวส.2</option>
+                                </select>
+                            </div>
+
+                            <!-- 4. เลือกแผนกวิชา -->
+                            <div>
+                                <select id="teacher-sub-filter-dept" onchange="loadTeacherSubmissions()" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                                    <option value="ทั้งหมด">แผนกวิชา: ทั้งหมด</option>
+                                    <option value="เทคโนโลยีธุรกิจดิจิทัล">เทคโนโลยีธุรกิจดิจิทัล</option>
+                                    <option value="การบัญชี">การบัญชี</option>
+                                    <option value="การตลาด">การตลาด</option>
+                                    <option value="ช่างไฟฟ้ากำลัง">ช่างไฟฟ้ากำลัง</option>
+                                    <option value="ช่างยนต์">ช่างยนต์</option>
+                                    <option value="ช่างเชื่อม">ช่างเชื่อม</option>
+                                    <option value="ช่างอิเล็กทรอนิกส์">ช่างอิเล็กทรอนิกส์</option>
+                                    <option value="การโรงแรม">การโรงแรม</option>
+                                    <option value="สามัญสัมพันธ์">สามัญสัมพันธ์</option>
+                                </select>
+                            </div>
+
+                            <!-- 5. เลือกห้องเรียน -->
+                            <div>
+                                <select id="teacher-sub-filter-room" onchange="loadTeacherSubmissions()" class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                                    <option value="ทั้งหมด">ห้องเรียน: ทั้งหมด</option>
+                                    <option value="ห้อง 1">ห้อง 1</option>
+                                    <option value="ห้อง 2">ห้อง 2</option>
+                                    <option value="ห้อง 3">ห้อง 3</option>
+                                    <option value="ห้อง 4">ห้อง 4</option>
+                                    <option value="ห้อง 5">ห้อง 5</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -1234,6 +1292,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.5.1"></script>
+    <script src="./public/app.js?v=2.5.2"></script>
 </body>
 </html>
