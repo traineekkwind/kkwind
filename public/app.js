@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ==============================================================================
  * EXAMSECURE PRO - MAIN FRONTEND APPLICATION (SPA)
  * ==============================================================================
@@ -76,12 +76,46 @@ function initSupabase() {
             state.supabaseClient = window.supabase.createClient(cleanUrl, creds.key);
             console.log('[Supabase] Initialized with:', cleanUrl);
             initGlobalRealtimeSync();
+            fetchCloudDataToLocal();
             syncLocalDataToSupabase();
         } else {
             console.warn('[Supabase] SDK not loaded yet.');
         }
     } catch (e) {
         console.error('[Supabase] Init Error:', e);
+    }
+}
+
+async function fetchCloudDataToLocal() {
+    if (!isSupabaseConfigured() || !state.supabaseClient) return;
+    try {
+        // 1. ดึงข้อมูลรายชื่ออาจารย์จากคลาวด์ลงมือถือ/ทุกอุปกรณ์
+        const { data: dbTeachers, error: tErr } = await state.supabaseClient
+            .from('teachers')
+            .select('*');
+        if (!tErr && Array.isArray(dbTeachers) && dbTeachers.length > 0) {
+            localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(dbTeachers));
+        }
+
+        // 2. ดึงรายวิชา
+        const { data: dbCourses, error: cErr } = await state.supabaseClient
+            .from('courses')
+            .select('*');
+        if (!cErr && Array.isArray(dbCourses) && dbCourses.length > 0) {
+            localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(dbCourses));
+            state.courses = dbCourses;
+        }
+
+        // 3. ดึงชุดข้อสอบ
+        const { data: dbExams, error: eErr } = await state.supabaseClient
+            .from('exams')
+            .select('*');
+        if (!eErr && Array.isArray(dbExams) && dbExams.length > 0) {
+            localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(dbExams));
+            state.localExams = dbExams;
+        }
+    } catch (e) {
+        console.warn('[Supabase Cloud Fetch Notice]', e);
     }
 }
 
@@ -628,7 +662,7 @@ function setupAuthEvents() {
 
     // 3.1 ฟอร์มนักเรียน (ล็อกอินด้วย รหัสนักเรียน/ชื่อ และ เลขบัตรประชาชน 13 หลัก)
     if (formStudent) {
-        formStudent.addEventListener('submit', (e) => {
+        formStudent.addEventListener('submit', async (e) => {
             e.preventDefault();
             const loginId = document.getElementById('student-login-id-input')?.value.trim();
             const citizenPass = document.getElementById('student-login-pass-input')?.value.trim();
@@ -647,17 +681,26 @@ function setupAuthEvents() {
                 return;
             }
 
-            const registeredStudents = getLocalStudents();
+            let registeredStudents = getLocalStudents();
+
+            if (isSupabaseConfigured() && state.supabaseClient) {
+                try {
+                    const { data, error } = await state.supabaseClient.from('students').select('*');
+                    if (!error && Array.isArray(data) && data.length > 0) {
+                        registeredStudents = data;
+                        localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(data));
+                    }
+                } catch (e) {}
+            }
+
             let matchedStudent = null;
 
             if (registeredStudents && registeredStudents.length > 0) {
-                // ตรวจสอบกับรายชื่อนักเรียนที่อาจารย์ลงทะเบียนไว้
                 matchedStudent = registeredStudents.find(s => 
                     (s.code === loginId || s.name.trim().toLowerCase() === loginId.toLowerCase() || s.citizen_id === loginId) && 
                     s.citizen_id === citizenPass
                 );
 
-                // หากค้นหาด้วยชื่อหรือรหัสอย่างใดอย่างหนึ่ง
                 if (!matchedStudent) {
                     const studentById = registeredStudents.find(s => s.code === loginId || s.name.trim().toLowerCase() === loginId.toLowerCase());
                     if (studentById) {
@@ -677,7 +720,6 @@ function setupAuthEvents() {
                     return;
                 }
             } else {
-                // หากยังไม่มีการลงทะเบียนนักเรียนในระบบเลย ให้สร้างเป็นบัญชีเริ่มต้นอัตโนมัติ
                 matchedStudent = {
                     id: generatePseudoUUID(),
                     code: loginId,
@@ -712,24 +754,40 @@ function setupAuthEvents() {
 
     // 3.2 ฟอร์มอาจารย์ (ระบุชื่ออาจารย์/รหัสอาจารย์ และ รหัสผ่านประจำตัว)
     if (formTeacher) {
-        formTeacher.addEventListener('submit', (e) => {
+        formTeacher.addEventListener('submit', async (e) => {
             e.preventDefault();
             const loginInput = document.getElementById('teacher-name-input').value.trim();
-            const password = document.getElementById('teacher-password-input').value;
+            const password = document.getElementById('teacher-password-input').value.trim();
 
-            if (!loginInput) {
-                showToast('กรุณากรอกชื่อ-นามสกุล หรือ รหัสอาจารย์', 'warning');
+            if (!loginInput || !password) {
+                showToast('กรุณากรอกชื่อ-นามสกุล หรือ รหัสอาจารย์ และ รหัสผ่าน', 'warning');
                 return;
             }
 
-            const registeredTeachers = getLocalTeachers();
+            let registeredTeachers = getLocalTeachers();
+
+            // ดึงข้อมูลอาจารย์ล่าสุดจาก Supabase Cloud (สำหรับมือถือหรือเครื่องอื่นที่เพิ่งเปิดเว็บ)
+            if (isSupabaseConfigured() && state.supabaseClient) {
+                try {
+                    const { data: dbTeachers, error: fetchErr } = await state.supabaseClient
+                        .from('teachers')
+                        .select('*');
+                    if (!fetchErr && Array.isArray(dbTeachers) && dbTeachers.length > 0) {
+                        registeredTeachers = dbTeachers;
+                        localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(registeredTeachers));
+                    }
+                } catch (err) {
+                    console.warn('[Teacher Login] Supabase check notice:', err);
+                }
+            }
 
             if (registeredTeachers && registeredTeachers.length > 0) {
-                // ตรวจสอบกับรายชื่ออาจารย์ที่แอดมินลงทะเบียนไว้
+                const cleanLogin = loginInput.toLowerCase();
                 const matchedTeacher = registeredTeachers.find(t => 
-                    (t.name.trim().toLowerCase() === loginInput.toLowerCase() || 
-                     (t.teacher_code && t.teacher_code.trim().toLowerCase() === loginInput.toLowerCase())) &&
-                    t.password === password
+                    (t.name.trim().toLowerCase() === cleanLogin || 
+                     (t.teacher_code && t.teacher_code.trim().toLowerCase() === cleanLogin) ||
+                     (t.code && String(t.code).trim().toLowerCase() === cleanLogin)) &&
+                    String(t.password).trim() === password
                 );
 
                 if (matchedTeacher) {
@@ -737,8 +795,8 @@ function setupAuthEvents() {
                         role: 'teacher',
                         id: matchedTeacher.id,
                         name: matchedTeacher.name,
-                        code: matchedTeacher.teacher_code,
-                        dept: matchedTeacher.department || 'เทคโนโลยีธุรกิจดิจิทัล'
+                        code: matchedTeacher.teacher_code || matchedTeacher.code,
+                        dept: matchedTeacher.department || matchedTeacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
                     };
                     try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
 
@@ -752,8 +810,9 @@ function setupAuthEvents() {
 
                 // เช็คว่าชื่ออาจารย์มีในระบบแต่รหัสผ่านผิดหรือไม่
                 const teacherExists = registeredTeachers.find(t => 
-                    t.name.trim().toLowerCase() === loginInput.toLowerCase() || 
-                    (t.teacher_code && t.teacher_code.trim().toLowerCase() === loginInput.toLowerCase())
+                    t.name.trim().toLowerCase() === cleanLogin || 
+                    (t.teacher_code && t.teacher_code.trim().toLowerCase() === cleanLogin) ||
+                    (t.code && String(t.code).trim().toLowerCase() === cleanLogin)
                 );
 
                 if (teacherExists) {
