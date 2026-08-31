@@ -18,7 +18,7 @@
     <!-- SheetJS (XLSX) CDN สำหรับ Import & Export Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="./public/styles.css?v=2.6.3">
+    <link rel="stylesheet" href="./public/styles.css?v=2.6.4">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-['Prompt',sans-serif]">
 
@@ -174,9 +174,10 @@
                 <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
                     <i class="fas fa-layer-group text-indigo-600"></i> ชุดข้อสอบที่เปิดให้คุณเข้าสอบ
                 </h3>
-                <button onclick="loadStudentLobby()" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-                    <i class="fas fa-rotate"></i> รีเฟรช
-                </button>
+                <button onclick="refreshStudentLobby(this)" class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 active:scale-95 text-indigo-700 text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-2xs border border-indigo-200 cursor-pointer">
+    <i class="fas fa-rotate text-indigo-600"></i> รีเฟรชข้อมูล
+</button>
+
             </div>
 
             <div id="exam-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1490,6 +1491,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.6.3"></script>
+    <script src="./public/app.js?v=2.6.4"></script>
 </body>
 </html>
