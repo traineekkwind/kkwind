@@ -3521,8 +3521,8 @@ async function loadTeacherExamsList() {
             <div class="bg-white p-8 rounded-3xl border border-slate-100 text-center">
                 <i class="fas fa-folder-open text-4xl text-slate-300 mb-3"></i>
                 <h4 class="font-bold text-slate-700">ยังไม่มีชุดข้อสอบของคุณ</h4>
-                <p class="text-xs text-slate-400 mt-1 mb-4">กดปุ่มสร้างชุดข้อสอบใหม่ด้านบนเพื่อเริ่มต้น</p>
-                <button onclick="openCreateExamModal()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-sm">
+                <p class="text-xs text-slate-400 mt-1 mb-4">สร้างชุดข้อสอบใหม่เพื่อเริ่มการทดสอบ</p>
+                <button onclick="openCreateExamModal()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-sm hover:bg-emerald-700 transition">
                     <i class="fas fa-plus mr-1"></i> สร้างชุดข้อสอบใหม่
                 </button>
             </div>
@@ -3552,28 +3552,33 @@ async function loadTeacherExamsList() {
                     </div>
                     
                     <div class="text-xs text-amber-800 font-semibold mb-2 flex items-center gap-1.5">
-                        <i class="fas fa-bullseye text-amber-600"></i> กลุ่มเป้าหมาย: <strong>${escapeHtml(targetTag)}</strong>
+                        <i class="fas fa-bullseye text-amber-600"></i> เป้าหมาย: <strong>${escapeHtml(targetTag)}</strong>
                     </div>
                     
-                    <p class="text-xs text-gray-500">${escapeHtml(exam.description || 'ไม่มีคำอธิบาย')}</p>
+                    <p class="text-xs text-gray-500">${escapeHtml(exam.description || 'ไม่มีคำอธิบายเพิ่มเติม')}</p>
                     
-                    <div class="flex items-center gap-4 text-xs text-gray-400 mt-2">
-                        <span><i class="far fa-clock"></i> ${exam.duration_minutes} นาที</span>
+                    <div class="flex flex-wrap items-center gap-3 text-xs text-gray-400 mt-2.5">
+                        <button type="button" onclick="openEditExamDurationModal('${exam.id}', ${exam.duration_minutes || 60}, '${escapeHtml(exam.title)}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 font-bold text-slate-700 transition border border-slate-200/60" title="คลิกเพื่อเปลี่ยนเวลาทำข้อสอบ">
+                            <i class="far fa-clock text-indigo-500"></i>
+                            <span>${exam.duration_minutes || 60} นาที</span>
+                            <i class="fas fa-pen-to-square text-[10px] text-slate-400 ml-0.5"></i>
+                        </button>
                         <span><i class="far fa-user-tie text-emerald-600"></i> ${escapeHtml(exam.teacher_name || 'อาจารย์ผู้สอน')}</span>
+                        <span><i class="fas fa-shield-halved text-purple-500"></i> สลับจอ: ${exam.max_tab_switches_allowed || 3} ครั้ง</span>
                     </div>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <!-- ปุ่มดูข้อสอบ (ตรวจดูโจทย์และเฉลย) -->
+                    <!-- ดูข้อสอบ (ตรวจดูโจทย์) -->
                     <button onclick="viewTeacherExam('${exam.id}')" class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm border border-indigo-200" title="คลิกเพื่อตรวจดูโจทย์และเฉลยของชุดข้อสอบนี้">
                         <i class="fas fa-eye text-indigo-600"></i>
                         <span>ดูข้อสอบ</span>
                     </button>
 
-                    <!-- ปุ่มสลับ เปิด/ปิดสอบ ทันที -->
-                    <button onclick="toggleExamActive('${exam.id}')" class="px-3.5 py-2 ${isActive ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="คลิกเพื่อสลับเปิดหรือปิดสอบ">
+                    <!-- สลับ เปิด/ปิดสอบ ทันที -->
+                    <button onclick="toggleExamActive('${exam.id}')" class="px-3.5 py-2 ${isActive ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="คลิกสลับเปิดหรือปิดสอบ">
                         <i class="fas ${isActive ? 'fa-toggle-on text-emerald-600 text-sm' : 'fa-toggle-off text-slate-400 text-sm'}"></i>
-                        <span>${isActive ? 'กดเพื่อปิดสอบ' : 'กดเพื่อเปิดสอบ'}</span>
+                        <span>${isActive ? 'ขอปิดสอบ' : 'เปิดสอบ'}</span>
                     </button>
 
                     <button onclick="openAddQuestionForExam('${exam.id}')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
@@ -3614,7 +3619,84 @@ window.toggleExamActive = async function(examId) {
     }
 
     broadcastAppEvent('exam_updated', exam);
-    showToast(`ชุดข้อสอบ "${exam.title}" เปลี่ยนสถานะเป็น ${newStatus ? '🟢 เปิดสอบแล้ว' : '⚪ ปิดสอบแล้ว'}`, 'success');
+    showToast(`ชุดข้อสอบ "${exam.title}" เปลี่ยนสถานะเป็น ${newStatus ? '🟢 เปิดสอบอยู่' : '⚪ ปิดสอบอยู่'}`, 'success');
+    await loadTeacherExamsList();
+};
+
+// 8.1.1 จัดการแก้ไขเวลาทำข้อสอบ (Duration Modal)
+window.openEditExamDurationModal = function(examId, currentMinutes, examTitle = '') {
+    const modal = document.getElementById('modal-edit-exam-duration');
+    const idInput = document.getElementById('edit-duration-exam-id');
+    const minInput = document.getElementById('edit-duration-minutes-input');
+    const titleEl = document.getElementById('edit-duration-exam-title');
+
+    if (!modal) return;
+
+    if (idInput) idInput.value = examId;
+    if (minInput) minInput.value = currentMinutes || 60;
+    if (titleEl) titleEl.textContent = examTitle || 'ชุดข้อสอบ';
+
+    modal.classList.remove('hidden');
+    if (minInput) {
+        minInput.focus();
+        minInput.select();
+    }
+};
+
+window.closeEditExamDurationModal = function() {
+    const modal = document.getElementById('modal-edit-exam-duration');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.setDurationPreset = function(minutes) {
+    const minInput = document.getElementById('edit-duration-minutes-input');
+    if (minInput) minInput.value = minutes;
+};
+
+window.saveExamDuration = async function(event) {
+    event.preventDefault();
+    const examId = document.getElementById('edit-duration-exam-id')?.value;
+    const minutes = parseInt(document.getElementById('edit-duration-minutes-input')?.value, 10);
+
+    if (!examId || isNaN(minutes) || minutes <= 0) {
+        showToast('กรุณาระบุเวลาทำข้อสอบให้ถูกต้อง (อย่างน้อย 1 นาที)', 'warning');
+        return;
+    }
+
+    const exams = getLocalExams();
+    const exam = exams.find(e => e.id === examId);
+    if (!exam) {
+        showToast('ไม่พบข้อมูลชุดข้อสอบ', 'error');
+        return;
+    }
+
+    exam.duration_minutes = minutes;
+    saveLocalExam(exam);
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            await state.supabaseClient
+                .from('exams')
+                .update({ duration_minutes: minutes })
+                .eq('id', examId);
+        } catch (e) {
+            console.warn('[saveExamDuration] Remote update warning:', e);
+        }
+    }
+
+    // Update in-memory state
+    if (state.localExams) {
+        const idx = state.localExams.findIndex(e => e.id === examId);
+        if (idx >= 0) state.localExams[idx].duration_minutes = minutes;
+    }
+
+    // Update view modal display if open
+    const displayEl = document.getElementById('teacher-view-duration-display');
+    if (displayEl) displayEl.textContent = `${minutes} นาที`;
+
+    closeEditExamDurationModal();
+    showToast(`อัปเดตเวลาทำข้อสอบ "${exam.title}" เป็น ${minutes} นาที เรียบร้อยแล้ว!`, 'success');
+    broadcastAppEvent('exam_updated', exam);
     await loadTeacherExamsList();
 };
 
@@ -3685,9 +3767,14 @@ function renderTeacherExamViewModal(exam, questions) {
     if (titleEl) titleEl.textContent = exam.title;
     if (metaEl) {
         metaEl.innerHTML = `
-            <span><i class="far fa-clock text-indigo-500"></i> เวลาสอบ: <strong>${exam.duration_minutes} นาที</strong></span>
+            <span class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100/80 px-2.5 py-1 rounded-xl text-indigo-900 shadow-2xs">
+                <i class="far fa-clock text-indigo-600"></i> เวลาสอบ: <strong id="teacher-view-duration-display" class="font-bold text-indigo-700">${exam.duration_minutes || 60} นาที</strong>
+                <button type="button" onclick="openEditExamDurationModal('${exam.id}', ${exam.duration_minutes || 60}, '${escapeHtml(exam.title)}')" class="ml-1 px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition inline-flex items-center gap-1 shadow-xs" title="คลิกเพื่อเปลี่ยนเวลาทำข้อสอบ">
+                    <i class="fas fa-pen-to-square"></i> แก้ไขเวลา
+                </button>
+            </span>
             <span><i class="fas fa-list-check text-emerald-500"></i> จำนวนข้อสอบ: <strong>${questions.length} ข้อ</strong> (${totalPoints} คะแนน)</span>
-            <span><i class="fas fa-bullseye text-amber-500"></i> เป้าหมาย: <strong>${exam.target_year || 'ทุกชั้น'} ${exam.target_department || 'ทุกแผนก'} ${exam.target_room || 'ทุกห้อง'}</strong></span>
+            <span><i class="fas fa-bullseye text-amber-500"></i> เป้าหมาย: <strong>${escapeHtml(exam.target_year || 'ทุกชั้น')} ${escapeHtml(exam.target_department || 'ทุกแผนก')} ${escapeHtml(exam.target_room || 'ทุกห้อง')}</strong></span>
             <span><i class="fas fa-shield-halved text-purple-500"></i> อนุญาตสลับจอ: <strong>${exam.max_tab_switches_allowed || 3} ครั้ง</strong></span>
         `;
     }
@@ -3716,10 +3803,10 @@ function renderTeacherExamViewModal(exam, questions) {
                     <i class="fas fa-clipboard-question"></i>
                 </div>
                 <h4 class="font-bold text-slate-800 text-base">ยังไม่มีคำถามในชุดข้อสอบนี้</h4>
-                <p class="text-xs text-slate-500 max-w-sm mx-auto">คุณสามารถเพิ่มคำถามแบบรายข้อ หรือนำเข้าข้อสอบหลายข้อพร้อมกันจากไฟล์ Excel (.xlsx) ได้ทันที</p>
+                <p class="text-xs text-slate-500 max-w-sm mx-auto">คุณสามารถเพิ่มคำถามแบบข้อต่อข้อ หรือนำเข้าข้อสอบพร้อมกันจากไฟล์ Excel (.xlsx) ได้ทันที</p>
                 <div class="flex items-center justify-center gap-2 pt-2">
                     <button onclick="closeTeacherExamViewModal(); openAddQuestionForExam('${exam.id}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
-                        <i class="fas fa-plus"></i> เพิ่มโจทย์ข้อแรก
+                        <i class="fas fa-plus"></i> เพิ่มโจทย์แรก
                     </button>
                     <button onclick="closeTeacherExamViewModal(); openExcelImportForExam('${exam.id}')" class="px-4 py-2 btn-excel text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
                         <i class="fas fa-file-excel"></i> นำเข้า Excel
@@ -3729,70 +3816,61 @@ function renderTeacherExamViewModal(exam, questions) {
         `;
     } else {
         contentEl.innerHTML = questions.map((q, idx) => {
-            let options = q.options;
-            if (typeof options === 'string') {
-                try { options = JSON.parse(options); } catch (e) { options = []; }
-            }
+            const qNum = idx + 1;
+            const points = q.points || 1;
+            const correctOpt = (q.correct || q.correct_option_id || 'A').toUpperCase();
 
-            const correctAns = q.correct || q.correct_option_id || 'A';
-            const points = q.points || 1.0;
-            const choiceLetters = ['A', 'B', 'C', 'D'];
+            // Render 4 choices
+            const optionsHtml = (q.options || []).map(opt => {
+                const isCorrect = String(opt.id).toUpperCase() === correctOpt;
+                return `
+                    <div class="p-3 rounded-2xl border ${isCorrect ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400 font-semibold text-emerald-950' : 'bg-white border-slate-200 text-slate-700'} flex items-start gap-2.5 text-xs transition">
+                        <span class="w-6 h-6 rounded-lg ${isCorrect ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-100 text-slate-600 font-bold'} flex items-center justify-center text-xs shrink-0">
+                            ${escapeHtml(opt.id)}
+                        </span>
+                        <div class="flex-1 pt-0.5 leading-relaxed">
+                            ${escapeHtml(opt.text || '')}
+                        </div>
+                        ${isCorrect ? `
+                            <span class="px-2 py-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded-md flex items-center gap-1 shrink-0">
+                                <i class="fas fa-check"></i> เฉลย
+                            </span>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
 
             return `
-                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
+                    <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black">
-                                ${idx + 1}
+                            <span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">
+                                ข้อที่ ${qNum}
                             </span>
-                            <span class="text-xs font-bold text-slate-700">ข้อที่ ${idx + 1}</span>
-                            <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold">
-                                ${points} คะแนน
-                            </span>
+                            <span class="text-xs text-slate-400">(${points} คะแนน)</span>
                         </div>
-                        <button onclick="deleteTeacherQuestion('${q.id}', '${exam.id}', ${idx + 1})" class="text-slate-400 hover:text-red-600 p-1 rounded-lg text-xs transition flex items-center gap-1" title="ลบข้อนี้">
-                            <i class="fas fa-trash-can"></i> <span class="hidden sm:inline">ลบข้อนี้</span>
+                        <button onclick="deleteTeacherQuestion('${q.id}', '${exam.id}', ${qNum})" class="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg transition font-medium flex items-center gap-1">
+                            <i class="fas fa-trash-can"></i> ลบข้อนี้
                         </button>
                     </div>
 
-                    <p class="text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-line">
-                        ${escapeHtml(q.question_text)}
-                    </p>
+                    <div class="text-sm font-bold text-slate-900 leading-snug">
+                        ${escapeHtml(q.question_text || '')}
+                    </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                        ${(options || []).map((opt, optIdx) => {
-                            const optId = opt.id || choiceLetters[optIdx] || 'A';
-                            const isCorrect = String(optId).trim().toUpperCase() === String(correctAns).trim().toUpperCase();
-
-                            return `
-                                <div class="p-3 rounded-xl border text-xs transition flex items-center justify-between ${
-                                    isCorrect 
-                                        ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 font-bold shadow-xs' 
-                                        : 'bg-slate-50/60 border-slate-200 text-slate-700'
-                                }">
-                                    <div class="flex items-center gap-2">
-                                        <span class="w-5 h-5 rounded-md flex items-center justify-center font-bold text-[11px] ${
-                                            isCorrect ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
-                                        }">
-                                            ${escapeHtml(optId)}
-                                        </span>
-                                        <span>${escapeHtml(opt.text || '')}</span>
-                                    </div>
-                                    ${isCorrect ? `
-                                        <span class="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-bold flex items-center gap-1">
-                                            <i class="fas fa-check text-[9px]"></i> เฉลย
-                                        </span>
-                                    ` : ''}
-                                </div>
-                            `;
-                        }).join('')}
+                        ${optionsHtml}
                     </div>
+
+                    ${q.explanation ? `
+                        <div class="p-3 bg-amber-50/70 border border-amber-200/60 rounded-xl text-xs text-amber-900 mt-2">
+                            <strong class="text-amber-800"><i class="fas fa-lightbulb text-amber-600 mr-1"></i> คำอธิบาย:</strong> ${escapeHtml(q.explanation)}
+                        </div>
+                    ` : ''}
                 </div>
             `;
         }).join('');
     }
-
-    modal.classList.remove('hidden');
 }
 
 window.deleteTeacherQuestion = async function(questionId, examId, qIndex) {
