@@ -18,7 +18,7 @@
     <!-- SheetJS (XLSX) CDN สำหรับ Import & Export Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="./public/styles.css?v=2.5.8">
+    <link rel="stylesheet" href="./public/styles.css?v=2.5.9">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-['Prompt',sans-serif]">
 
@@ -332,9 +332,49 @@
                 <div id="teacher-courses-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
             </div>
 
-            <!-- Tab 2: Manage Exams List -->
+            <!-- Tab 2: Manage Exams List (แยกตามรายวิชาและระดับชั้นปี) -->
             <div id="teacher-content-exams" class="hidden space-y-4">
-                <div id="teacher-exams-list-container" class="space-y-3"></div>
+                <!-- Filter Bar for Exams List -->
+                <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex flex-wrap items-center gap-2.5 flex-1">
+                            <!-- Search exam title -->
+                            <div class="relative min-w-[200px] flex-1 sm:flex-initial">
+                                <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                                <input type="text" id="teacher-exam-list-filter-search" oninput="loadTeacherExamsList()" placeholder="ค้นหาชื่อชุดข้อสอบ..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            </div>
+
+                            <!-- Filter Course -->
+                            <div class="min-w-[180px]">
+                                <select id="teacher-exam-list-filter-course" onchange="loadTeacherExamsList()" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                                    <option value="ทั้งหมด">วิชาทั้งหมด</option>
+                                </select>
+                            </div>
+
+                            <!-- Filter Class Year -->
+                            <div class="min-w-[140px]">
+                                <select id="teacher-exam-list-filter-year" onchange="loadTeacherExamsList()" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
+                                    <option value="ทั้งหมด">ทุกระดับชั้น</option>
+                                    <option value="ปวช.1">ปวช.1</option>
+                                    <option value="ปวช.2">ปวช.2</option>
+                                    <option value="ปวช.3">ปวช.3</option>
+                                    <option value="ปวส.1">ปวส.1</option>
+                                    <option value="ปวส.2">ปวส.2</option>
+                                </select>
+                            </div>
+
+                            <button type="button" onclick="resetTeacherExamListFilters()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition inline-flex items-center gap-1">
+                                <i class="fas fa-rotate-left"></i> ล้างตัวกรอง
+                            </button>
+                        </div>
+
+                        <button onclick="openCreateExamModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-100 transition inline-flex items-center gap-1.5">
+                            <i class="fas fa-plus"></i> สร้างชุดข้อสอบใหม่
+                        </button>
+                    </div>
+                </div>
+
+                <div id="teacher-exams-list-container" class="space-y-6"></div>
             </div>
 
             <!-- Tab 3: Submissions & Anti-Cheat Audit (with EXCEL EXPORT) -->
@@ -959,6 +999,62 @@
         </div>
     </div>
 
+        <!-- 3.2.3 EXAM SUBMISSIONS & UNLOCK RETAKE MODAL (ดูผลสอบและปลดล็อกสอบใหม่รายชุดข้อสอบ) -->
+    <div id="modal-exam-submissions-unlock" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white max-w-4xl w-full max-h-[90vh] flex flex-col rounded-3xl border border-slate-200 shadow-2xl overflow-hidden animate-fade-in">
+            <!-- Modal Header -->
+            <div class="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span id="exam-unlock-course-badge" class="px-2.5 py-0.5 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700">
+                            [วิชา]
+                        </span>
+                        <span class="px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 inline-flex items-center gap-1">
+                            <i class="fas fa-rotate-left"></i> จัดการสิทธิ์การสอบใหม่
+                        </span>
+                    </div>
+                    <h3 id="exam-unlock-title" class="font-extrabold text-slate-900 text-lg">ชื่อชุดข้อสอบ</h3>
+                    <p id="exam-unlock-meta" class="text-xs text-slate-500 mt-1 flex items-center gap-3"></p>
+                </div>
+                <button onclick="closeExamSubmissionsUnlockModal()" class="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition">
+                    <i class="fas fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content (Student Submissions Table) -->
+            <div class="p-6 overflow-y-auto flex-1 bg-slate-50/50">
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
+                            <tr>
+                                <th class="py-3 px-4">ชื่อนักเรียน / รหัส</th>
+                                <th class="py-3 px-4">ระดับชั้น / แผนก / ห้อง</th>
+                                <th class="py-3 px-4">คะแนนที่ได้</th>
+                                <th class="py-3 px-4 text-center">สลับจอ</th>
+                                <th class="py-3 px-4 text-center">สถานะ</th>
+                                <th class="py-3 px-4">เวลาที่ส่ง</th>
+                                <th class="py-3 px-4 text-right">การจัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exam-unlock-table-body" class="divide-y divide-slate-100">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-slate-100 bg-white flex items-center justify-between">
+                <div class="text-xs text-slate-500">
+                    <i class="fas fa-circle-info text-amber-500 mr-1"></i> คลิกปุ่ม <strong>"🔄 ให้สอบใหม่"</strong> เพื่อล้างผลคะแนนเดิมและเปิดสิทธิ์ให้นักเรียนเข้าทำข้อสอบใหม่อีกครั้ง
+                </div>
+                <button onclick="closeExamSubmissionsUnlockModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition shadow-sm">
+                    ปิดหน้าต่าง
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 3.3 CREATE NEW COURSE MODAL -->
     <div id="modal-create-course" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
         <div class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xl">
@@ -1350,6 +1446,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.5.8"></script>
+    <script src="./public/app.js?v=2.5.9"></script>
 </body>
 </html>
