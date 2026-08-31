@@ -1,3 +1,43 @@
+/**
+ * ==============================================================================
+ * EXAMSECURE PRO - MAIN FRONTEND APPLICATION (SPA)
+ * ==============================================================================
+ * 1. 3-Role Access: Student (นักเรียน), Teacher (อาจารย์), Admin (ผู้ดูแลระบบ)
+ * 2. Teacher Course Management: จัดการรายวิชาของครูแต่ละคน
+ * 3. Classroom Targeting: กำหนดระดับชั้น (Year), แผนกวิชา (Dept), ห้องเรียน (Room)
+ * 4. Student Auto-Filtering: นักเรียนเห็นเฉพาะข้อสอบของกลุ่มตนเอง
+ * 5. Excel Import & Export (SheetJS Engine): นำเข้าข้อสอบ & ส่งออกคะแนนจำแนกห้อง
+ * 6. Anti-Cheating Engine: Fullscreen, Split-Screen Detect, Tab Switch Telemetry
+ * 7. Custom In-App Modal Dialogs: No more native browser popups!
+ */
+
+// Global App State
+const state = {
+    currentAddQuestionImage: null,
+    supabaseClient: null,
+    currentUser: null, // { role, id, name, year, dept, room }
+    currentExam: null,
+    questions: [],
+    currentView: 'view-auth',
+    currentQuestionIndex: 0,
+    answers: {}, // { [questionId]: selectedOptionId }
+    examTimer: null,
+    remainingSeconds: 0,
+    antiCheat: {
+        tabSwitches: 0,
+        fullscreenExits: 0,
+        isMonitoring: false
+    },
+    teacherCurrentTab: 'courses',
+    courses: [],
+    excelParsedQuestions: [],
+    realtimeAlertsEnabled: localStorage.getItem('EXAM_REALTIME_NOTIFICATIONS') !== 'false',
+    realtimeAlertsSoundEnabled: localStorage.getItem('EXAM_REALTIME_SOUND') !== 'false',
+    realtimeChannel: null,
+    globalRealtimeChannel: null,
+    liveFeedLogs: []
+};
+
 // ==============================================================================
 // QUESTION IMAGE & FORMATTING HELPERS
 // ==============================================================================
@@ -29,8 +69,6 @@ window.parseQuestionTextAndImage = function(rawText, explicitImgUrl) {
 
     return { text, image };
 };
-
-state.currentAddQuestionImage = null;
 
 window.handleQuestionImageSelect = function(event) {
     const file = event.target.files?.[0];
@@ -122,45 +160,6 @@ window.fillQuickChoices = function(type) {
     }
 };
 
-
-﻿/**
- * ==============================================================================
- * EXAMSECURE PRO - MAIN FRONTEND APPLICATION (SPA)
- * ==============================================================================
- * 1. 3-Role Access: Student (นักเรียน), Teacher (อาจารย์), Admin (ผู้ดูแลระบบ)
- * 2. Teacher Course Management: จัดการรายวิชาของครูแต่ละคน
- * 3. Classroom Targeting: กำหนดระดับชั้น (Year), แผนกวิชา (Dept), ห้องเรียน (Room)
- * 4. Student Auto-Filtering: นักเรียนเห็นเฉพาะข้อสอบของกลุ่มตนเอง
- * 5. Excel Import & Export (SheetJS Engine): นำเข้าข้อสอบ & ส่งออกคะแนนจำแนกห้อง
- * 6. Anti-Cheating Engine: Fullscreen, Split-Screen Detect, Tab Switch Telemetry
- * 7. Custom In-App Modal Dialogs: No more native browser popups!
- */
-
-// Global App State
-const state = {
-    supabaseClient: null,
-    currentUser: null, // { role, id, name, year, dept, room }
-    currentExam: null,
-    questions: [],
-    currentView: 'view-auth',
-    currentQuestionIndex: 0,
-    answers: {}, // { [questionId]: selectedOptionId }
-    examTimer: null,
-    remainingSeconds: 0,
-    antiCheat: {
-        tabSwitches: 0,
-        fullscreenExits: 0,
-        isMonitoring: false
-    },
-    teacherCurrentTab: 'courses',
-    courses: [],
-    excelParsedQuestions: [],
-    realtimeAlertsEnabled: localStorage.getItem('EXAM_REALTIME_NOTIFICATIONS') !== 'false',
-    realtimeAlertsSoundEnabled: localStorage.getItem('EXAM_REALTIME_SOUND') !== 'false',
-    realtimeChannel: null,
-    globalRealtimeChannel: null,
-    liveFeedLogs: []
-};
 
 // ==============================================================================
 // 1. SUPABASE INITIALIZATION & CONFIG (ADMIN ONLY)
