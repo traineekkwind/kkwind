@@ -3745,6 +3745,8 @@ function renderTeacherExamViewModal(exam, questions) {
     const modal = document.getElementById('modal-teacher-exam-view');
     if (!modal) return;
 
+    modal.classList.remove('hidden');
+
     const matchedCourse = state.courses?.find(c => c.id === exam.course_id);
     const courseCode = matchedCourse?.course_code || 'ทั่วไป';
     const courseName = matchedCourse?.course_name || 'วิชาทั่วไป';
