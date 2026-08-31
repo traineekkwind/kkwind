@@ -1242,6 +1242,23 @@
                     </div>
                 </div>
 
+                
+                <!-- Toggle: แสดงคะแนนทันทีหรือซ่อนไว้ -->
+                <div class="bg-amber-50/60 p-3.5 rounded-2xl border border-amber-100">
+                    <label class="flex items-center justify-between gap-3 cursor-pointer select-none">
+                        <div>
+                            <div class="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                                <i class="fas fa-eye text-amber-600"></i> แสดงคะแนนให้นักเรียนเห็นทันทีหลังส่ง
+                            </div>
+                            <div class="text-[11px] text-amber-700 mt-0.5">ปิด = นักเรียนจะเห็นแค่ "ส่งเรียบร้อย" โดยไม่เห็นคะแนน</div>
+                        </div>
+                        <div class="relative shrink-0">
+                            <input type="checkbox" id="create-exam-show-score" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-slate-300 peer-checked:bg-amber-500 rounded-full transition peer-focus:ring-2 peer-focus:ring-amber-400"></div>
+                            <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition peer-checked:translate-x-5"></div>
+                        </div>
+                    </label>
+                </div>
                 <div class="flex gap-2 pt-3">
                     <button type="button" onclick="document.getElementById('modal-create-exam').classList.add('hidden')" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium">ยกเลิก</button>
                     <button type="submit" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-100">สร้างข้อสอบ</button>
@@ -1491,6 +1508,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.7.1"></script>
+    <script src="./public/app.js?v=2.7.2"></script>
 </body>
 </html>

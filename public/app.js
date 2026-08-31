@@ -2127,7 +2127,23 @@ function renderResultView(res) {
     const cheatAuditEl = document.getElementById('result-cheat-audit-box');
     const examNameEl = document.getElementById('result-exam-title');
 
-    if (examNameEl) examNameEl.textContent = state.currentExam.title;
+    if (examNameEl) examNameEl.textContent = state.currentExam?.title || '';
+
+    // ตรวจสอบว่าอาจารย์อนุญาตให้แสดงคะแนนหรือไม่
+    const showScore = state.currentExam?.show_score_immediately !== false; // default = true
+
+    if (!showScore) {
+        // ซ่อนคะแนน → แสดงแค่ "ส่งเรียบร้อย รอประกาศผล"
+        if (scoreEl) scoreEl.innerHTML = `<span class="text-3xl">🎉</span><br><span class="text-lg font-bold text-slate-700">ส่งข้อสอบเรียบร้อยแล้ว!</span>`;
+        if (percentEl) percentEl.textContent = 'รอประกาศผลจากอาจารย์';
+        if (statusEl) {
+            statusEl.textContent = '📋 รอตรวจและประกาศผล';
+            statusEl.className = 'px-4 py-1.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-300';
+        }
+        if (cheatAuditEl) cheatAuditEl.innerHTML = '';
+        return;
+    }
+
     if (scoreEl) scoreEl.textContent = `${res.total_score} / ${res.max_score}`;
     if (percentEl) percentEl.textContent = `${res.percentage}%`;
 
@@ -5080,6 +5096,7 @@ function setupGlobalFormEvents() {
             const desc = document.getElementById('create-exam-desc').value.trim();
             const duration = document.getElementById('create-exam-duration').value;
             const maxSwitches = document.getElementById('create-exam-max-switches').value;
+            const showScore = document.getElementById('create-exam-show-score')?.checked !== false;
 
             if (!title) {
                 showToast('กรุณากรอกชื่อชุดข้อสอบ', 'warning');
@@ -5097,6 +5114,7 @@ function setupGlobalFormEvents() {
                 target_room: targetRoom,
                 duration_minutes: Number(duration) || 60,
                 max_tab_switches_allowed: Number(maxSwitches) || 3,
+                show_score_immediately: showScore,
                 is_active: true,
                 created_at: new Date().toISOString()
             };
