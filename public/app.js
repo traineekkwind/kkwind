@@ -4031,25 +4031,19 @@ async function loadTeacherExamsList() {
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2">
-                        <!-- 1. ดูข้อสอบ (ตรวจดูโจทย์) -->
-                        <button onclick="viewTeacherExam('${exam.id}')" class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs border border-indigo-200" title="คลิกเพื่อตรวจดูโจทย์และเฉลยของชุดข้อสอบนี้">
-                            <i class="fas fa-eye text-indigo-600"></i>
-                            <span>ดูข้อสอบ</span>
+                        <!-- 1. แก้ไขข้อสอบ (ตรวจดูโจทย์, เฉลย และเปิด/ปิดแสดงคะแนน) -->
+                        <button onclick="viewTeacherExam('${exam.id}')" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs" title="คลิกเพื่อแก้ไขข้อสอบ ตรวจดูโจทย์ เฉลย และตั้งค่าเปิด/ปิดแสดงคะแนน">
+                            <i class="fas fa-pen-to-square text-white"></i>
+                            <span>แก้ไขข้อสอบ</span>
                         </button>
 
-                        <!-- 2. สลับ เปิด/ปิดแสดงคะแนนทันที (Toggle Show/Hide Score) -->
-                        <button onclick="toggleExamShowScore('${exam.id}')" class="px-3.5 py-2 ${isShowScore ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300' : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="คลิกเพื่อเปิดหรือปิดการแสดงคะแนนให้นักเรียนเห็นทันทีหลังส่ง">
-                            <i class="fas ${isShowScore ? 'fa-eye text-amber-600' : 'fa-eye-slash text-slate-400'}"></i>
-                            <span>${isShowScore ? 'แสดงคะแนน' : 'ซ่อนคะแนน'}</span>
-                        </button>
-
-                        <!-- 3. ผลสอบ & ให้สอบใหม่ (Allow Retake) -->
-                        <button onclick="openExamSubmissionsUnlockModal('${exam.id}')" class="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs border border-purple-200" title="ดูผลสอบของชุดนี้ และกดปลดล็อกให้นักเรียนทำใหม่">
-                            <i class="fas fa-rotate-left text-purple-600"></i>
+                        <!-- 2. ผลสอบ & ให้สอบใหม่ (Allow Retake) -->
+                        <button onclick="openExamSubmissionsUnlockModal('${exam.id}')" class="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs border border-amber-300" title="ดูผลสอบของชุดนี้ และกดปลดล็อกให้นักเรียนทำใหม่">
+                            <i class="fas fa-rotate-left text-amber-600"></i>
                             <span>🔄 ให้สอบใหม่</span>
                         </button>
 
-                        <!-- 4. สลับ เปิด/ปิดสอบ ทันที -->
+                        <!-- 3. สลับ เปิด/ปิดสอบ ทันที -->
                         <button onclick="toggleExamActive('${exam.id}')" class="px-3.5 py-2 ${isActive ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="คลิกสลับเปิดหรือปิดสอบ">
                             <i class="fas ${isActive ? 'fa-toggle-on text-emerald-600 text-sm' : 'fa-toggle-off text-slate-400 text-sm'}"></i>
                             <span>${isActive ? 'ขอปิดสอบ' : 'เปิดสอบ'}</span>
@@ -4441,22 +4435,24 @@ function renderTeacherExamViewModal(exam, questions) {
     if (titleEl) titleEl.textContent = exam.title;
     if (metaEl) {
         metaEl.innerHTML = `
-            <span class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100/80 px-2.5 py-1 rounded-xl text-indigo-900 shadow-2xs">
-                <i class="far fa-clock text-indigo-600"></i> เวลาสอบ: <strong id="teacher-view-duration-display" class="font-bold text-indigo-700">${exam.duration_minutes || 60} นาที</strong>
-                <button type="button" onclick="openEditExamDurationModal('${exam.id}', ${exam.duration_minutes || 60}, '${escapeHtml(exam.title)}')" class="ml-1 px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition inline-flex items-center gap-1 shadow-xs" title="คลิกเพื่อเปลี่ยนเวลาทำข้อสอบ">
-                    <i class="fas fa-pen-to-square"></i> แก้ไขเวลา
+            <div class="flex flex-wrap items-center gap-2 pt-1">
+                <span class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100/80 px-2.5 py-1 rounded-xl text-indigo-900 shadow-2xs">
+                    <i class="far fa-clock text-indigo-600"></i> เวลาสอบ: <strong id="teacher-view-duration-display" class="font-bold text-indigo-700">${exam.duration_minutes || 60} นาที</strong>
+                    <button type="button" onclick="openEditExamDurationModal('${exam.id}', ${exam.duration_minutes || 60}, '${escapeHtml(exam.title)}')" class="ml-1 px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition inline-flex items-center gap-1 shadow-xs" title="คลิกเพื่อเปลี่ยนเวลาทำข้อสอบ">
+                        <i class="fas fa-pen-to-square"></i> แก้ไขเวลา
+                    </button>
+                </span>
+                <button type="button" onclick="toggleExamShowScore('${exam.id}'); setTimeout(() => viewTeacherExam('${exam.id}'), 200);" class="px-3 py-1.5 ${isShowScore ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'} rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-xs" title="คลิกเพื่อเปิดหรือปิดการแสดงคะแนนให้นักเรียนเห็นทันทีหลังส่ง">
+                    <i class="fas ${isShowScore ? 'fa-eye text-amber-600' : 'fa-eye-slash text-slate-500'}"></i>
+                    <span>${isShowScore ? '👁️ แสดงคะแนนให้นักเรียน: เปิด' : '🔒 ซ่อนคะแนน: ปิดอยู่'}</span>
                 </button>
-            </span>
-            <span><i class="fas fa-list-check text-emerald-500"></i> จำนวนข้อสอบ: <strong>${questions.length} ข้อ</strong> (${totalPoints} คะแนน)</span>
-            <span><i class="fas fa-bullseye text-amber-500"></i> เป้าหมาย: <strong>${escapeHtml(exam.target_year || 'ทุกชั้น')} ${escapeHtml(exam.target_department || 'ทุกแผนก')} ${escapeHtml(exam.target_room || 'ทุกห้อง')}</strong></span>
-            <span><i class="fas fa-shield-halved text-purple-500"></i> สลับจอ: <strong>${exam.max_tab_switches_allowed || 3} ครั้ง</strong></span>
-            <button type="button" onclick="toggleExamShowScore('${exam.id}'); setTimeout(() => viewTeacherExam('${exam.id}'), 200);" class="px-2.5 py-1 ${isShowScore ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'} rounded-xl text-xs font-bold transition inline-flex items-center gap-1 shadow-xs" title="คลิกเพื่อเปิดหรือปิดการแสดงคะแนนให้นักเรียนเห็นทันทีหลังส่ง">
-                <i class="fas ${isShowScore ? 'fa-eye text-amber-600' : 'fa-eye-slash text-slate-500'}"></i>
-                <span>${isShowScore ? '👁️ แสดงคะแนน: เปิด' : '🔒 ซ่อนคะแนนอยู่'}</span>
-            </button>
-            <button type="button" onclick="closeTeacherExamViewModal(); openExamSubmissionsUnlockModal('${exam.id}')" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1 shadow-xs">
-                <i class="fas fa-rotate-left"></i> ผลสอบ & ให้สอบใหม่
-            </button>
+                <span><i class="fas fa-list-check text-emerald-500"></i> ข้อสอบ: <strong>${questions.length} ข้อ</strong> (${totalPoints} คะแนน)</span>
+                <span><i class="fas fa-bullseye text-amber-500"></i> <strong>${escapeHtml(exam.target_year || 'ทุกชั้น')} ${escapeHtml(exam.target_department || 'ทุกแผนก')} ${escapeHtml(exam.target_room || 'ทุกห้อง')}</strong></span>
+                <span><i class="fas fa-shield-halved text-purple-500"></i> สลับจอ: <strong>${exam.max_tab_switches_allowed || 3} ครั้ง</strong></span>
+                <button type="button" onclick="closeTeacherExamViewModal(); openExamSubmissionsUnlockModal('${exam.id}')" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1 shadow-xs">
+                    <i class="fas fa-rotate-left"></i> ผลสอบ & ให้สอบใหม่
+                </button>
+            </div>
         `;
     }
 
