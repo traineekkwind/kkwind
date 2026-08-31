@@ -1338,33 +1338,37 @@ window.startExam = async function(examId) {
             try {
                 const studentId = state.currentUser.id;
                 const studentName = state.currentUser.name || '';
-                
-                let checkQuery = state.supabaseClient
-                    .from('exam_results')
-                    .select('id, total_score, max_score, percentage')
-                    .eq('exam_id', examId);
 
-                if (isValidUUID(studentId) && studentName) {
-                    checkQuery = checkQuery.or(`student_id.eq.${studentId},student_name.eq."${studentName}"`);
-                } else if (isValidUUID(studentId)) {
-                    checkQuery = checkQuery.eq('student_id', studentId);
-                } else if (studentName) {
-                    checkQuery = checkQuery.eq('student_name', studentName);
+                // ค้นหาด้วยชื่อก่อน (สำคัญที่สุด)
+                let { data: byName } = await state.supabaseClient
+                    .from('exam_results')
+                    .select('id')
+                    .eq('exam_id', examId)
+                    .eq('student_name', studentName);
+
+                // ถ้าไม่เจอด้วยชื่อ ลองด้วย UUID
+                if ((!byName || byName.length === 0) && isValidUUID(studentId)) {
+                    const res = await state.supabaseClient
+                        .from('exam_results')
+                        .select('id')
+                        .eq('exam_id', examId)
+                        .eq('student_id', studentId);
+                    byName = res.data;
                 }
 
-                const { data: dbCheck, error } = await checkQuery;
-
-                if (!error && dbCheck && dbCheck.length > 0) {
+                if (byName && byName.length > 0) {
                     isAlreadySubmitted = true;
-                } else if (!error && Array.isArray(dbCheck) && dbCheck.length === 0) {
-                    // คลาวด์ยืนยันว่าไม่มีผลสอบแล้ว (อาจารย์ปลดล็อกให้สอบใหม่แล้ว)
+                } else {
+                    // Cloud ยืนยันว่าไม่มีผลสอบแล้ว → ล้างแคชเก่าออก
                     const localSubs = getLocalSubmissions();
                     const cleanName = (studentName || '').trim().toLowerCase();
                     const filtered = localSubs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || (s.student_name && s.student_name.trim().toLowerCase() === cleanName))));
                     localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(filtered));
                     isAlreadySubmitted = false;
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.warn('[startExam] Submission check error:', e);
+            }
         } else {
             const localSubs = getLocalSubmissions();
             const currentName = (state.currentUser?.name || '').trim().toLowerCase();
@@ -1485,7 +1489,14 @@ function renderExamQuestion() {
 
     if (optionsContainer) {
         const selectedOpt = state.answers[q.id];
-        optionsContainer.innerHTML = (q.options || []).map(opt => {
+        // options จาก Supabase อาจเป็น string JSON → ต้อง parse ก่อน
+        let opts = q.options;
+        if (typeof opts === 'string') {
+            try { opts = JSON.parse(opts); } catch (e) { opts = []; }
+        }
+        if (!Array.isArray(opts)) opts = [];
+
+        optionsContainer.innerHTML = opts.map(opt => {
             const isChecked = selectedOpt === opt.id;
             return `
                 <label class="p-4 rounded-2xl border-2 cursor-pointer transition flex items-start gap-3.5 ${
