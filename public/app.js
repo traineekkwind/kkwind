@@ -2127,8 +2127,10 @@ async function submitExamFinal() {
 function renderResultView(res) {
     showView('view-student-result');
 
+    const scoreTitleEl = document.getElementById('result-score-title-label');
     const scoreEl = document.getElementById('result-score-display');
     const percentEl = document.getElementById('result-percentage-display');
+    const percentPrefix = document.getElementById('result-percentage-prefix');
     const statusEl = document.getElementById('result-status-badge');
     const cheatAuditEl = document.getElementById('result-cheat-audit-box');
     const examNameEl = document.getElementById('result-exam-title');
@@ -2139,18 +2141,22 @@ function renderResultView(res) {
     const showScore = state.currentExam?.show_score_immediately !== false; // default = true
 
     if (!showScore) {
-        // ซ่อนคะแนน → แสดงแค่ "ส่งเรียบร้อย รอประกาศผล"
-        if (scoreEl) scoreEl.innerHTML = `<span class="text-3xl">🎉</span><br><span class="text-lg font-bold text-slate-700">ส่งข้อสอบเรียบร้อยแล้ว!</span>`;
-        if (percentEl) percentEl.textContent = 'รอประกาศผลจากอาจารย์';
+        // ซ่อนคะแนน → แสดงแค่ "ส่งเรียบร้อย รอประกาศผล" (เอาคำว่า คิดเป็นร้อยละ: ออก)
+        if (scoreTitleEl) scoreTitleEl.textContent = 'สถานะการส่งข้อสอบ';
+        if (scoreEl) scoreEl.innerHTML = `<span class="text-3xl text-emerald-600">🎉</span><br><span class="text-xl font-bold text-slate-800">ส่งข้อสอบเรียบร้อยแล้ว</span>`;
+        if (percentPrefix) percentPrefix.textContent = '';
+        if (percentEl) percentEl.innerHTML = '<span class="text-xs font-medium text-slate-500">ระบบบันทึกคำตอบของคุณแล้ว กรุณารออาจารย์ตรวจและประกาศคะแนน</span>';
         if (statusEl) {
-            statusEl.textContent = '📋 รอตรวจและประกาศผล';
+            statusEl.textContent = '📋 บันทึกข้อสอบเรียบร้อย (รอประกาศผล)';
             statusEl.className = 'px-4 py-1.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-300';
         }
         if (cheatAuditEl) cheatAuditEl.innerHTML = '';
         return;
     }
 
+    if (scoreTitleEl) scoreTitleEl.textContent = 'คะแนนรวมที่ทำได้';
     if (scoreEl) scoreEl.textContent = `${res.total_score} / ${res.max_score}`;
+    if (percentPrefix) percentPrefix.textContent = 'คิดเป็นร้อยละ: ';
     if (percentEl) percentEl.textContent = `${res.percentage}%`;
 
     if (res.is_flagged_cheating) {

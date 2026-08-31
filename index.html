@@ -244,10 +244,10 @@
                 <p id="result-exam-title" class="text-xs font-medium text-slate-500 mb-6">ชื่อชุดข้อสอบ</p>
 
                 <div class="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-6">
-                    <div class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">คะแนนรวมที่ทำได้</div>
+                    <div id="result-score-title-label" class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">คะแนนรวมที่ทำได้</div>
                     <div id="result-score-display" class="text-4xl sm:text-5xl font-black text-indigo-600 mb-2">0.00 / 0.00</div>
-                    <div class="text-sm font-semibold text-slate-600">
-                        คิดเป็นร้อยละ: <span id="result-percentage-display" class="text-indigo-700 font-bold">0%</span>
+                    <div id="result-percentage-container" class="text-sm font-semibold text-slate-600">
+                        <span id="result-percentage-prefix">คิดเป็นร้อยละ: </span><span id="result-percentage-display" class="text-indigo-700 font-bold">0%</span>
                     </div>
                 </div>
 
@@ -1508,6 +1508,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.7.4"></script>
+    <script src="./public/app.js?v=2.7.5"></script>
 </body>
 </html>
