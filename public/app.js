@@ -2057,28 +2057,10 @@ async function submitExamFinal() {
 
         // 2. ถ้าต่อ Supabase ได้ ให้ Sync ขึ้น DB
         if (isSupabaseConfigured() && state.supabaseClient) {
+            // ลอง RPC grade_exam_secure ก่อน
+            let rpcOk = false;
             try {
-                const answersList = state.questions.map(q => ({
-                    student_id: state.currentUser.id,
-                    student_name: state.currentUser.name,
-                    student_year: state.currentUser.year || 'ไม่ระบุ',
-                    student_department: state.currentUser.dept || 'ไม่ระบุ',
-                    student_room: state.currentUser.room || 'ไม่ระบุ',
-                    exam_id: state.currentExam.id,
-                    question_id: q.id,
-                    selected_option_id: state.answers[q.id] || 'NONE',
-                    tab_switch_count: state.antiCheat.tabSwitches,
-                    fullscreen_exit_count: state.antiCheat.fullscreenExits,
-                    submitted_at: new Date().toISOString()
-                }));
-
-                await state.supabaseClient
-                    .from('student_submissions')
-                    .upsert(answersList, {
-                        onConflict: 'student_id,exam_id,question_id'
-                    });
-
-                await state.supabaseClient.rpc('grade_exam_secure', {
+                const rpcRes = await state.supabaseClient.rpc('grade_exam_secure', {
                     p_student_id: state.currentUser.id,
                     p_exam_id: state.currentExam.id,
                     p_student_name: state.currentUser.name,
@@ -2086,8 +2068,37 @@ async function submitExamFinal() {
                     p_student_department: state.currentUser.dept || 'ไม่ระบุ',
                     p_student_room: state.currentUser.room || 'ไม่ระบุ'
                 });
-            } catch (syncErr) {
-                console.warn('[Supabase Grade Sync Warning]:', syncErr);
+                if (!rpcRes.error) rpcOk = true;
+            } catch (rpcErr) {
+                console.warn('[grade_exam_secure RPC warning]:', rpcErr);
+            }
+
+            // ถ้า RPC ไม่สำเร็จ → บันทึกตรงลง exam_results เอง
+            if (!rpcOk) {
+                try {
+                    await state.supabaseClient
+                        .from('exam_results')
+                        .upsert({
+                            student_id: state.currentUser.id,
+                            student_name: state.currentUser.name,
+                            student_year: state.currentUser.year || 'ไม่ระบุ',
+                            student_department: state.currentUser.dept || 'ไม่ระบุ',
+                            student_room: state.currentUser.room || 'ไม่ระบุ',
+                            exam_id: state.currentExam.id,
+                            course_name: state.currentExam?.course?.course_name || 'วิชาทั่วไป',
+                            total_score: gradeResult.total_score,
+                            max_score: gradeResult.max_score,
+                            percentage: gradeResult.percentage,
+                            total_tab_switches: state.antiCheat.tabSwitches || 0,
+                            total_fullscreen_exits: state.antiCheat.fullscreenExits || 0,
+                            is_flagged_cheating: gradeResult.is_flagged_cheating,
+                            cheating_reasons: gradeResult.cheating_reasons || [],
+                            status: 'graded',
+                            graded_at: new Date().toISOString()
+                        }, { onConflict: 'student_name,exam_id' });
+                } catch (upsertErr) {
+                    console.warn('[exam_results upsert warning]:', upsertErr);
+                }
             }
         }
 
