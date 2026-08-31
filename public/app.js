@@ -447,6 +447,19 @@ function handleIncomingAppSync(message) {
     }
 
     // 2. Student Submission Event
+        // 1.1 Student Retake Unlocked Event (อาจารย์ปลดล็อกให้สอบใหม่)
+    if (type === 'student_retake_unlocked') {
+        const isStudentLobby = state.currentView === 'view-student-lobby' || (document.getElementById('view-student-lobby') && !document.getElementById('view-student-lobby').classList.contains('hidden'));
+        if (isStudentLobby && state.currentUser?.role === 'student') {
+            const currentStudentId = state.currentUser.id;
+            const currentStudentCode = state.currentUser.student_code || state.currentUser.code;
+            if (!payload || payload.studentId === currentStudentId || payload.studentId === currentStudentCode) {
+                loadStudentLobby();
+                showToast('อาจารย์ได้ปลดล็อกให้คุณเข้าทำข้อสอบใหม่อีกครั้งแล้ว!', 'success');
+            }
+        }
+    }
+
     if (type === 'student_submission') {
         const isTeacherView = state.currentView === 'view-teacher' || (document.getElementById('view-teacher') && !document.getElementById('view-teacher').classList.contains('hidden'));
         if (isTeacherView) {
@@ -939,6 +952,36 @@ async function loadStudentLobby() {
         }
     }
 
+    // ดึงประวัติการส่งข้อสอบของนักเรียนคนนี้ เพื่อตรวจสอบว่าเคยทำข้อสอบไปแล้วหรือไม่
+    let studentSubmissions = [];
+    if (isSupabaseConfigured() && state.supabaseClient && state.currentUser) {
+        try {
+            const studentId = state.currentUser.id;
+            const studentCode = state.currentUser.student_code || state.currentUser.code || '';
+            const { data: dbSubmissions } = await state.supabaseClient
+                .from('exam_results')
+                .select('*')
+                .or(`student_id.eq.${studentId},student_id.eq.${studentCode}`);
+            if (dbSubmissions && Array.isArray(dbSubmissions)) {
+                studentSubmissions = dbSubmissions;
+            }
+        } catch (subErr) {
+            console.warn('[loadStudentLobby] Submissions check notice:', subErr);
+        }
+    }
+
+    if (studentSubmissions.length === 0) {
+        const localSubs = getLocalSubmissions();
+        const currentName = (state.currentUser?.name || '').trim().toLowerCase();
+        const currentId = state.currentUser?.id;
+        const currentCode = state.currentUser?.student_code || state.currentUser?.code;
+        studentSubmissions = (localSubs || []).filter(s => 
+            s.student_id === currentId || 
+            s.student_id === currentCode ||
+            (s.student_name && s.student_name.trim().toLowerCase() === currentName)
+        );
+    }
+
     // คัดกรองเฉพาะข้อสอบที่ตรงกับกลุ่มของนักเรียน (หรือเป็น 'ทั้งหมด')
     const eligibleExams = (exams || []).filter(exam => isExamEligibleForStudent(exam, state.currentUser));
 
@@ -964,15 +1007,25 @@ async function loadStudentLobby() {
 
         const targetTag = `${exam.target_year || 'ทุกชั้น'} | ${exam.target_department || 'ทุกแผนก'} | ${exam.target_room || 'ทุกห้อง'}`;
 
+        // เช็คว่าทำข้อสอบชุดนี้ไปแล้วหรือไม่
+        const pastSubmission = studentSubmissions.find(s => s.exam_id === exam.id);
+        const isCompleted = !!pastSubmission;
+
         return `
-            <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+            <div class="bg-white rounded-3xl p-6 border ${isCompleted ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-100'} shadow-sm hover:shadow-md transition flex flex-col justify-between">
                 <div>
                     <!-- Header Badges -->
                     <div class="flex items-center justify-between gap-2 mb-3">
                         <span class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100">
                             [${escapeHtml(courseCode)}] ${escapeHtml(courseName)}
                         </span>
-                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700">เปิดสอบ</span>
+                        ${isCompleted ? `
+                            <span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                                <i class="fas fa-check-circle"></i> ทำแล้ว
+                            </span>
+                        ` : `
+                            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700">เปิดสอบ</span>
+                        `}
                     </div>
 
                     <h3 class="text-base font-bold text-slate-900 mb-1.5 leading-snug">${escapeHtml(exam.title)}</h3>
@@ -988,17 +1041,37 @@ async function loadStudentLobby() {
                     </div>
                 </div>
 
-                <div class="pt-4 border-t border-slate-100">
-                    <div class="grid grid-cols-2 gap-2 text-xs text-slate-500 mb-4">
-                        <div><i class="far fa-clock mr-1 text-indigo-500"></i> เวลา: <strong>${exam.duration_minutes} นาที</strong></div>
-                        <div><i class="far fa-question-circle mr-1 text-indigo-500"></i> ชุดข้อสอบ: <strong>พร้อมทำ</strong></div>
-                        <div class="col-span-2 text-amber-700 text-[11px]"><i class="fas fa-eye mr-1"></i> อนุญาตสลับจอ: <strong>${exam.max_tab_switches_allowed} ครั้ง</strong></div>
-                    </div>
+                ${isCompleted ? `
+                    <div class="pt-4 border-t border-emerald-100">
+                        <div class="p-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl mb-3 text-center">
+                            <div class="text-xs font-bold text-emerald-800 flex items-center justify-center gap-1.5 mb-1">
+                                <i class="fas fa-circle-check text-emerald-600"></i> ทำข้อสอบเสร็จสิ้นแล้ว
+                            </div>
+                            <div class="text-xs text-emerald-700">
+                                คะแนน: <strong>${pastSubmission.total_score} / ${pastSubmission.max_score}</strong> (${pastSubmission.percentage}%)
+                            </div>
+                        </div>
 
-                    <button onclick="startExam('${exam.id}')" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-sm">
-                        <i class="fas fa-play text-xs"></i> เข้าทำข้อสอบ
-                    </button>
-                </div>
+                        <button disabled class="w-full py-2.5 px-4 bg-slate-100 text-slate-400 font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-not-allowed border border-slate-200">
+                            <i class="fas fa-lock text-slate-400"></i> สอบไปแล้ว (ไม่อนุญาตให้ทำซ้ำ)
+                        </button>
+                        <p class="text-[10px] text-slate-400 text-center mt-1.5">
+                            * หากต้องการทำใหม่ กรุณาติดต่ออาจารย์ผู้สอนเพื่อปลดล็อก
+                        </p>
+                    </div>
+                ` : `
+                    <div class="pt-4 border-t border-slate-100">
+                        <div class="grid grid-cols-2 gap-2 text-xs text-slate-500 mb-4">
+                            <div><i class="far fa-clock mr-1 text-indigo-500"></i> เวลา: <strong>${exam.duration_minutes || 60} นาที</strong></div>
+                            <div><i class="far fa-question-circle mr-1 text-indigo-500"></i> ชุดข้อสอบ: <strong>พร้อมทำ</strong></div>
+                            <div class="col-span-2 text-amber-700 text-[11px]"><i class="fas fa-eye mr-1"></i> อนุญาตสลับจอ: <strong>${exam.max_tab_switches_allowed || 3} ครั้ง</strong></div>
+                        </div>
+
+                        <button onclick="startExam('${exam.id}')" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fas fa-play text-xs"></i> เข้าทำข้อสอบ
+                        </button>
+                    </div>
+                `}
             </div>
         `;
     }).join('');
@@ -1048,10 +1121,48 @@ window.startExam = async function(examId) {
             return;
         }
 
+        // ตรวจสอบว่านักเรียนเคยส่งข้อสอบชุดนี้ไปแล้วหรือไม่
+        let isAlreadySubmitted = false;
+        if (isSupabaseConfigured() && state.supabaseClient && state.currentUser) {
+            try {
+                const studentId = state.currentUser.id;
+                const studentCode = state.currentUser.student_code || state.currentUser.code || '';
+                const { data: dbCheck } = await state.supabaseClient
+                    .from('exam_results')
+                    .select('id, total_score, max_score, percentage')
+                    .eq('exam_id', examId)
+                    .or(`student_id.eq.${studentId},student_id.eq.${studentCode}`);
+                if (dbCheck && dbCheck.length > 0) {
+                    isAlreadySubmitted = true;
+                }
+            } catch (e) {}
+        }
+
+        if (!isAlreadySubmitted) {
+            const localSubs = getLocalSubmissions();
+            const currentName = (state.currentUser?.name || '').trim().toLowerCase();
+            const currentId = state.currentUser?.id;
+            const currentCode = state.currentUser?.student_code || state.currentUser?.code;
+            const match = (localSubs || []).find(s => 
+                s.exam_id === examId &&
+                (s.student_id === currentId || s.student_id === currentCode || (s.student_name && s.student_name.trim().toLowerCase() === currentName))
+            );
+            if (match) isAlreadySubmitted = true;
+        }
+
+        if (isAlreadySubmitted) {
+            showCustomAlert({
+                title: 'คุณได้ทำข้อสอบชุดนี้ไปแล้ว',
+                message: `คุณได้ส่งคำตอบสำหรับชุดข้อสอบ "${exam.title}" เรียบร้อยแล้ว และไม่อนุญาตให้ทำซ้ำ\n\nหากมีเหตุจำเป็นต้องสอบใหม่ กรุณาติดต่ออาจารย์ผู้สอนเพื่อกดเปิด/ปลดล็อกให้สอบใหม่ครับ`,
+                icon: 'fas fa-lock'
+            });
+            return;
+        }
+
         if (!questions || questions.length === 0) {
             showCustomAlert({
                 title: 'ยังไม่มีคำถาม',
-                message: 'ชุดข้อสอบนี้ยังไม่มีคำถาม กรุณาติดต่ออาจารย์ประจำวิชาเพื่อเพิ่มโจทย์หรือนำเข้าไฟล์ Excel',
+                message: 'ชุดข้อสอบนี้ยังไม่มีคำถาม กรุณาติดต่ออาจารย์ประจำวิชาเพื่อเพิ่มโจทย์หรือนำเข้า Excel',
                 icon: 'fas fa-circle-info'
             });
             return;
@@ -1060,16 +1171,16 @@ window.startExam = async function(examId) {
         // ตรวจจับ Split Screen
         if (isSplitScreenDetected()) {
             showCustomAlert({
-                title: 'ตรวจพบโหมดแบ่งหน้าจอ',
-                message: 'ตรวจพบการใช้งานโหมดแบ่งหน้าจอ (Split Screen / Pop-up Window)\n\nระบบไม่อนุญาตให้ทำข้อสอบในโหมดนี้ กรุณาขยายหน้าจอเต็มก่อนเริ่มสอบ',
+                title: 'ตรวจพบการแบ่งหน้าจอ',
+                message: 'ตรวจพบว่ามีการใช้งานแบ่งหน้าจอ (Split Screen / Pop-up Window)\n\nระบบไม่อนุญาตให้เข้าทำข้อสอบ กรุณาขยายเต็มหน้าจอก่อนเริ่มสอบ',
                 icon: 'fas fa-triangle-exclamation'
             });
             return;
         }
 
         showCustomConfirm({
-            title: 'พร้อมเริ่มทำข้อสอบหรือไม่?',
-            message: `ชุดข้อสอบ: ${exam.title}\nรายวิชา: ${exam.course?.course_name || 'ทั่วไป'}\nเวลาทำข้อสอบ: ${exam.duration_minutes} นาที (${questions.length} ข้อ)\n\n⚠️ กฎความปลอดภัยห้องสอบ:\n1. กรุณาปิดหน้าต่างแชทลอย (Messenger / LINE Bubbles) และการแจ้งเตือนทั้งหมด\n2. ห้ามสลับหน้าจอ ห้ามย่อจอ หรือเปิดแอปอื่นเด็ดขาด\n3. การแตะเปิดแชทลอยระหว่างสอบจะถูกบันทึกเป็นการทุจริตทันที`,
+            title: 'เริ่มเข้าทำข้อสอบ?',
+            message: `ชุดข้อสอบ: ${exam.title}\nวิชา: ${exam.course?.course_name || 'ทั่วไป'}\nเวลาทำข้อสอบ: ${exam.duration_minutes || 60} นาที (${questions.length} ข้อ)\n\n🛡️ กฎระเบียบระหว่างการสอบ:\n1. กรุณาปิดหน้าต่างแชทลอย (Messenger / LINE Bubbles) ทั้งหมดก่อนเริ่ม\n2. ห้ามสลับหน้าจอ ห้ามแคปจอ และห้ามออกจากโหมดเต็มจอเด็ดขาด\n3. การเปิดแชทระหว่างสอบจะถูกบันทึกเป็นพฤติกรรมทุจริตทันที`,
             icon: 'fas fa-shield-halved',
             confirmText: 'รับทราบและเริ่มสอบทันที',
             cancelText: 'ยังไม่พร้อม',
@@ -1079,294 +1190,140 @@ window.startExam = async function(examId) {
                     if (document.documentElement.requestFullscreen) {
                         await document.documentElement.requestFullscreen();
                     }
-                } catch (fsErr) {}
+                } catch (e) {
+                    console.warn('[Fullscreen Warning]:', e);
+                }
 
                 state.currentExam = exam;
-
-                // 🔀 1. SHUFFLE QUESTIONS & OPTIONS (สลับข้อและสลับตัวเลือกแบบสุ่มเฉพาะบุคคล)
-                // ตรวจสอบว่ามีร่างคำตอบเดิมที่เคยเซฟไว้หรือไม่ (Auto-Save Resume)
-                const savedDraft = loadStudentDraftAnswers(state.currentUser.id, exam.id);
-                
-                if (savedDraft && savedDraft.questions && savedDraft.questions.length > 0) {
-                    // ใช้ลำดับข้อและตัวเลือกเดิมที่บันทึกไว้
-                    state.questions = savedDraft.questions;
-                    state.answers = savedDraft.answers || {};
-                    state.remainingSeconds = savedDraft.remainingSeconds > 0 ? savedDraft.remainingSeconds : (exam.duration_minutes * 60);
-                    showToast(`💾 กู้คืนคำตอบที่บันทึกไว้อัตโนมัติ (${Object.keys(state.answers).length}/${state.questions.length} ข้อ)`, 'success');
-                } else {
-                    // สุ่มสลับข้อสอบและตัวเลือกใหม่สำหรับนักเรียนคนนี้
-                    state.questions = prepareShuffledQuestions(questions);
-                    state.answers = {};
-                    state.remainingSeconds = exam.duration_minutes * 60;
-                    saveStudentDraftAnswers();
-                }
-
+                state.questions = questions;
                 state.currentQuestionIndex = 0;
-                state.antiCheat = {
-                    tabSwitches: 0,
-                    fullscreenExits: 0,
-                    isMonitoring: true
-                };
-
-                // Connect student realtime broadcaster channel
-                if (state.supabaseClient) {
-                    try {
-                        if (state.realtimeChannel) {
-                            state.supabaseClient.removeChannel(state.realtimeChannel);
-                        }
-                        state.realtimeChannel = state.supabaseClient.channel('exam_realtime_alerts');
-                        state.realtimeChannel.subscribe((status) => {
-                            console.log('[Student Realtime Status]:', status);
-                        });
-                    } catch (rtErr) {
-                        console.warn('[Student Realtime Warning]:', rtErr);
-                    }
-                }
+                state.answers = {};
+                state.antiCheat.tabSwitches = 0;
+                state.antiCheat.fullscreenExits = 0;
+                state.antiCheat.cheatingReasons = [];
+                state.examRemainingSeconds = (exam.duration_minutes || 60) * 60;
 
                 showView('view-student-exam');
-                renderExamHeader();
-                renderQuestion(0);
-                renderQuestionNav();
-                updateAutoSaveBadge();
-                startAntiCheatMonitor();
+                renderExamQuestion();
+                renderQuestionPalette();
                 startCountdownTimer();
-
-                showToast('เริ่มการสอบแล้ว ขอให้โชคดี!', 'info');
+                startAntiCheatMonitor();
+                showToast('เริ่มทำข้อสอบ ขอให้โชคดีในการสอบครับ!', 'success');
             }
         });
 
     } catch (err) {
-        showToast('เกิดข้อผิดพลาดในการโหลดข้อสอบ: ' + err.message, 'error');
+        showCustomAlert({
+            title: 'เกิดข้อผิดพลาด',
+            message: 'ไม่สามารถโหลดชุดข้อสอบได้: ' + err.message,
+            icon: 'fas fa-triangle-exclamation'
+        });
     }
 };
 
-// ==============================================================================
-// 4.1 SHUFFLE & AUTO-SAVE HELPERS
-// ==============================================================================
+function renderExamQuestion() {
+    if (!state.questions || state.questions.length === 0) return;
+    const q = state.questions[state.currentQuestionIndex];
+    if (!q) return;
 
-function shuffleArray(array) {
-    const arr = [...array];
-    for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
+    const numEl = document.getElementById('exam-question-number');
+    const pointsEl = document.getElementById('exam-question-points');
+    const textEl = document.getElementById('exam-question-text');
+    const optionsContainer = document.getElementById('exam-options-container');
+
+    if (numEl) numEl.textContent = `ข้อที่ ${state.currentQuestionIndex + 1} จาก ${state.questions.length}`;
+    if (pointsEl) pointsEl.textContent = `(${q.points || 1} คะแนน)`;
+    if (textEl) textEl.textContent = q.question_text;
+
+    if (optionsContainer) {
+        const selectedOpt = state.answers[q.id];
+        optionsContainer.innerHTML = (q.options || []).map(opt => {
+            const isChecked = selectedOpt === opt.id;
+            return `
+                <label class="p-4 rounded-2xl border-2 cursor-pointer transition flex items-start gap-3.5 ${
+                    isChecked
+                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 shadow-sm font-semibold'
+                        : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                }">
+                    <input type="radio" name="option-choice" value="${opt.id}" ${isChecked ? 'checked' : ''} onchange="selectExamOption('${q.id}', '${opt.id}')" class="mt-1 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                    <span class="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-xs shrink-0 ${isChecked ? 'bg-indigo-600 text-white' : 'text-slate-600'}">
+                        ${opt.id}
+                    </span>
+                    <span class="text-sm pt-0.5 leading-relaxed">${escapeHtml(opt.text)}</span>
+                </label>
+            `;
+        }).join('');
     }
-    return arr;
+
+    updateExamNavButtons();
+    renderQuestionPalette();
 }
 
-function prepareShuffledQuestions(originalQuestions) {
-    if (!originalQuestions || originalQuestions.length === 0) return [];
-
-    // 1. สลับลำดับข้อสอบ (Questions Shuffle)
-    const shuffledList = shuffleArray(originalQuestions);
-
-    // 2. สลับลำดับตัวเลือก ก, ข, ค, ง ในแต่ละข้อ (Choices Shuffle)
-    return shuffledList.map(q => {
-        let opts = q.options;
-        if (typeof opts === 'string') {
-            try { opts = JSON.parse(opts); } catch (e) { opts = []; }
-        }
-        if (!Array.isArray(opts) || opts.length === 0) return q;
-
-        // สลับตัวเลือกแบบสุ่ม
-        const shuffledOptions = shuffleArray(opts);
-
-        return {
-            ...q,
-            options: shuffledOptions
-        };
-    });
-}
-
-function getDraftStorageKey(studentId, examId) {
-    const sId = studentId || state.currentUser?.id;
-    const eId = examId || state.currentExam?.id;
-    if (!sId || !eId) return null;
-    return `EXAM_DRAFT_ANSWERS_${sId}_${eId}`;
+function selectExamOption(questionId, optionId) {
+    state.answers[questionId] = optionId;
+    saveStudentDraftAnswers();
+    renderExamQuestion();
 }
 
 function saveStudentDraftAnswers() {
-    const key = getDraftStorageKey();
-    if (!key) return;
+    if (!state.currentExam || !state.currentUser) return;
     try {
-        const draft = {
-            questions: state.questions,
-            answers: state.answers,
-            remainingSeconds: state.remainingSeconds,
-            lastSaved: Date.now()
-        };
-        localStorage.setItem(key, JSON.stringify(draft));
+        const key = `DRAFT_ANSWERS_${state.currentUser.id}_${state.currentExam.id}`;
+        localStorage.setItem(key, JSON.stringify(state.answers));
     } catch (e) {}
-}
-
-function loadStudentDraftAnswers(studentId, examId) {
-    const key = getDraftStorageKey(studentId, examId);
-    if (!key) return null;
-    try {
-        const raw = localStorage.getItem(key);
-        if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return null;
 }
 
 function clearStudentDraftAnswers() {
-    const key = getDraftStorageKey();
-    if (key) {
-        try { localStorage.removeItem(key); } catch (e) {}
-    }
+    if (!state.currentExam || !state.currentUser) return;
+    try {
+        const key = `DRAFT_ANSWERS_${state.currentUser.id}_${state.currentExam.id}`;
+        localStorage.removeItem(key);
+    } catch (e) {}
 }
 
-function updateAutoSaveBadge() {
-    const badge = document.getElementById('exam-autosave-badge');
-    if (!badge) return;
+function renderQuestionPalette() {
+    const palette = document.getElementById('exam-question-palette');
+    if (!palette || !state.questions) return;
 
-    const answeredCount = Object.keys(state.answers).length;
-    const totalCount = state.questions.length;
-
-    badge.innerHTML = `
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span>บันทึกแล้ว (${answeredCount}/${totalCount} ข้อ)</span>
-    `;
-}
-
-function renderExamHeader() {
-    const titleEl = document.getElementById('exam-room-title');
-    const studentEl = document.getElementById('exam-room-student');
-    const courseBadge = document.getElementById('exam-room-course-badge');
-    const badgeEl = document.getElementById('exam-room-tab-badge');
-
-    if (titleEl) titleEl.textContent = state.currentExam.title;
-    if (courseBadge) courseBadge.textContent = state.currentExam.course?.course_name || 'ชุดข้อสอบ';
-    if (studentEl) studentEl.textContent = `${state.currentUser.name} (${state.currentUser.year} ${state.currentUser.room})`;
-    if (badgeEl) badgeEl.textContent = `สลับจอ: 0/${state.currentExam.max_tab_switches_allowed}`;
-}
-
-function renderQuestion(index) {
-    state.currentQuestionIndex = index;
-    const q = state.questions[index];
-    if (!q) return;
-
-    const container = document.getElementById('exam-question-card');
-    if (!container) return;
-
-    renderQuestionNav();
-
-    let options = q.options;
-    if (typeof options === 'string') {
-        try { options = JSON.parse(options); } catch (e) { options = []; }
-    }
-
-    const selectedOption = state.answers[q.id] || null;
-
-    container.innerHTML = `
-        <div class="flex items-start justify-between gap-4 mb-6 select-none">
-            <div class="flex items-center gap-3">
-                <span class="w-9 h-9 flex items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 font-bold text-base">
-                    ${index + 1}
-                </span>
-                <span class="text-xs font-medium px-2.5 py-1 bg-gray-100 text-gray-600 rounded-lg">
-                    คะแนน: ${q.points} คะแนน
-                </span>
-            </div>
-            <span class="text-xs text-gray-400">ข้อที่ ${index + 1} จากทั้งหมด ${state.questions.length} ข้อ</span>
-        </div>
-
-        <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-6 leading-relaxed exam-protection select-none">
-            ${escapeHtml(q.question_text)}
-        </h2>
-
-        <div class="space-y-3 mb-8">
-            ${options.map((opt, optIdx) => {
-                const isChecked = selectedOption === opt.id;
-                const displayLabel = ['A', 'B', 'C', 'D', 'E', 'F'][optIdx] || (optIdx + 1);
-                return `
-                    <label onclick="selectAnswer('${q.id}', '${opt.id}')" class="flex items-center p-4 rounded-xl border-2 cursor-pointer transition select-none ${
-                        isChecked 
-                            ? 'border-indigo-600 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-500' 
-                            : 'border-gray-100 hover:border-gray-200 bg-white'
-                    }">
-                        <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition ${
-                            isChecked ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'
-                        }">
-                            ${isChecked ? '<i class="fas fa-check text-white text-xs"></i>' : ''}
-                        </div>
-                        <span class="font-bold text-gray-700 w-6">${displayLabel}.</span>
-                        <span class="text-gray-800 text-sm md:text-base flex-1 exam-protection select-none">${escapeHtml(opt.text)}</span>
-                    </label>
-                `;
-            }).join('')}
-        </div>
-
-        <div class="flex items-center justify-between pt-6 border-t border-gray-100">
-            <button onclick="prevQuestion()" ${index === 0 ? 'disabled' : ''} class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
-                <i class="fas fa-arrow-left text-xs"></i> ข้อย้อนหลัง
-            </button>
-
-            ${index < state.questions.length - 1 ? `
-                <button onclick="nextQuestion()" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition flex items-center gap-2 shadow-sm">
-                    ข้อถัดไป <i class="fas fa-arrow-right text-xs"></i>
-                </button>
-            ` : `
-                <button onclick="confirmSubmitExam()" class="px-6 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition flex items-center gap-2 shadow-sm">
-                    <i class="fas fa-paper-plane text-xs"></i> ส่งข้อสอบ
-                </button>
-            `}
-        </div>
-    `;
-}
-
-function renderQuestionNav() {
-    const navContainer = document.getElementById('exam-nav-buttons');
-    if (!navContainer) return;
-
-    navContainer.innerHTML = state.questions.map((q, idx) => {
+    palette.innerHTML = state.questions.map((q, idx) => {
+        const isCurrent = idx === state.currentQuestionIndex;
         const isAnswered = !!state.answers[q.id];
-        const isCurrent = state.currentQuestionIndex === idx;
 
-        let bgClass = 'bg-gray-100 text-gray-600 border border-gray-200';
-        if (isCurrent) {
-            bgClass = 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-400';
-        } else if (isAnswered) {
-            bgClass = 'bg-green-100 text-green-700 border border-green-300 font-semibold';
-        }
+        let cls = 'bg-slate-100 text-slate-600 hover:bg-slate-200';
+        if (isAnswered) cls = 'bg-emerald-600 text-white shadow-xs';
+        if (isCurrent) cls += ' ring-2 ring-indigo-500 ring-offset-2 font-black scale-105';
 
         return `
-            <button onclick="renderQuestion(${idx})" class="w-10 h-10 rounded-xl flex items-center justify-center text-sm transition ${bgClass}">
+            <button type="button" onclick="jumpToQuestion(${idx})" class="w-8 h-8 rounded-xl text-xs font-bold transition flex items-center justify-center ${cls}">
                 ${idx + 1}
             </button>
         `;
     }).join('');
 }
 
-window.selectAnswer = async function(questionId, optionId) {
-    state.answers[questionId] = optionId;
-    
-    // 💾 บันทึกคำตอบสดทันที (Real-Time Auto-Save Answers)
-    saveStudentDraftAnswers();
-    updateAutoSaveBadge();
-    renderQuestion(state.currentQuestionIndex);
-
-    try {
-        if (state.supabaseClient && isSupabaseConfigured()) {
-            state.supabaseClient
-                .from('student_submissions')
-                .upsert({
-                    student_id: state.currentUser.id,
-                    student_name: state.currentUser.name,
-                    student_year: state.currentUser.year || 'ไม่ระบุ',
-                    student_department: state.currentUser.dept || 'ไม่ระบุ',
-                    student_room: state.currentUser.room || 'ไม่ระบุ',
-                    exam_id: state.currentExam.id,
-                    question_id: questionId,
-                    selected_option_id: optionId,
-                    tab_switch_count: state.antiCheat.tabSwitches,
-                    fullscreen_exit_count: state.antiCheat.fullscreenExits,
-                    submitted_at: new Date().toISOString()
-                }, {
-                    onConflict: 'student_id,exam_id,question_id'
-                }).then(() => {}).catch(() => {});
-        }
-    } catch (e) {}
+window.jumpToQuestion = function(idx) {
+    if (idx >= 0 && idx < state.questions.length) {
+        state.currentQuestionIndex = idx;
+        renderExamQuestion();
+    }
 };
+
+function updateExamNavButtons() {
+    const btnPrev = document.getElementById('btn-prev-question');
+    const btnNext = document.getElementById('btn-next-question');
+    const btnSubmit = document.getElementById('btn-submit-exam');
+
+    const isFirst = state.currentQuestionIndex === 0;
+    const isLast = state.currentQuestionIndex === state.questions.length - 1;
+
+    if (btnPrev) btnPrev.disabled = isFirst;
+    if (btnNext) {
+        btnNext.classList.toggle('hidden', isLast);
+    }
+    if (btnSubmit) {
+        btnSubmit.classList.toggle('hidden', !isLast);
+    }
+}
 
 window.prevQuestion = function() {
     if (state.currentQuestionIndex > 0) renderQuestion(state.currentQuestionIndex - 1);
@@ -3384,6 +3341,57 @@ function setupExcelDragDrop() {
 }
 
 // 7.7 ตรวจคำตอบนักเรียนทีละข้อ (Inspection Modal)
+// 7.2.2 อาจารย์ปลดล็อกให้นักเรียนทำข้อสอบใหม่อีกครั้ง (ล้างผลสอบเดิมและเปิดสิทธิ์)
+window.allowStudentRetake = function(studentId, examId, studentName, examTitle) {
+    showCustomConfirm({
+        title: 'ปลดล็อกให้เข้าทำข้อสอบใหม่',
+        message: `คุณต้องการล้างผลสอบเดิมและอนุญาตให้นักเรียน "${studentName}" เข้าทำข้อสอบชุด "${examTitle}" ใหม่อีกครั้งใช่หรือไม่?`,
+        icon: 'fas fa-rotate-left text-amber-500',
+        confirmText: 'ปลดล็อกให้สอบใหม่',
+        cancelText: 'ยกเลิก',
+        confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-100',
+        onConfirm: async () => {
+            // 1. ลบจาก Local Storage
+            const subs = getLocalSubmissions();
+            const studentCode = studentId;
+            const updatedSubs = subs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || s.student_id === studentCode || (s.student_name && s.student_name === studentName))));
+            localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(updatedSubs));
+
+            // 2. ลบจาก Supabase Cloud
+            if (isSupabaseConfigured() && state.supabaseClient) {
+                try {
+                    await state.supabaseClient
+                        .from('exam_results')
+                        .delete()
+                        .eq('exam_id', examId)
+                        .or(`student_id.eq.${studentId},student_id.eq.${studentCode}`);
+
+                    await state.supabaseClient
+                        .from('student_submissions')
+                        .delete()
+                        .eq('exam_id', examId)
+                        .or(`student_id.eq.${studentId},student_id.eq.${studentCode}`);
+                } catch (err) {
+                    console.warn('[allowStudentRetake] Remote delete warning:', err);
+                }
+            }
+
+            // 3. ส่งสัญญาณ Realtime แจ้งหน้าจอนักเรียนให้อัปเดตทันที
+            broadcastAppEvent('student_retake_unlocked', {
+                studentId: studentId,
+                examId: examId,
+                studentName: studentName
+            });
+
+            showToast(`ปลดล็อกให้นักเรียน "${studentName}" เข้าทำข้อสอบใหม่เรียบร้อยแล้ว!`, 'success');
+            await loadTeacherSubmissions();
+
+            // ปิด modal ตรวจคำตอบถ้าเปิดอยู่
+            closeInspectModal();
+        }
+    });
+};
+
 window.inspectStudentSubmission = async function(studentId, examId, studentName) {
     const modal = document.getElementById('modal-inspect');
     const container = document.getElementById('inspect-content');
