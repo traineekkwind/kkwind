@@ -571,19 +571,33 @@ function handleIncomingAppSync(message) {
     }
 
     // 2. Student Submission Event
-        // 1.1 Student Retake Unlocked Event (อาจารย์ปลดล็อกให้สอบใหม่)
+            // 1.1 Student Retake Unlocked Event (อาจารย์ปลดล็อกให้สอบใหม่)
     if (type === 'student_retake_unlocked') {
-        const isStudentLobby = state.currentView === 'view-student-lobby' || (document.getElementById('view-student-lobby') && !document.getElementById('view-student-lobby').classList.contains('hidden'));
-        if (isStudentLobby && state.currentUser?.role === 'student') {
+        if (state.currentUser?.role === 'student') {
             const currentStudentId = state.currentUser.id;
             const currentStudentCode = state.currentUser.student_code || state.currentUser.code;
-            if (!payload || payload.studentId === currentStudentId || payload.studentId === currentStudentCode) {
+            const currentStudentName = (state.currentUser.name || '').trim().toLowerCase();
+
+            const matchId = !payload || payload.studentId === currentStudentId || payload.studentId === currentStudentCode;
+            const matchName = payload?.studentName && payload.studentName.trim().toLowerCase() === currentStudentName;
+
+            if (matchId || matchName) {
+                // ล้างประวัติข้อสอบชุดนี้ออกจาก Local Storage ของนักเรียนทันที!
+                if (payload?.examId) {
+                    const localSubs = getLocalSubmissions();
+                    const filtered = localSubs.filter(s => !(s.exam_id === payload.examId && (s.student_id === currentStudentId || s.student_name === state.currentUser.name)));
+                    localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(filtered));
+
+                    try {
+                        localStorage.removeItem(`DRAFT_ANSWERS_${state.currentUser.id}_${payload.examId}`);
+                    } catch (e) {}
+                }
+
                 loadStudentLobby();
                 showToast('อาจารย์ได้ปลดล็อกให้คุณเข้าทำข้อสอบใหม่อีกครั้งแล้ว!', 'success');
             }
         }
     }
-
     if (type === 'student_submission') {
         const isTeacherView = state.currentView === 'view-teacher' || (document.getElementById('view-teacher') && !document.getElementById('view-teacher').classList.contains('hidden'));
         if (isTeacherView) {
@@ -1082,19 +1096,30 @@ async function loadStudentLobby() {
         try {
             const studentId = state.currentUser.id;
             const studentCode = state.currentUser.student_code || state.currentUser.code || '';
-            const { data: dbSubmissions } = await state.supabaseClient
-                .from('exam_results')
-                .select('*')
-                .or(`student_id.eq.${studentId},student_id.eq.${studentCode}`);
-            if (dbSubmissions && Array.isArray(dbSubmissions)) {
+            const studentName = state.currentUser.name || '';
+            
+            let query = state.supabaseClient.from('exam_results').select('*');
+
+            if (studentId && studentName) {
+                query = query.or(`student_id.eq.${studentId},student_id.eq.${studentCode},student_name.eq.${studentName}`);
+            } else if (studentId) {
+                query = query.eq('student_id', studentId);
+            }
+
+            const { data: dbSubmissions, error: subError } = await query;
+            if (!subError && Array.isArray(dbSubmissions)) {
                 studentSubmissions = dbSubmissions;
+                // ซิงค์ LocalStorage ของนักเรียนให้ตรงกับฐานข้อมูลคลาวด์ที่เป็นความจริงเสมอ
+                const allLocal = getLocalSubmissions();
+                const otherStudents = allLocal.filter(s => s.student_id !== studentId && s.student_name !== studentName);
+                const updatedForStudent = [...otherStudents, ...dbSubmissions];
+                localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(updatedForStudent));
             }
         } catch (subErr) {
             console.warn('[loadStudentLobby] Submissions check notice:', subErr);
         }
-    }
-
-    if (studentSubmissions.length === 0) {
+    } else {
+        // ออฟไลน์ fallback
         const localSubs = getLocalSubmissions();
         const currentName = (state.currentUser?.name || '').trim().toLowerCase();
         const currentId = state.currentUser?.id;
@@ -1245,24 +1270,31 @@ window.startExam = async function(examId) {
             return;
         }
 
-        // ตรวจสอบว่านักเรียนเคยส่งข้อสอบชุดนี้ไปแล้วหรือไม่
+        // ตรวจสอบว่านักเรียนเคยส่งข้อสอบชุดนี้ไปแล้วหรือไม่ โดยยึด Supabase Cloud เป็นหลัก
         let isAlreadySubmitted = false;
         if (isSupabaseConfigured() && state.supabaseClient && state.currentUser) {
             try {
                 const studentId = state.currentUser.id;
                 const studentCode = state.currentUser.student_code || state.currentUser.code || '';
-                const { data: dbCheck } = await state.supabaseClient
+                const studentName = state.currentUser.name || '';
+                const { data: dbCheck, error } = await state.supabaseClient
                     .from('exam_results')
                     .select('id, total_score, max_score, percentage')
                     .eq('exam_id', examId)
-                    .or(`student_id.eq.${studentId},student_id.eq.${studentCode}`);
-                if (dbCheck && dbCheck.length > 0) {
+                    .or(`student_id.eq.${studentId},student_id.eq.${studentCode},student_name.eq.${studentName}`);
+
+                if (!error && dbCheck && dbCheck.length > 0) {
                     isAlreadySubmitted = true;
+                } else if (!error && Array.isArray(dbCheck) && dbCheck.length === 0) {
+                    // คลาวด์ยืนยันว่าไม่มีผลสอบแล้ว (อาจารย์ปลดล็อกให้สอบใหม่แล้ว)
+                    // ล้างแคชข้อสอบชุดนี้ออกจาก LocalStorage ทันที
+                    const localSubs = getLocalSubmissions();
+                    const filtered = localSubs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || s.student_name === studentName)));
+                    localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(filtered));
+                    isAlreadySubmitted = false;
                 }
             } catch (e) {}
-        }
-
-        if (!isAlreadySubmitted) {
+        } else {
             const localSubs = getLocalSubmissions();
             const currentName = (state.currentUser?.name || '').trim().toLowerCase();
             const currentId = state.currentUser?.id;
@@ -1282,7 +1314,6 @@ window.startExam = async function(examId) {
             });
             return;
         }
-
         if (!questions || questions.length === 0) {
             showCustomAlert({
                 title: 'ยังไม่มีคำถาม',
@@ -3497,32 +3528,48 @@ window.allowStudentRetake = function(studentId, examId, studentName, examTitle) 
         cancelText: 'ยกเลิก',
         confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-100',
         onConfirm: async () => {
-            // 1. ลบจาก Local Storage
+            // 1. ลบจาก Local Storage ของครู
             const subs = getLocalSubmissions();
             const studentCode = studentId;
-            const updatedSubs = subs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || s.student_id === studentCode || (s.student_name && s.student_name === studentName))));
+            const updatedSubs = subs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || s.student_id === studentCode || (s.student_name && s.student_name.trim().toLowerCase() === studentName.trim().toLowerCase()))));
             localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(updatedSubs));
 
-            // 2. ลบจาก Supabase Cloud
+            // 2. ลบจาก Supabase Cloud (ลองทั้ง RPC และ Direct Delete ทุกคอลัมน์ที่เกี่ยวข้อง)
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
+                    // Try RPC first if available
+                    try {
+                        await state.supabaseClient.rpc('reset_student_exam_attempt', {
+                            p_student_id: String(studentId),
+                            p_exam_id: examId,
+                            p_student_name: studentName
+                        });
+                    } catch (rpcErr) {}
+
+                    // Direct Delete by student_id or student_name
                     await state.supabaseClient
                         .from('exam_results')
                         .delete()
                         .eq('exam_id', examId)
-                        .or(`student_id.eq.${studentId},student_id.eq.${studentCode}`);
+                        .or(`student_id.eq.${studentId},student_name.eq.${studentName}`);
 
                     await state.supabaseClient
                         .from('student_submissions')
                         .delete()
                         .eq('exam_id', examId)
-                        .or(`student_id.eq.${studentId},student_id.eq.${studentCode}`);
+                        .eq('student_id', studentId);
+
+                    await state.supabaseClient
+                        .from('anti_cheat_logs')
+                        .delete()
+                        .eq('exam_id', examId)
+                        .eq('student_id', studentId);
                 } catch (err) {
                     console.warn('[allowStudentRetake] Remote delete warning:', err);
                 }
             }
 
-            // 3. ส่งสัญญาณ Realtime แจ้งหน้าจอนักเรียนให้อัปเดตทันที
+            // 3. ส่งสัญญาณ Realtime เพื่อปลดล็อกในเครื่องนักเรียนทันที
             broadcastAppEvent('student_retake_unlocked', {
                 studentId: studentId,
                 examId: examId,
@@ -3532,11 +3579,16 @@ window.allowStudentRetake = function(studentId, examId, studentName, examTitle) 
             showToast(`ปลดล็อกให้นักเรียน "${studentName}" เข้าทำข้อสอบใหม่เรียบร้อยแล้ว!`, 'success');
             await loadTeacherSubmissions();
 
-            // ปิด modal ตรวจคำตอบถ้าเปิดอยู่
+            const unlockModal = document.getElementById('modal-exam-submissions-unlock');
+            if (unlockModal && !unlockModal.classList.contains('hidden')) {
+                await openExamSubmissionsUnlockModal(examId);
+            }
+
             closeInspectModal();
         }
     });
 };
+
 
 window.inspectStudentSubmission = async function(studentId, examId, studentName) {
     const modal = document.getElementById('modal-inspect');
