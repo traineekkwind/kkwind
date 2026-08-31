@@ -18,7 +18,7 @@
     <!-- SheetJS (XLSX) CDN สำหรับ Import & Export Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="./public/styles.css?v=2.5.9">
+    <link rel="stylesheet" href="./public/styles.css?v=2.6.0">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-['Prompt',sans-serif]">
 
@@ -332,40 +332,26 @@
                 <div id="teacher-courses-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
             </div>
 
-            <!-- Tab 2: Manage Exams List (แยกตามรายวิชาและระดับชั้นปี) -->
+                        <!-- Tab 2: Manage Exams List (โชว์ชุดข้อสอบทั้งหมด จัดกลุ่มแยกตามหมวดหมู่วิชาและระดับชั้นปี) -->
             <div id="teacher-content-exams" class="hidden space-y-4">
-                <!-- Filter Bar for Exams List -->
+                <!-- Search & Quick Class Year Filter Bar -->
                 <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs">
                     <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="flex flex-wrap items-center gap-2.5 flex-1">
-                            <!-- Search exam title -->
-                            <div class="relative min-w-[200px] flex-1 sm:flex-initial">
+                        <div class="flex flex-wrap items-center gap-2 flex-1">
+                            <div class="relative min-w-[220px] flex-1 sm:flex-initial">
                                 <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-                                <input type="text" id="teacher-exam-list-filter-search" oninput="loadTeacherExamsList()" placeholder="ค้นหาชื่อชุดข้อสอบ..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                                <input type="text" id="teacher-exam-list-filter-search" oninput="loadTeacherExamsList()" placeholder="ค้นหาชื่อชุดข้อสอบ, วิชา..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
                             </div>
 
-                            <!-- Filter Course -->
-                            <div class="min-w-[180px]">
-                                <select id="teacher-exam-list-filter-course" onchange="loadTeacherExamsList()" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
-                                    <option value="ทั้งหมด">วิชาทั้งหมด</option>
-                                </select>
+                            <!-- Filter Level Pills -->
+                            <div class="flex flex-wrap items-center gap-1.5" id="teacher-exam-year-pills">
+                                <button type="button" onclick="setTeacherExamYearFilter('ทั้งหมด')" class="year-pill-btn px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-2xs transition" data-year="ทั้งหมด">ทั้งหมด</button>
+                                <button type="button" onclick="setTeacherExamYearFilter('ปวช.1')" class="year-pill-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" data-year="ปวช.1">ปวช.1</button>
+                                <button type="button" onclick="setTeacherExamYearFilter('ปวช.2')" class="year-pill-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" data-year="ปวช.2">ปวช.2</button>
+                                <button type="button" onclick="setTeacherExamYearFilter('ปวช.3')" class="year-pill-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" data-year="ปวช.3">ปวช.3</button>
+                                <button type="button" onclick="setTeacherExamYearFilter('ปวส.1')" class="year-pill-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" data-year="ปวส.1">ปวส.1</button>
+                                <button type="button" onclick="setTeacherExamYearFilter('ปวส.2')" class="year-pill-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition" data-year="ปวส.2">ปวส.2</button>
                             </div>
-
-                            <!-- Filter Class Year -->
-                            <div class="min-w-[140px]">
-                                <select id="teacher-exam-list-filter-year" onchange="loadTeacherExamsList()" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500">
-                                    <option value="ทั้งหมด">ทุกระดับชั้น</option>
-                                    <option value="ปวช.1">ปวช.1</option>
-                                    <option value="ปวช.2">ปวช.2</option>
-                                    <option value="ปวช.3">ปวช.3</option>
-                                    <option value="ปวส.1">ปวส.1</option>
-                                    <option value="ปวส.2">ปวส.2</option>
-                                </select>
-                            </div>
-
-                            <button type="button" onclick="resetTeacherExamListFilters()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition inline-flex items-center gap-1">
-                                <i class="fas fa-rotate-left"></i> ล้างตัวกรอง
-                            </button>
                         </div>
 
                         <button onclick="openCreateExamModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-100 transition inline-flex items-center gap-1.5">
@@ -374,8 +360,10 @@
                     </div>
                 </div>
 
+                <!-- Grouped Exams Container (แสดงชุดข้อสอบทั้งหมด แยกเป็นหมวดหมู่อย่างชัดเจน) -->
                 <div id="teacher-exams-list-container" class="space-y-6"></div>
             </div>
+
 
             <!-- Tab 3: Submissions & Anti-Cheat Audit (with EXCEL EXPORT) -->
             <div id="teacher-content-submissions" class="hidden space-y-6">
@@ -1446,6 +1434,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.5.9"></script>
+    <script src="./public/app.js?v=2.6.0"></script>
 </body>
 </html>
