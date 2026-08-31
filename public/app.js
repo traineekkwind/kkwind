@@ -750,6 +750,47 @@ window.goToHome = function() {
 // 3. AUTHENTICATION & LOGIN (3 ROLES)
 // ==============================================================================
 
+window.setLoginRoleTab = function(role) {
+    const tabStudent = document.getElementById('tab-login-student');
+    const tabTeacher = document.getElementById('tab-login-teacher');
+    const tabAdmin = document.getElementById('tab-login-admin');
+
+    const formStudent = document.getElementById('form-login-student');
+    const formTeacher = document.getElementById('form-login-teacher');
+    const formAdmin = document.getElementById('form-login-admin');
+
+    [tabStudent, tabTeacher, tabAdmin].forEach(tab => {
+        if (tab) {
+            tab.classList.remove('border-indigo-600', 'border-emerald-600', 'border-purple-600', 'text-indigo-600', 'text-emerald-600', 'text-purple-600');
+            tab.classList.add('border-transparent', 'text-slate-400');
+        }
+    });
+
+    if (formStudent) formStudent.classList.add('hidden');
+    if (formTeacher) formTeacher.classList.add('hidden');
+    if (formAdmin) formAdmin.classList.add('hidden');
+
+    if (role === 'student') {
+        if (tabStudent) {
+            tabStudent.classList.add('border-indigo-600', 'text-indigo-600');
+            tabStudent.classList.remove('border-transparent', 'text-slate-400');
+        }
+        if (formStudent) formStudent.classList.remove('hidden');
+    } else if (role === 'teacher') {
+        if (tabTeacher) {
+            tabTeacher.classList.add('border-emerald-600', 'text-emerald-600');
+            tabTeacher.classList.remove('border-transparent', 'text-slate-400');
+        }
+        if (formTeacher) formTeacher.classList.remove('hidden');
+    } else if (role === 'admin') {
+        if (tabAdmin) {
+            tabAdmin.classList.add('border-purple-600', 'text-purple-600');
+            tabAdmin.classList.remove('border-transparent', 'text-slate-400');
+        }
+        if (formAdmin) formAdmin.classList.remove('hidden');
+    }
+};
+
 function setupAuthEvents() {
     const tabStudent = document.getElementById('tab-login-student');
     const tabTeacher = document.getElementById('tab-login-teacher');
@@ -759,34 +800,9 @@ function setupAuthEvents() {
     const formTeacher = document.getElementById('form-login-teacher');
     const formAdmin = document.getElementById('form-login-admin');
 
-    const setLoginTab = (role) => {
-        [tabStudent, tabTeacher, tabAdmin].forEach(tab => {
-            tab.classList.remove('border-indigo-600', 'border-emerald-600', 'border-purple-600', 'text-indigo-600', 'text-emerald-600', 'text-purple-600');
-            tab.classList.add('border-transparent', 'text-slate-400');
-        });
-
-        formStudent.classList.add('hidden');
-        formTeacher.classList.add('hidden');
-        formAdmin.classList.add('hidden');
-
-        if (role === 'student') {
-            tabStudent.classList.add('border-indigo-600', 'text-indigo-600');
-            tabStudent.classList.remove('border-transparent', 'text-slate-400');
-            formStudent.classList.remove('hidden');
-        } else if (role === 'teacher') {
-            tabTeacher.classList.add('border-emerald-600', 'text-emerald-600');
-            tabTeacher.classList.remove('border-transparent', 'text-slate-400');
-            formTeacher.classList.remove('hidden');
-        } else if (role === 'admin') {
-            tabAdmin.classList.add('border-purple-600', 'text-purple-600');
-            tabAdmin.classList.remove('border-transparent', 'text-slate-400');
-            formAdmin.classList.remove('hidden');
-        }
-    };
-
-    if (tabStudent) tabStudent.onclick = () => setLoginTab('student');
-    if (tabTeacher) tabTeacher.onclick = () => setLoginTab('teacher');
-    if (tabAdmin) tabAdmin.onclick = () => setLoginTab('admin');
+    if (tabStudent) tabStudent.onclick = () => window.setLoginRoleTab('student');
+    if (tabTeacher) tabTeacher.onclick = () => window.setLoginRoleTab('teacher');
+    if (tabAdmin) tabAdmin.onclick = () => window.setLoginRoleTab('admin');
 
     window.toggleStudentPasswordVisibility = function() {
         const input = document.getElementById('student-login-pass-input');

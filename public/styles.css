@@ -1,4 +1,15 @@
-.hidden { display: none !important; }
+.hidden {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+}
+
+input, textarea, select, button {
+    user-select: auto !important;
+    -webkit-user-select: auto !important;
+    pointer-events: auto !important;
+}
+
 /* ==========================================================================
    Anti-Cheating Online Exam System - Custom Styles & Animations
    ========================================================================== */
