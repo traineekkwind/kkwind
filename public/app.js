@@ -1147,27 +1147,35 @@ async function loadStudentLobby() {
     if (isSupabaseConfigured() && state.supabaseClient && state.currentUser) {
         try {
             const studentId = state.currentUser.id;
-            const studentCode = state.currentUser.student_code || state.currentUser.code || '';
             const studentName = state.currentUser.name || '';
             
-            let query = state.supabaseClient.from('exam_results').select('*');
+            let { data: dbSubmissions } = await state.supabaseClient
+                .from('exam_results')
+                .select('*')
+                .eq('student_name', studentName);
 
-            if (isValidUUID(studentId) && studentName) {
-                query = query.or(`student_id.eq.${studentId},student_name.eq."${studentName}"`);
-            } else if (isValidUUID(studentId)) {
-                query = query.eq('student_id', studentId);
-            } else if (studentName) {
-                query = query.eq('student_name', studentName);
+            if (!dbSubmissions || dbSubmissions.length === 0) {
+                if (isValidUUID(studentId)) {
+                    const res = await state.supabaseClient
+                        .from('exam_results')
+                        .select('*')
+                        .eq('student_id', studentId);
+                    if (!res.error && res.data) dbSubmissions = res.data;
+                }
             }
 
-            const { data: dbSubmissions, error: subError } = await query;
-            if (!subError && Array.isArray(dbSubmissions)) {
+            if (Array.isArray(dbSubmissions)) {
                 studentSubmissions = dbSubmissions;
-                // ซิงค์ LocalStorage ของนักเรียนให้ตรงกับฐานข้อมูลคลาวด์ที่เป็นความจริงเสมอ
+                // ถ้า Supabase คืนค่ามาแล้ว (รวมถึงกรณีเป็น 0 คน/ปลดล็อกแล้ว)
+                // ให้ลบแคชข้อสอบที่ไม่มีใน Cloud ออกจาก LocalStorage ของเครื่องนี้ทันที!
+                const activeDbExamIds = new Set(dbSubmissions.map(s => s.exam_id));
                 const allLocal = getLocalSubmissions();
-                const otherStudents = allLocal.filter(s => s.student_id !== studentId && s.student_name !== studentName);
-                const updatedForStudent = [...otherStudents, ...dbSubmissions];
-                localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(updatedForStudent));
+                const filteredLocal = allLocal.filter(s => {
+                    const isMe = s.student_id === studentId || (s.student_name && s.student_name.trim().toLowerCase() === studentName.trim().toLowerCase());
+                    if (!isMe) return true;
+                    return activeDbExamIds.has(s.exam_id);
+                });
+                localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(filteredLocal));
             }
         } catch (subErr) {
             console.warn('[loadStudentLobby] Submissions check notice:', subErr);
@@ -3583,7 +3591,16 @@ function setupExcelDragDrop() {
 
 // 7.7 ตรวจคำตอบนักเรียนทีละข้อ (Inspection Modal)
 // 7.2.2 อาจารย์ปลดล็อกให้นักเรียนทำข้อสอบใหม่อีกครั้ง (ล้างผลสอบเดิมและเปิดสิทธิ์)
-window.allowStudentRetake = function(studentId, examId, studentName, examTitle) {
+window.allowStudentRetake = function(subId, studentId, examId, studentName, examTitle) {
+    // รองรับการเรียกแบบ 4 พารามิเตอร์เดิม (studentId, examId, studentName, examTitle)
+    if (!examTitle && studentName && examId) {
+        examTitle = studentName;
+        studentName = examId;
+        examId = studentId;
+        studentId = subId;
+        subId = null;
+    }
+
     showCustomConfirm({
         title: 'ปลดล็อกให้เข้าทำข้อสอบใหม่',
         message: `คุณต้องการล้างผลสอบเดิมและอนุญาตให้นักเรียน "${studentName}" เข้าทำข้อสอบชุด "${examTitle}" ใหม่อีกครั้งใช่หรือไม่?`,
@@ -3601,14 +3618,13 @@ window.allowStudentRetake = function(studentId, examId, studentName, examTitle) 
             // 2. ลบจาก Supabase Cloud แบบแยกคำสั่ง ป้องกัน syntax error จากช่องว่างในชื่อหรือ UUID error
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
-                    // Try RPC first if available
-                    try {
-                        await state.supabaseClient.rpc('reset_student_exam_attempt', {
-                            p_student_id: String(studentId),
-                            p_exam_id: examId,
-                            p_student_name: studentName
-                        });
-                    } catch (rpcErr) {}
+                    // ลบจาก exam_results ด้วย Primary Key ID โดยตรง (100% แน่นอน)
+                    if (subId && isValidUUID(subId)) {
+                        await state.supabaseClient
+                            .from('exam_results')
+                            .delete()
+                            .eq('id', subId);
+                    }
 
                     // ลบจาก exam_results ด้วย student_id (ถ้าเป็น UUID)
                     if (isValidUUID(studentId)) {
@@ -4118,7 +4134,7 @@ window.openExamSubmissionsUnlockModal = async function(examId) {
                         <button onclick="inspectStudentSubmission('${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}')" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1">
                             <i class="fas fa-search"></i> ตรวจคำตอบ
                         </button>
-                        <button onclick="allowStudentRetake('${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}', '${escapeHtml(exam.title)}')" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1 border border-amber-300" title="ล้างผลสอบเดิมและเปิดสิทธิ์ให้นักเรียนทำใหม่ทันที">
+                        <button onclick="allowStudentRetake('${sub.id || ''}', '${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}', '${escapeHtml(exam.title)}')" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1 border border-amber-300" title="ล้างผลสอบเดิมและเปิดสิทธิ์ให้นักเรียนทำใหม่ทันที">
                             <i class="fas fa-rotate-left"></i> ให้สอบใหม่
                         </button>
                     </div>
