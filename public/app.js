@@ -1428,7 +1428,7 @@ window.startExam = async function(examId) {
                 state.antiCheat.tabSwitches = 0;
                 state.antiCheat.fullscreenExits = 0;
                 state.antiCheat.cheatingReasons = [];
-                state.examRemainingSeconds = (exam.duration_minutes || 60) * 60;
+                state.remainingSeconds = (exam.duration_minutes || 60) * 60;
 
                 showView('view-student-exam');
                 renderExamQuestion();
