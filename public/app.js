@@ -12,1101 +12,34 @@
  */
 
 // Global App State
-const state = {
-    currentAddQuestionImage: null,
-    supabaseClient: null,
-    currentUser: null, // { role, id, name, year, dept, room }
-    currentExam: null,
-    questions: [],
-    currentView: 'view-auth',
-    currentQuestionIndex: 0,
-    answers: {}, // { [questionId]: selectedOptionId }
-    examTimer: null,
-    remainingSeconds: 0,
-    antiCheat: {
-        tabSwitches: 0,
-        fullscreenExits: 0,
-        isMonitoring: false
-    },
-    teacherCurrentTab: 'courses',
-    courses: [],
-    excelParsedQuestions: [],
-    realtimeAlertsEnabled: localStorage.getItem('EXAM_REALTIME_NOTIFICATIONS') !== 'false',
-    realtimeAlertsSoundEnabled: localStorage.getItem('EXAM_REALTIME_SOUND') !== 'false',
-    realtimeChannel: null,
-    globalRealtimeChannel: null,
-    liveFeedLogs: []
-};
-
-// ==============================================================================
-// QUESTION IMAGE & FORMATTING HELPERS
-// ==============================================================================
-window.openImageZoomModal = function(imgSrc) {
-    const modal = document.getElementById('modal-image-zoom');
-    const target = document.getElementById('image-zoom-target');
-    if (!modal || !target || !imgSrc) return;
-
-    target.src = imgSrc;
-    modal.classList.remove('hidden');
-};
-
-window.closeImageZoomModal = function() {
-    const modal = document.getElementById('modal-image-zoom');
-    if (modal) modal.classList.add('hidden');
-};
-
-window.parseQuestionTextAndImage = function(rawText, explicitImgUrl) {
-    let text = rawText || '';
-    let image = explicitImgUrl || null;
-
-    if (!image && text) {
-        const match = text.match(/\[img:\s*(data:image\/[^;]+;base64,[^\]]+|https?:\/\/[^\]]+)\]/i);
-        if (match) {
-            image = match[1];
-            text = text.replace(match[0], '').trim();
-        }
-    }
-
-    return { text, image };
-};
-
-window.handleQuestionImageSelect = function(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-        showToast('กรุณาเลือกไฟล์รูปภาพเท่านั้น (JPG, PNG, WebP)', 'warning');
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const img = new Image();
-        img.onload = function() {
-            // Compress using canvas to max 1000px
-            const maxDimension = 1000;
-            let width = img.width;
-            let height = img.height;
-
-            if (width > maxDimension || height > maxDimension) {
-                if (width > height) {
-                    height = Math.round((height * maxDimension) / width);
-                    width = maxDimension;
-                } else {
-                    width = Math.round((width * maxDimension) / height);
-                    height = maxDimension;
-                }
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-
-            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.82);
-            state.currentAddQuestionImage = compressedBase64;
-
-            // Update UI preview
-            const previewEl = document.getElementById('q-image-preview');
-            const nameEl = document.getElementById('q-image-preview-name');
-            const containerEl = document.getElementById('q-image-preview-container');
-            const uploadBoxEl = document.getElementById('q-image-upload-box');
-
-            if (previewEl) previewEl.src = compressedBase64;
-            if (nameEl) nameEl.textContent = file.name;
-            if (containerEl) containerEl.classList.remove('hidden');
-            if (uploadBoxEl) uploadBoxEl.classList.add('hidden');
-
-            showToast('อัปโหลดและบีบอัดรูปภาพเรียบร้อยแล้ว!', 'success');
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-};
-
-window.removeTeacherQuestionImage = function() {
-    state.currentAddQuestionImage = null;
-    const input = document.getElementById('teacher-add-q-image-input');
-    const containerEl = document.getElementById('q-image-preview-container');
-    const uploadBoxEl = document.getElementById('q-image-upload-box');
-
-    if (input) input.value = '';
-    if (containerEl) containerEl.classList.add('hidden');
-    if (uploadBoxEl) uploadBoxEl.classList.remove('hidden');
-};
-
-window.fillQuickChoices = function(type) {
-    const optA = document.getElementById('teacher-add-opt-a');
-    const optB = document.getElementById('teacher-add-opt-b');
-    const optC = document.getElementById('teacher-add-opt-c');
-    const optD = document.getElementById('teacher-add-opt-d');
-
-    if (type === 'ABCD') {
-        if (optA) optA.value = 'A';
-        if (optB) optB.value = 'B';
-        if (optC) optC.value = 'C';
-        if (optD) optD.value = 'D';
-    } else if (type === 'THAI') {
-        if (optA) optA.value = 'ก';
-        if (optB) optB.value = 'ข';
-        if (optC) optC.value = 'ค';
-        if (optD) optD.value = 'ง';
-    } else if (type === 'TF') {
-        if (optA) optA.value = 'ถูก (True)';
-        if (optB) optB.value = 'ผิด (False)';
-        if (optC) optC.value = '';
-        if (optD) optD.value = '';
-    }
-};
-
-
-// ==============================================================================
-// 1. SUPABASE INITIALIZATION & CONFIG (ADMIN ONLY)
-// ==============================================================================
-
-function cleanSupabaseUrl(rawUrl) {
-    if (!rawUrl) return '';
-    let url = String(rawUrl).trim();
-    // ถ้าผู้ใช้วาง URL หน้า Dashboard เช่น https://supabase.com/dashboard/project/ividsfcwvhngsojtzwjt...
-    const dashboardMatch = url.match(/dashboard\/project\/([a-zA-Z0-9_-]+)/);
-    if (dashboardMatch && dashboardMatch[1]) {
-        return `https://${dashboardMatch[1]}.supabase.co`;
-    }
-    // ถ้าผู้ใช้มี path ต่อท้าย เช่น https://ividsfcwvhngsojtzwjt.supabase.co/settings/api-keys
-    const coMatch = url.match(/(https?:\/\/[a-zA-Z0-9_-]+\.supabase\.co)/);
-    if (coMatch && coMatch[1]) {
-        return coMatch[1];
-    }
-    // ตัด trailing slash
-    return url.replace(/\/+$/, '');
+function isValidUUID(str) {
+    return typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 }
 
-function getSupabaseCredentials() {
-    const savedUrl = localStorage.getItem('EXAM_SUPABASE_URL');
-    const savedKey = localStorage.getItem('EXAM_SUPABASE_ANON_KEY');
-
-    return {
-        url: cleanSupabaseUrl(savedUrl) || window.SUPABASE_URL || 'https://ividsfcwvhngsojtzwjt.supabase.co',
-        key: (savedKey ? savedKey.trim() : '') || window.SUPABASE_ANON_KEY || 'sb_publishable_7uhXNfvOOImPUONxRwId4w_4uONoAnO'
-    };
-}
-
-function initSupabase() {
-    const creds = getSupabaseCredentials();
-    try {
-        if (window.supabase && typeof window.supabase.createClient === 'function') {
-            const cleanUrl = cleanSupabaseUrl(creds.url);
-            state.supabaseClient = window.supabase.createClient(cleanUrl, creds.key);
-            console.log('[Supabase] Initialized with:', cleanUrl);
-            initGlobalRealtimeSync();
-            fetchCloudDataToLocal();
-            syncLocalDataToSupabase();
-        } else {
-            console.warn('[Supabase] SDK not loaded yet.');
-        }
-    } catch (e) {
-        console.error('[Supabase] Init Error:', e);
-    }
-}
-
-async function fetchCloudDataToLocal() {
-    if (!isSupabaseConfigured() || !state.supabaseClient) return;
-    try {
-        // 1. ดึงข้อมูลรายชื่ออาจารย์จากคลาวด์ลงมือถือ/ทุกอุปกรณ์
-        const { data: dbTeachers, error: tErr } = await state.supabaseClient
-            .from('teachers')
-            .select('*');
-        if (!tErr && Array.isArray(dbTeachers) && dbTeachers.length > 0) {
-            localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(dbTeachers));
-        }
-
-        // 2. ดึงรายวิชา
-        const { data: dbCourses, error: cErr } = await state.supabaseClient
-            .from('courses')
-            .select('*');
-        if (!cErr && Array.isArray(dbCourses) && dbCourses.length > 0) {
-            localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(dbCourses));
-            state.courses = dbCourses;
-        }
-
-        // 3. ดึงชุดข้อสอบ
-        const { data: dbExams, error: eErr } = await state.supabaseClient
-            .from('exams')
-            .select('*');
-        if (!eErr && Array.isArray(dbExams) && dbExams.length > 0) {
-            localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(dbExams));
-            state.localExams = dbExams;
-        }
-    } catch (e) {
-        console.warn('[Supabase Cloud Fetch Notice]', e);
-    }
-}
-
-async function syncLocalDataToSupabase() {
-    if (!isSupabaseConfigured() || !state.supabaseClient) return;
-    try {
-        // 0. Sync teachers from local to Supabase
-        const localTeachers = getLocalTeachers();
-        if (localTeachers.length > 0) {
-            for (const t of localTeachers) {
-                await state.supabaseClient.from('teachers').upsert({
-                    id: t.id,
-                    teacher_code: t.teacher_code || t.code,
-                    name: t.name,
-                    department: t.department || t.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
-                    password: t.password || 'teacher1234'
-                }, { onConflict: 'id' });
-            }
-        }
-
-        // 1. Sync courses from local to Supabase
-        const localCourses = getLocalCourses();
-        if (localCourses.length > 0) {
-            for (const c of localCourses) {
-                await state.supabaseClient.from('courses').upsert({
-                    id: c.id,
-                    course_code: c.course_code,
-                    course_name: c.course_name,
-                    description: c.description || '',
-                    target_year: c.target_year || 'ทั้งหมด',
-                    target_department: c.target_department || 'ทั้งหมด',
-                    teacher_id: c.teacher_id || '11111111-0000-0000-0000-000000000001',
-                    teacher_name: c.teacher_name || 'อาจารย์ผู้สอน'
-                }, { onConflict: 'id' });
-            }
-        }
-
-        // 2. Sync exams from local to Supabase
-        const localExams = getLocalExams();
-        if (localExams.length > 0) {
-            for (const e of localExams) {
-                await state.supabaseClient.from('exams').upsert({
-                    id: e.id,
-                    course_id: e.course_id || null,
-                    teacher_name: e.teacher_name || 'อาจารย์ผู้สอน',
-                    title: e.title,
-                    description: e.description || '',
-                    duration_minutes: Number(e.duration_minutes) || 60,
-                    is_active: e.is_active !== false,
-                    max_tab_switches_allowed: Number(e.max_tab_switches_allowed) || 3,
-                    target_year: e.target_year || 'ทั้งหมด',
-                    target_department: e.target_department || 'ทั้งหมด',
-                    target_room: e.target_room || 'ทั้งหมด'
-                }, { onConflict: 'id' });
-            }
-        }
-
-        // 3. Sync questions from local to Supabase
-        const localQuestions = getLocalQuestions();
-        if (localQuestions.length > 0) {
-            for (const q of localQuestions) {
-                await state.supabaseClient.from('questions').upsert({
-                    id: q.id,
-                    exam_id: q.exam_id,
-                    question_text: q.question_text,
-                    options: q.options,
-                    points: Number(q.points) || 1.0,
-                    order_seq: q.order_seq || 0
-                }, { onConflict: 'id' });
-            }
-        }
-        console.log('[Supabase Sync] Local data synchronized to cloud successfully');
-    } catch (err) {
-        console.warn('[Supabase Sync Notice]', err);
-    }
-}
-
-// ==============================================================================
-// 1.2 HYBRID DATA STORE (LOCALSTORAGE + SUPABASE OFFLINE-FIRST)
-// ==============================================================================
-
-function isSupabaseConfigured() {
-    const creds = getSupabaseCredentials();
-    return creds.url && !creds.url.includes('your-project-id.supabase.co') && creds.key && !creds.key.includes('.dummy');
-}
-
-function getLocalCourses() {
-    try {
-        const raw = localStorage.getItem('EXAM_LOCAL_COURSES');
-        if (raw) {
-            const list = JSON.parse(raw);
-            // Clean dummy records
-            return list.filter(c => c.id !== '33333333-3333-3333-3333-333333333331');
-        }
-    } catch (e) {}
-    return [];
-}
-
-function saveLocalCourse(course) {
-    const list = getLocalCourses();
-    const idx = list.findIndex(c => c.id === course.id);
-    if (idx >= 0) {
-        list[idx] = course;
-    } else {
-        list.unshift(course);
-    }
-    localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(list));
-    state.courses = list;
-    broadcastAppEvent('course_updated', course);
-}
-
-function deleteLocalCourse(courseId) {
-    const list = getLocalCourses().filter(c => c.id !== courseId);
-    localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(list));
-    state.courses = list;
-    broadcastAppEvent('course_deleted', { courseId });
-}
-
-function getLocalExams() {
-    try {
-        const raw = localStorage.getItem('EXAM_LOCAL_EXAMS');
-        if (raw) {
-            const list = JSON.parse(raw);
-            // Clean dummy records
-            return list.filter(e => e.id !== '11111111-1111-1111-1111-111111111111');
-        }
-    } catch (e) {}
-    return [];
-}
-
-function saveLocalExam(exam) {
-    const list = getLocalExams();
-    const idx = list.findIndex(e => e.id === exam.id);
-    if (idx >= 0) {
-        list[idx] = exam;
-    } else {
-        list.unshift(exam);
-    }
-    localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(list));
-    state.localExams = list;
-    broadcastAppEvent('exam_updated', exam);
-}
-
-function deleteLocalExam(examId) {
-    const list = getLocalExams().filter(e => e.id !== examId);
-    localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(list));
-    state.localExams = list;
-    broadcastAppEvent('exam_deleted', { examId });
-}
-
-function getLocalQuestions(examId) {
-    try {
-        const raw = localStorage.getItem('EXAM_LOCAL_QUESTIONS');
-        if (raw) {
-            const all = JSON.parse(raw).filter(q => !q.id?.startsWith('22222222-'));
-            if (examId) return all.filter(q => q.exam_id === examId);
-            return all;
-        }
-    } catch (e) {}
-    return [];
-}
-
-function saveLocalQuestion(qObj) {
-    const list = getLocalQuestions();
-    list.unshift(qObj);
-    localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify(list));
-    broadcastAppEvent('question_updated', qObj);
-}
-
-function getLocalSubmissions() {
-    try {
-        const raw = localStorage.getItem('EXAM_LOCAL_SUBMISSIONS');
-        if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return [];
-}
-
-function saveLocalSubmission(sub) {
-    const list = getLocalSubmissions();
-    list.unshift(sub);
-    localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(list));
-    broadcastAppEvent('student_submission', sub);
-}
-
-function getLocalStudents() {
-    try {
-        const raw = localStorage.getItem('EXAM_LOCAL_STUDENTS');
-        if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return [];
-}
-
-function saveLocalStudent(student) {
-    const list = getLocalStudents();
-    const idx = list.findIndex(s => s.id === student.id || (s.code && s.code === student.code));
-    if (idx >= 0) {
-        list[idx] = { ...list[idx], ...student, updated_at: new Date().toISOString() };
-    } else {
-        student.id = student.id || generatePseudoUUID();
-        student.created_at = student.created_at || new Date().toISOString();
-        list.unshift(student);
-    }
-    localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(list));
-    broadcastAppEvent('student_roster_updated', student);
-}
-
-function deleteLocalStudent(studentId) {
-    const list = getLocalStudents().filter(s => s.id !== studentId);
-    localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(list));
-    broadcastAppEvent('student_roster_updated', { studentId });
-}
-
-function getLocalTeachers() {
-    try {
-        const raw = localStorage.getItem('EXAM_LOCAL_TEACHERS');
-        if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return [];
-}
-
-function saveLocalTeacher(teacher) {
-    const list = getLocalTeachers();
-    const idx = list.findIndex(t => t.id === teacher.id || (t.teacher_code && t.teacher_code === teacher.teacher_code));
-    if (idx >= 0) {
-        list[idx] = { ...list[idx], ...teacher, updated_at: new Date().toISOString() };
-    } else {
-        teacher.id = teacher.id || generatePseudoUUID();
-        teacher.created_at = teacher.created_at || new Date().toISOString();
-        list.unshift(teacher);
-    }
-    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(list));
-    broadcastAppEvent('teacher_roster_updated', teacher);
-}
-
-function deleteLocalTeacher(teacherId) {
-    const list = getLocalTeachers().filter(t => t.id !== teacherId);
-    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(list));
-    broadcastAppEvent('teacher_roster_updated', { teacherId });
-}
-
-// ==============================================================================
-// 1.3 REAL-TIME MULTI-CHANNEL AUTO-SYNC ENGINE (NO REFRESH NEEDED)
-// ==============================================================================
-
-const _processedAppEventIds = new Set();
-
-function broadcastAppEvent(eventType, payload = {}) {
-    const eventId = `evt_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
-    const message = {
-        eventId: eventId,
-        type: eventType,
-        payload: payload,
-        timestamp: Date.now(),
-        senderId: state.currentUser?.id || 'sys'
-    };
-
-    console.log('[Broadcasting Realtime Event]:', eventType, message);
-
-    // 1. HTML5 BroadcastChannel (Zero-latency instant cross-tab sync)
-    try {
-        if (typeof BroadcastChannel !== 'undefined') {
-            if (!state.globalBroadcastChannel) {
-                state.globalBroadcastChannel = new BroadcastChannel('exam_global_realtime_sync');
-                state.globalBroadcastChannel.onmessage = (event) => {
-                    handleIncomingAppSync(event.data);
-                };
-            }
-            state.globalBroadcastChannel.postMessage(message);
-        }
-    } catch (e) {
-        console.warn('[BroadcastChannel send warning]', e);
+window.refreshStudentLobby = async function(btn) {
+    if (btn) {
+        const icon = btn.querySelector('i');
+        if (icon) icon.classList.add('fa-spin');
+        btn.disabled = true;
     }
 
-    // 2. LocalStorage Storage Event (Cross-window backup with unique trigger)
-    try {
-        localStorage.setItem('EXAM_REALTIME_SYNC_SIGNAL', JSON.stringify({
-            ...message,
-            _uid: Date.now() + '_' + Math.random()
-        }));
-    } catch (e) {}
-
-    // 3. Supabase Realtime WebSocket (Network-wide cross-device sync)
-    if (state.globalRealtimeChannel) {
-        try {
-            state.globalRealtimeChannel.send({
-                type: 'broadcast',
-                event: 'app_event',
-                payload: message
-            }).catch(() => {});
-        } catch (e) {}
-    }
-}
-
-function handleIncomingAppSync(message) {
-    if (!message || !message.type) return;
-
-    // Deduplication by Event ID
-    if (message.eventId) {
-        if (_processedAppEventIds.has(message.eventId)) {
-            return; // Already processed by another channel
-        }
-        _processedAppEventIds.add(message.eventId);
-        setTimeout(() => _processedAppEventIds.delete(message.eventId), 5000);
-    }
-
-    const { type, payload } = message;
-    console.log('[Realtime Auto-Sync Received & Dispatched]:', type, payload);
-
-    // 1. Exam / Course / Question Data Updated (Created, Modified, Deleted)
-    if (type === 'exam_updated' || type === 'exam_deleted' || type === 'course_updated' || type === 'course_deleted' || type === 'question_updated') {
-        // A. Student Lobby: Auto-refresh available exams without reload (Protected: Only in lobby, never during active exam!)
-        const isStudentLobby = state.currentView === 'view-student-lobby' || (document.getElementById('view-student-lobby') && !document.getElementById('view-student-lobby').classList.contains('hidden'));
-        if (isStudentLobby) {
-            console.log('[Realtime] Auto-updating Student Lobby cards...');
-            loadStudentLobby();
-            if (type === 'exam_updated') {
-                showToast(`🔔 มีชุดข้อสอบใหม่เปิดให้เข้าสอบ: "${payload.title || 'ชุดข้อสอบ'}"`, 'info');
-            }
-        }
-
-        // B. Teacher Portal: Auto-refresh courses, exams, and selects if teacher is active
-        const isTeacherView = state.currentView === 'view-teacher' || (document.getElementById('view-teacher') && !document.getElementById('view-teacher').classList.contains('hidden'));
-        if (isTeacherView) {
-            console.log('[Realtime] Auto-updating Teacher Dashboard...');
-            loadTeacherCourses();
-            loadTeacherExamsList();
-            populateTeacherExamSelects();
-        }
-    }
-
-    // 2. Student Submission Event
-            // 1.1 Student Retake Unlocked Event (อาจารย์ปลดล็อกให้สอบใหม่)
-    if (type === 'student_retake_unlocked') {
-        if (state.currentUser?.role === 'student') {
-            const currentStudentId = state.currentUser.id;
-            const currentStudentCode = state.currentUser.student_code || state.currentUser.code;
-            const currentStudentName = (state.currentUser.name || '').trim().toLowerCase();
-
-            const matchId = !payload || payload.studentId === currentStudentId || payload.studentId === currentStudentCode;
-            const matchName = payload?.studentName && payload.studentName.trim().toLowerCase() === currentStudentName;
-
-            if (matchId || matchName) {
-                // ล้างประวัติข้อสอบชุดนี้ออกจาก Local Storage ของนักเรียนทันที!
-                if (payload?.examId) {
-                    const localSubs = getLocalSubmissions();
-                    const filtered = localSubs.filter(s => !(s.exam_id === payload.examId && (s.student_id === currentStudentId || s.student_name === state.currentUser.name)));
-                    localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(filtered));
-
-                    try {
-                        localStorage.removeItem(`DRAFT_ANSWERS_${state.currentUser.id}_${payload.examId}`);
-                    } catch (e) {}
-                }
-
-                loadStudentLobby();
-                showToast('อาจารย์ได้ปลดล็อกให้คุณเข้าทำข้อสอบใหม่อีกครั้งแล้ว!', 'success');
-            }
-        }
-    }
-    if (type === 'student_submission') {
-        const isTeacherView = state.currentView === 'view-teacher' || (document.getElementById('view-teacher') && !document.getElementById('view-teacher').classList.contains('hidden'));
-        if (isTeacherView) {
-            console.log('[Realtime] Student submitted exam, auto-updating submissions table...');
-            loadTeacherSubmissions();
-            const studentName = payload.student_name || 'นักเรียน';
-            const examTitle = payload.exam_title || 'ชุดข้อสอบ';
-            const scoreText = `${payload.total_score}/${payload.max_score} (${payload.percentage}%)`;
-            showToast(`📝 ${studentName} ส่งข้อสอบ "${examTitle}" แล้ว [${scoreText}]`, 'success');
-        }
-    }
-
-    // 3. Student Roster Updated Event
-    if (type === 'student_roster_updated') {
-        const isTeacherView = state.currentView === 'view-teacher' || (document.getElementById('view-teacher') && !document.getElementById('view-teacher').classList.contains('hidden'));
-        if (isTeacherView) {
-            console.log('[Realtime] Student roster updated, refreshing table...');
-            loadTeacherStudentsList();
-        }
-    }
-
-    // 4. Anti-Cheating Event
-    if (type === 'student_cheat_event') {
-        handleIncomingCheatingAlert(payload);
-    }
-}
-
-function initGlobalRealtimeSync() {
-    // 1. BroadcastChannel Listener
-    try {
-        if (typeof BroadcastChannel !== 'undefined') {
-            if (!state.globalBroadcastChannel) {
-                state.globalBroadcastChannel = new BroadcastChannel('exam_global_realtime_sync');
-            }
-            state.globalBroadcastChannel.onmessage = (event) => {
-                handleIncomingAppSync(event.data);
-            };
-        }
-    } catch (e) {
-        console.warn('[BroadcastChannel init warning]', e);
-    }
-
-    // 2. LocalStorage Storage Event Listener
-    if (!window._globalSyncStorageListenerAttached) {
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'EXAM_REALTIME_SYNC_SIGNAL' && e.newValue) {
-                try {
-                    const data = JSON.parse(e.newValue);
-                    handleIncomingAppSync(data);
-                } catch (err) {}
-            }
-        });
-        window._globalSyncStorageListenerAttached = true;
-    }
-
-    // 3. Supabase Realtime WebSocket Listener
-    if (state.supabaseClient && isSupabaseConfigured()) {
-        try {
-            if (state.globalRealtimeChannel) {
-                state.supabaseClient.removeChannel(state.globalRealtimeChannel);
-            }
-            state.globalRealtimeChannel = state.supabaseClient
-                .channel('exam_global_realtime_sync')
-                .on('broadcast', { event: 'app_event' }, (payload) => {
-                    handleIncomingAppSync(payload.payload || payload);
-                })
-                .subscribe((status) => {
-                    console.log('[Global Realtime Channel Subscribed]:', status);
-                });
-        } catch (e) {}
-    }
-
-    // 4. Window Focus Auto-Sync (When user returns to tab, seamlessly check for latest data)
-    if (!window._windowFocusSyncAttached) {
-        window.addEventListener('focus', () => {
-            if (state.currentView === 'view-student-lobby' && state.currentUser?.role === 'student') {
-                loadStudentLobby();
-            } else if (state.currentView === 'view-teacher') {
-                loadTeacherCourses();
-                loadTeacherExamsList();
-                loadTeacherSubmissions();
-            }
-        });
-        window._windowFocusSyncAttached = true;
-    }
-}
-
-// ==============================================================================
-// 2. VIEW NAVIGATION & USER BAR
-// ==============================================================================
-
-function showView(viewId) {
-    state.currentView = viewId;
-
-    const views = [
-        'view-auth',
-        'view-student-lobby',
-        'view-student-exam',
-        'view-student-result',
-        'view-teacher',
-        'view-admin'
-    ];
-
-    views.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            if (id === viewId) {
-                el.classList.remove('hidden');
-                el.classList.add('animate-fade-in');
-            } else {
-                el.classList.add('hidden');
-                el.classList.remove('animate-fade-in');
-            }
-        }
-    });
-
-    updateUserInfoBar();
-}
-
-function updateUserInfoBar() {
-    const bar = document.getElementById('user-info-bar');
-    const nameEl = document.getElementById('current-user-name');
-    const roleBadge = document.getElementById('current-user-role-badge');
-
-    if (!bar) return;
-
-    if (state.currentUser) {
-        bar.classList.remove('hidden');
-        if (nameEl) nameEl.textContent = state.currentUser.name;
-        if (roleBadge) {
-            if (state.currentUser.role === 'admin') {
-                roleBadge.textContent = '⚙️ แอดมิน';
-                roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 border border-purple-300';
-            } else if (state.currentUser.role === 'teacher') {
-                roleBadge.textContent = `👨‍🏫 ${state.currentUser.name}`;
-                roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300';
-            } else {
-                roleBadge.textContent = `👨‍🎓 ${state.currentUser.year} ${state.currentUser.room}`;
-                roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 border border-blue-300';
-            }
-        }
-    } else {
-        bar.classList.add('hidden');
-    }
-}
-
-window.goToHome = function() {
-    if (!state.currentUser) {
-        showView('view-auth');
-    } else if (state.currentUser.role === 'student') {
-        if (!state.antiCheat.isMonitoring) loadStudentLobby();
-    } else if (state.currentUser.role === 'teacher') {
-        loadTeacherDashboard();
-    } else if (state.currentUser.role === 'admin') {
-        loadAdminDashboard();
-    }
-};
-
-// ==============================================================================
-// 3. AUTHENTICATION & LOGIN (3 ROLES)
-// ==============================================================================
-
-function setupAuthEvents() {
-    const tabStudent = document.getElementById('tab-login-student');
-    const tabTeacher = document.getElementById('tab-login-teacher');
-    const tabAdmin = document.getElementById('tab-login-admin');
-
-    const formStudent = document.getElementById('form-login-student');
-    const formTeacher = document.getElementById('form-login-teacher');
-    const formAdmin = document.getElementById('form-login-admin');
-
-    const setLoginTab = (role) => {
-        [tabStudent, tabTeacher, tabAdmin].forEach(tab => {
-            tab.classList.remove('border-indigo-600', 'border-emerald-600', 'border-purple-600', 'text-indigo-600', 'text-emerald-600', 'text-purple-600');
-            tab.classList.add('border-transparent', 'text-slate-400');
-        });
-
-        formStudent.classList.add('hidden');
-        formTeacher.classList.add('hidden');
-        formAdmin.classList.add('hidden');
-
-        if (role === 'student') {
-            tabStudent.classList.add('border-indigo-600', 'text-indigo-600');
-            tabStudent.classList.remove('border-transparent', 'text-slate-400');
-            formStudent.classList.remove('hidden');
-        } else if (role === 'teacher') {
-            tabTeacher.classList.add('border-emerald-600', 'text-emerald-600');
-            tabTeacher.classList.remove('border-transparent', 'text-slate-400');
-            formTeacher.classList.remove('hidden');
-        } else if (role === 'admin') {
-            tabAdmin.classList.add('border-purple-600', 'text-purple-600');
-            tabAdmin.classList.remove('border-transparent', 'text-slate-400');
-            formAdmin.classList.remove('hidden');
-        }
-    };
-
-    if (tabStudent) tabStudent.onclick = () => setLoginTab('student');
-    if (tabTeacher) tabTeacher.onclick = () => setLoginTab('teacher');
-    if (tabAdmin) tabAdmin.onclick = () => setLoginTab('admin');
-
-    window.toggleStudentPasswordVisibility = function() {
-        const input = document.getElementById('student-login-pass-input');
-        const icon = document.getElementById('student-pass-eye-icon');
-        if (!input || !icon) return;
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.className = 'fas fa-eye-slash text-xs text-indigo-600';
-        } else {
-            input.type = 'password';
-            icon.className = 'fas fa-eye text-xs';
-        }
-    };
-
-    // 3.1 ฟอร์มนักเรียน (ล็อกอินด้วย รหัสนักเรียน/ชื่อ และ เลขบัตรประชาชน 13 หลัก)
-    if (formStudent) {
-        formStudent.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const loginId = document.getElementById('student-login-id-input')?.value.trim();
-            const citizenPass = document.getElementById('student-login-pass-input')?.value.trim();
-
-            if (!loginId) {
-                showToast('กรุณากรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล', 'warning');
-                return;
-            }
-
-            if (!citizenPass || citizenPass.length !== 13) {
-                showCustomAlert({
-                    title: 'เลขบัตรประชาชนไม่ถูกต้อง',
-                    message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลัก\n(ใช้เป็นรหัสผ่านเข้าสอบ)',
-                    icon: 'fas fa-id-card'
-                });
-                return;
-            }
-
-            let registeredStudents = getLocalStudents();
-
-            if (isSupabaseConfigured() && state.supabaseClient) {
-                try {
-                    const { data, error } = await state.supabaseClient.from('students').select('*');
-                    if (!error && Array.isArray(data) && data.length > 0) {
-                        registeredStudents = data;
-                        localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(data));
-                    }
-                } catch (e) {}
-            }
-
-            let matchedStudent = null;
-
-            if (registeredStudents && registeredStudents.length > 0) {
-                matchedStudent = registeredStudents.find(s => 
-                    (s.code === loginId || s.name.trim().toLowerCase() === loginId.toLowerCase() || s.citizen_id === loginId) && 
-                    s.citizen_id === citizenPass
-                );
-
-                if (!matchedStudent) {
-                    const studentById = registeredStudents.find(s => s.code === loginId || s.name.trim().toLowerCase() === loginId.toLowerCase());
-                    if (studentById) {
-                        showCustomAlert({
-                            title: 'รหัสผ่านไม่ถูกต้อง',
-                            message: `พบรายชื่อ "${studentById.name}" ในระบบ\nแต่เลขบัตรประจำตัวประชาชน 13 หลัก (รหัสผ่าน) ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง`,
-                            icon: 'fas fa-lock'
-                        });
-                        return;
-                    }
-
-                    showCustomAlert({
-                        title: 'ไม่พบข้อมูลนักเรียนในระบบ',
-                        message: `ไม่พบรหัสนักเรียนหรือชื่อ "${loginId}" ที่อาจารย์ได้ลงทะเบียนไว้\nกรุณาตรวจสอบหรือติดต่ออาจารย์ผู้สอนเพื่อเพิ่มรายชื่อก่อนเข้าสอบ`,
-                        icon: 'fas fa-user-xmark'
-                    });
-                    return;
-                }
-            } else {
-                matchedStudent = {
-                    id: generatePseudoUUID(),
-                    code: loginId,
-                    name: loginId,
-                    citizen_id: citizenPass,
-                    year: 'ปวช.2',
-                    dept: 'เทคโนโลยีธุรกิจดิจิทัล',
-                    room: 'ห้อง 1'
-                };
-                saveLocalStudent(matchedStudent);
-            }
-
-            state.currentUser = {
-                role: 'student',
-                id: matchedStudent.id || generatePseudoUUID(),
-                student_code: matchedStudent.code,
-                name: matchedStudent.name,
-                citizen_id: matchedStudent.citizen_id,
-                year: matchedStudent.year || 'ปวช.2',
-                dept: matchedStudent.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
-                room: matchedStudent.room || 'ห้อง 1'
-            };
-            try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
-
-            const badge = document.getElementById('student-class-badge');
-            if (badge) badge.textContent = `${state.currentUser.year} | ${state.currentUser.dept} | ${state.currentUser.room}`;
-
-            showToast(`ยินดีต้อนรับคุณ ${state.currentUser.name} (${state.currentUser.year} ${state.currentUser.room})`, 'success');
-            loadStudentLobby();
-        });
-    }
-
-    // 3.2 ฟอร์มอาจารย์ (ระบุชื่ออาจารย์/รหัสอาจารย์ และ รหัสผ่านประจำตัว)
-    if (formTeacher) {
-        formTeacher.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const loginInput = document.getElementById('teacher-name-input').value.trim();
-            const password = document.getElementById('teacher-password-input').value.trim();
-
-            if (!loginInput || !password) {
-                showToast('กรุณากรอกชื่อ-นามสกุล หรือ รหัสอาจารย์ และ รหัสผ่าน', 'warning');
-                return;
-            }
-
-            let registeredTeachers = getLocalTeachers();
-
-            // ดึงข้อมูลอาจารย์ล่าสุดจาก Supabase Cloud (สำหรับมือถือหรือเครื่องอื่นที่เพิ่งเปิดเว็บ)
-            if (isSupabaseConfigured() && state.supabaseClient) {
-                try {
-                    const { data: dbTeachers, error: fetchErr } = await state.supabaseClient
-                        .from('teachers')
-                        .select('*');
-                    if (!fetchErr && Array.isArray(dbTeachers) && dbTeachers.length > 0) {
-                        registeredTeachers = dbTeachers;
-                        localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(registeredTeachers));
-                    }
-                } catch (err) {
-                    console.warn('[Teacher Login] Supabase check notice:', err);
-                }
-            }
-
-            if (registeredTeachers && registeredTeachers.length > 0) {
-                const cleanLogin = loginInput.toLowerCase();
-                const matchedTeacher = registeredTeachers.find(t => 
-                    (t.name.trim().toLowerCase() === cleanLogin || 
-                     (t.teacher_code && t.teacher_code.trim().toLowerCase() === cleanLogin) ||
-                     (t.code && String(t.code).trim().toLowerCase() === cleanLogin)) &&
-                    String(t.password).trim() === password
-                );
-
-                if (matchedTeacher) {
-                    state.currentUser = {
-                        role: 'teacher',
-                        id: matchedTeacher.id,
-                        name: matchedTeacher.name,
-                        code: matchedTeacher.teacher_code || matchedTeacher.code,
-                        dept: matchedTeacher.department || matchedTeacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
-                    };
-                    try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
-
-                    const portalNameEl = document.getElementById('teacher-portal-name');
-                    if (portalNameEl) portalNameEl.textContent = `${matchedTeacher.name} (${matchedTeacher.department || 'อาจารย์ผู้สอน'})`;
-
-                    showToast(`ยินดีต้อนรับ ${matchedTeacher.name}`, 'success');
-                    loadTeacherDashboard();
-                    return;
-                }
-
-                // เช็คว่าชื่ออาจารย์มีในระบบแต่รหัสผ่านผิดหรือไม่
-                const teacherExists = registeredTeachers.find(t => 
-                    t.name.trim().toLowerCase() === cleanLogin || 
-                    (t.teacher_code && t.teacher_code.trim().toLowerCase() === cleanLogin) ||
-                    (t.code && String(t.code).trim().toLowerCase() === cleanLogin)
-                );
-
-                if (teacherExists) {
-                    showCustomAlert({
-                        title: 'รหัสผ่านไม่ถูกต้อง',
-                        message: `พบข้อมูลอาจารย์ "${teacherExists.name}" ในระบบ\nแต่รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง`,
-                        icon: 'fas fa-lock'
-                    });
-                    return;
-                }
-
-                showCustomAlert({
-                    title: 'ไม่พบบัญชีอาจารย์ในระบบ',
-                    message: `ไม่พบชื่อหรือรหัสอาจารย์ "${loginInput}" ในระบบ\nกรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อเพิ่มรายชื่ออาจารย์เข้าสู่ระบบ`,
-                    icon: 'fas fa-user-xmark'
-                });
-                return;
-            } else {
-                // กรณีระบบยังไม่มีการลงทะเบียนอาจารย์เลย ให้ใช้ค่าเริ่มต้น
-                if (password === 'teacher1234' || password === 'teacher' || password === 'admin1234') {
-                    const teacherId = generateTeacherUUID(loginInput);
-
-                    state.currentUser = {
-                        role: 'teacher',
-                        id: teacherId,
-                        name: loginInput,
-                        code: 'T001',
-                        dept: 'เทคโนโลยีธุรกิจดิจิทัล'
-                    };
-                    try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
-
-                    const portalNameEl = document.getElementById('teacher-portal-name');
-                    if (portalNameEl) portalNameEl.textContent = loginInput;
-
-                    showToast(`ยินดีต้อนรับ ${loginInput}`, 'success');
-                    loadTeacherDashboard();
-                } else {
-                    showCustomAlert({
-                        title: 'รหัสผ่านไม่ถูกต้อง',
-                        message: 'รหัสผ่านสำหรับอาจารย์ไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง',
-                        icon: 'fas fa-lock'
-                    });
-                }
-            }
-        });
-    }
-
-    // 3.3 ฟอร์มแอดมิน
-    if (formAdmin) {
-        formAdmin.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const password = document.getElementById('admin-password-input').value;
-
-            if (password === 'admin9999' || password === 'admin1234' || password === 'admin') {
-                state.currentUser = {
-                    role: 'admin',
-                    id: '00000000-0000-0000-0000-000000000001',
-                    name: 'ผู้ดูแลระบบสูงสุด (Admin)'
-                };
-                try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
-                showToast('เข้าสู่ระบบแอดมินสำเร็จ', 'success');
-                loadAdminDashboard();
-            } else {
-                showCustomAlert({
-                    title: 'รหัสผ่านไม่ถูกต้อง',
-                    message: 'รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง',
-                    icon: 'fas fa-shield-cat'
-                });
-            }
-        });
-    }
-
-    // ปุ่มออกจากระบบ (Custom In-App Modal - No browser popup!)
-    const btnLogout = document.getElementById('btn-logout');
-    if (btnLogout) {
-        btnLogout.addEventListener('click', () => {
-            showCustomConfirm({
-                title: 'ออกจากระบบ',
-                message: 'คุณต้องการออกจากระบบและกลับสู่หน้าหลักหรือไม่?',
-                icon: 'fas fa-arrow-right-from-bracket',
-                confirmText: 'ออกจากระบบ',
-                cancelText: 'ยกเลิก',
-                confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
-                onConfirm: () => {
-                    stopAntiCheatMonitor();
-                    clearInterval(state.examTimer);
-                    try { sessionStorage.removeItem('EXAM_SESSION_USER'); } catch (e) {}
-                    state.currentUser = null;
-                    state.currentExam = null;
-                    state.questions = [];
-                    state.answers = {};
-                    showView('view-auth');
-                    showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
-                }
-            });
-        });
-    }
-}
-
-// ==============================================================================
-// 4. STUDENT LOBBY & EXAM ROOM (WITH TARGETING FILTER)
-// ==============================================================================
-
-async function loadStudentLobby() {
-    showView('view-student-lobby');
-    const listContainer = document.getElementById('exam-cards-container');
-    if (!listContainer) return;
-
-    let exams = getLocalExams();
-
-    if (isSupabaseConfigured() && state.supabaseClient) {
-        try {
-            const { data, error } = await state.supabaseClient
-                .from('exams')
-                .select('*')
-                .eq('is_active', true)
-                .order('created_at', { ascending: false });
-
-            if (!error && Array.isArray(data) && data.length > 0) {
-                exams = data;
-            }
-        } catch (e) {
-            console.warn('[loadStudentLobby] Remote query failed, using local exams:', e);
-        }
-    }
-
-    // ดึงประวัติการส่งข้อสอบของนักเรียนคนนี้ เพื่อตรวจสอบว่าเคยทำข้อสอบไปแล้วหรือไม่
-    let studentSubmissions = [];
+    // Force clear any local submission for current student if Supabase says 0
     if (isSupabaseConfigured() && state.supabaseClient && state.currentUser) {
         try {
             const studentId = state.currentUser.id;
-            const studentCode = state.currentUser.student_code || state.currentUser.code || '';
             const studentName = state.currentUser.name || '';
-            
-            let query = state.supabaseClient.from('exam_results').select('*');
+                        let query = state.supabaseClient.from('exam_results').select('*');
 
-            if (studentId && studentName) {
-                query = query.or(`student_id.eq.${studentId},student_id.eq.${studentCode},student_name.eq.${studentName}`);
-            } else if (studentId) {
+            if (isValidUUID(studentId) && studentName) {
+                query = query.or(`student_id.eq.${studentId},student_name.eq."${studentName}"`);
+            } else if (isValidUUID(studentId)) {
                 query = query.eq('student_id', studentId);
+            } else if (studentName) {
+                query = query.eq('student_name', studentName);
             }
 
             const { data: dbSubmissions, error: subError } = await query;
+
             if (!subError && Array.isArray(dbSubmissions)) {
                 studentSubmissions = dbSubmissions;
                 // ซิงค์ LocalStorage ของนักเรียนให้ตรงกับฐานข้อมูลคลาวด์ที่เป็นความจริงเสมอ
@@ -1271,25 +204,34 @@ window.startExam = async function(examId) {
         }
 
         // ตรวจสอบว่านักเรียนเคยส่งข้อสอบชุดนี้ไปแล้วหรือไม่ โดยยึด Supabase Cloud เป็นหลัก
-        let isAlreadySubmitted = false;
+                let isAlreadySubmitted = false;
         if (isSupabaseConfigured() && state.supabaseClient && state.currentUser) {
             try {
                 const studentId = state.currentUser.id;
-                const studentCode = state.currentUser.student_code || state.currentUser.code || '';
                 const studentName = state.currentUser.name || '';
-                const { data: dbCheck, error } = await state.supabaseClient
+                
+                let checkQuery = state.supabaseClient
                     .from('exam_results')
                     .select('id, total_score, max_score, percentage')
-                    .eq('exam_id', examId)
-                    .or(`student_id.eq.${studentId},student_id.eq.${studentCode},student_name.eq.${studentName}`);
+                    .eq('exam_id', examId);
+
+                if (isValidUUID(studentId) && studentName) {
+                    checkQuery = checkQuery.or(`student_id.eq.${studentId},student_name.eq."${studentName}"`);
+                } else if (isValidUUID(studentId)) {
+                    checkQuery = checkQuery.eq('student_id', studentId);
+                } else if (studentName) {
+                    checkQuery = checkQuery.eq('student_name', studentName);
+                }
+
+                const { data: dbCheck, error } = await checkQuery;
 
                 if (!error && dbCheck && dbCheck.length > 0) {
                     isAlreadySubmitted = true;
                 } else if (!error && Array.isArray(dbCheck) && dbCheck.length === 0) {
                     // คลาวด์ยืนยันว่าไม่มีผลสอบแล้ว (อาจารย์ปลดล็อกให้สอบใหม่แล้ว)
-                    // ล้างแคชข้อสอบชุดนี้ออกจาก LocalStorage ทันที
                     const localSubs = getLocalSubmissions();
-                    const filtered = localSubs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || s.student_name === studentName)));
+                    const cleanName = (studentName || '').trim().toLowerCase();
+                    const filtered = localSubs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || (s.student_name && s.student_name.trim().toLowerCase() === cleanName))));
                     localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(filtered));
                     isAlreadySubmitted = false;
                 }
@@ -1307,6 +249,7 @@ window.startExam = async function(examId) {
         }
 
         if (isAlreadySubmitted) {
+
             showCustomAlert({
                 title: 'คุณได้ทำข้อสอบชุดนี้ไปแล้ว',
                 message: `คุณได้ส่งคำตอบสำหรับชุดข้อสอบ "${exam.title}" เรียบร้อยแล้ว และไม่อนุญาตให้ทำซ้ำ\n\nหากมีเหตุจำเป็นต้องสอบใหม่ กรุณาติดต่ออาจารย์ผู้สอนเพื่อกดเปิด/ปลดล็อกให้สอบใหม่ครับ`,
@@ -3530,11 +2473,11 @@ window.allowStudentRetake = function(studentId, examId, studentName, examTitle) 
         onConfirm: async () => {
             // 1. ลบจาก Local Storage ของครู
             const subs = getLocalSubmissions();
-            const studentCode = studentId;
-            const updatedSubs = subs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || s.student_id === studentCode || (s.student_name && s.student_name.trim().toLowerCase() === studentName.trim().toLowerCase()))));
+            const cleanName = (studentName || '').trim().toLowerCase();
+            const updatedSubs = subs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || (s.student_name && s.student_name.trim().toLowerCase() === cleanName))));
             localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(updatedSubs));
 
-            // 2. ลบจาก Supabase Cloud (ลองทั้ง RPC และ Direct Delete ทุกคอลัมน์ที่เกี่ยวข้อง)
+            // 2. ลบจาก Supabase Cloud แบบแยกคำสั่ง ป้องกัน syntax error จากช่องว่างในชื่อหรือ UUID error
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
                     // Try RPC first if available
@@ -3546,24 +2489,50 @@ window.allowStudentRetake = function(studentId, examId, studentName, examTitle) 
                         });
                     } catch (rpcErr) {}
 
-                    // Direct Delete by student_id or student_name
-                    await state.supabaseClient
-                        .from('exam_results')
-                        .delete()
-                        .eq('exam_id', examId)
-                        .or(`student_id.eq.${studentId},student_name.eq.${studentName}`);
+                    // ลบจาก exam_results ด้วย student_id (ถ้าเป็น UUID)
+                    if (isValidUUID(studentId)) {
+                        await state.supabaseClient
+                            .from('exam_results')
+                            .delete()
+                            .eq('exam_id', examId)
+                            .eq('student_id', studentId);
+                    }
 
-                    await state.supabaseClient
-                        .from('student_submissions')
-                        .delete()
-                        .eq('exam_id', examId)
-                        .eq('student_id', studentId);
+                    // ลบจาก exam_results ด้วย student_name
+                    if (studentName) {
+                        await state.supabaseClient
+                            .from('exam_results')
+                            .delete()
+                            .eq('exam_id', examId)
+                            .eq('student_name', studentName);
+                    }
 
-                    await state.supabaseClient
-                        .from('anti_cheat_logs')
-                        .delete()
-                        .eq('exam_id', examId)
-                        .eq('student_id', studentId);
+                    // ลบจาก student_submissions ด้วย student_id (ถ้าเป็น UUID)
+                    if (isValidUUID(studentId)) {
+                        await state.supabaseClient
+                            .from('student_submissions')
+                            .delete()
+                            .eq('exam_id', examId)
+                            .eq('student_id', studentId);
+                    }
+
+                    // ลบจาก student_submissions ด้วย student_name
+                    if (studentName) {
+                        await state.supabaseClient
+                            .from('student_submissions')
+                            .delete()
+                            .eq('exam_id', examId)
+                            .eq('student_name', studentName);
+                    }
+
+                    // ลบจาก anti_cheat_logs
+                    if (isValidUUID(studentId)) {
+                        await state.supabaseClient
+                            .from('anti_cheat_logs')
+                            .delete()
+                            .eq('exam_id', examId)
+                            .eq('student_id', studentId);
+                    }
                 } catch (err) {
                     console.warn('[allowStudentRetake] Remote delete warning:', err);
                 }
@@ -3588,6 +2557,7 @@ window.allowStudentRetake = function(studentId, examId, studentName, examTitle) 
         }
     });
 };
+
 
 
 window.inspectStudentSubmission = async function(studentId, examId, studentName) {
