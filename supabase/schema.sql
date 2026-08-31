@@ -598,3 +598,38 @@ BEGIN
     ON CONFLICT (question_id) DO NOTHING;
 END;
 $$;
+
+-- 4.6.1 ปลดล็อกสิทธิ์ DELETE สำหรับ exam_results และ student_submissions
+DROP POLICY IF EXISTS "Allow delete exam results" ON public.exam_results;
+CREATE POLICY "Allow delete exam results" ON public.exam_results FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Allow delete student submissions" ON public.student_submissions;
+CREATE POLICY "Allow delete student submissions" ON public.student_submissions FOR DELETE USING (true);
+
+-- 5.3 ฟังก์ชันปลดล็อกให้นักเรียนเข้าทำข้อสอบใหม่ (Security Definer Reset Engine)
+CREATE OR REPLACE FUNCTION public.reset_student_exam_attempt(
+    p_student_id TEXT,
+    p_exam_id UUID,
+    p_student_name TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    DELETE FROM public.exam_results 
+    WHERE exam_id = p_exam_id 
+      AND (student_id::TEXT = p_student_id OR student_name = p_student_name);
+
+    DELETE FROM public.student_submissions 
+    WHERE exam_id = p_exam_id 
+      AND (student_id::TEXT = p_student_id);
+
+    DELETE FROM public.anti_cheat_logs 
+    WHERE exam_id = p_exam_id 
+      AND (student_id::TEXT = p_student_id);
+
+    RETURN jsonb_build_object('success', true, 'message', 'Reset successful');
+END;
+$$;
+
