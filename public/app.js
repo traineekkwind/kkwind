@@ -1,3 +1,128 @@
+// ==============================================================================
+// QUESTION IMAGE & FORMATTING HELPERS
+// ==============================================================================
+window.openImageZoomModal = function(imgSrc) {
+    const modal = document.getElementById('modal-image-zoom');
+    const target = document.getElementById('image-zoom-target');
+    if (!modal || !target || !imgSrc) return;
+
+    target.src = imgSrc;
+    modal.classList.remove('hidden');
+};
+
+window.closeImageZoomModal = function() {
+    const modal = document.getElementById('modal-image-zoom');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.parseQuestionTextAndImage = function(rawText, explicitImgUrl) {
+    let text = rawText || '';
+    let image = explicitImgUrl || null;
+
+    if (!image && text) {
+        const match = text.match(/\[img:\s*(data:image\/[^;]+;base64,[^\]]+|https?:\/\/[^\]]+)\]/i);
+        if (match) {
+            image = match[1];
+            text = text.replace(match[0], '').trim();
+        }
+    }
+
+    return { text, image };
+};
+
+state.currentAddQuestionImage = null;
+
+window.handleQuestionImageSelect = function(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        showToast('กรุณาเลือกไฟล์รูปภาพเท่านั้น (JPG, PNG, WebP)', 'warning');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            // Compress using canvas to max 1000px
+            const maxDimension = 1000;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxDimension || height > maxDimension) {
+                if (width > height) {
+                    height = Math.round((height * maxDimension) / width);
+                    width = maxDimension;
+                } else {
+                    width = Math.round((width * maxDimension) / height);
+                    height = maxDimension;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.82);
+            state.currentAddQuestionImage = compressedBase64;
+
+            // Update UI preview
+            const previewEl = document.getElementById('q-image-preview');
+            const nameEl = document.getElementById('q-image-preview-name');
+            const containerEl = document.getElementById('q-image-preview-container');
+            const uploadBoxEl = document.getElementById('q-image-upload-box');
+
+            if (previewEl) previewEl.src = compressedBase64;
+            if (nameEl) nameEl.textContent = file.name;
+            if (containerEl) containerEl.classList.remove('hidden');
+            if (uploadBoxEl) uploadBoxEl.classList.add('hidden');
+
+            showToast('อัปโหลดและบีบอัดรูปภาพเรียบร้อยแล้ว!', 'success');
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+};
+
+window.removeTeacherQuestionImage = function() {
+    state.currentAddQuestionImage = null;
+    const input = document.getElementById('teacher-add-q-image-input');
+    const containerEl = document.getElementById('q-image-preview-container');
+    const uploadBoxEl = document.getElementById('q-image-upload-box');
+
+    if (input) input.value = '';
+    if (containerEl) containerEl.classList.add('hidden');
+    if (uploadBoxEl) uploadBoxEl.classList.remove('hidden');
+};
+
+window.fillQuickChoices = function(type) {
+    const optA = document.getElementById('teacher-add-opt-a');
+    const optB = document.getElementById('teacher-add-opt-b');
+    const optC = document.getElementById('teacher-add-opt-c');
+    const optD = document.getElementById('teacher-add-opt-d');
+
+    if (type === 'ABCD') {
+        if (optA) optA.value = 'A';
+        if (optB) optB.value = 'B';
+        if (optC) optC.value = 'C';
+        if (optD) optD.value = 'D';
+    } else if (type === 'THAI') {
+        if (optA) optA.value = 'ก';
+        if (optB) optB.value = 'ข';
+        if (optC) optC.value = 'ค';
+        if (optD) optD.value = 'ง';
+    } else if (type === 'TF') {
+        if (optA) optA.value = 'ถูก (True)';
+        if (optB) optB.value = 'ผิด (False)';
+        if (optC) optC.value = '';
+        if (optD) optD.value = '';
+    }
+};
+
+
 ﻿/**
  * ==============================================================================
  * EXAMSECURE PRO - MAIN FRONTEND APPLICATION (SPA)
@@ -1231,9 +1356,30 @@ function renderExamQuestion() {
     const textEl = document.getElementById('exam-question-text');
     const optionsContainer = document.getElementById('exam-options-container');
 
+    const parsed = parseQuestionTextAndImage(q.question_text, q.image_url || q.image);
+
     if (numEl) numEl.textContent = `ข้อที่ ${state.currentQuestionIndex + 1} จาก ${state.questions.length}`;
     if (pointsEl) pointsEl.textContent = `(${q.points || 1} คะแนน)`;
-    if (textEl) textEl.textContent = q.question_text;
+    
+    if (textEl) {
+        let questionMarkup = '';
+        if (parsed.image) {
+            questionMarkup += `
+                <div class="mb-4 p-2 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center">
+                    <img src="${parsed.image}" alt="ภาพประกอบข้อสอบ" class="max-h-80 max-w-full object-contain rounded-xl shadow-2xs cursor-pointer hover:opacity-95 transition" onclick="openImageZoomModal('${parsed.image}')">
+                    <div class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
+                        <i class="fas fa-magnifying-glass-plus"></i> คลิกที่รูปเพื่อขยายดูเต็มจอ
+                    </div>
+                </div>
+            `;
+        }
+        if (parsed.text) {
+            questionMarkup += `<div class="text-slate-800 text-base font-bold leading-relaxed">${escapeHtml(parsed.text)}</div>`;
+        } else if (!parsed.image) {
+            questionMarkup += `<div class="text-slate-800 text-base font-bold leading-relaxed">(ไม่มีข้อความคำถาม)</div>`;
+        }
+        textEl.innerHTML = questionMarkup;
+    }
 
     if (optionsContainer) {
         const selectedOpt = state.answers[q.id];
@@ -1258,6 +1404,7 @@ function renderExamQuestion() {
     updateExamNavButtons();
     renderQuestionPalette();
 }
+
 
 function selectExamOption(questionId, optionId) {
     state.answers[questionId] = optionId;
@@ -3459,23 +3606,31 @@ window.inspectStudentSubmission = async function(studentId, examId, studentName)
 
             <div class="space-y-4">
                 ${questions.map((q, idx) => {
-                    const isCorrect = q.is_correct;
-                    return `
-                        <div class="p-4 rounded-xl border ${isCorrect ? 'border-green-200 bg-green-50/30' : 'border-red-200 bg-red-50/30'}">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="font-bold text-sm text-gray-800">ข้อที่ ${idx + 1}: ${escapeHtml(q.question_text)}</span>
-                                <span class="text-xs font-bold px-2 py-0.5 rounded ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
-                                    ${isCorrect ? `+${q.points} คะแนน (ถูก)` : '0 คะแนน (ผิด)'}
-                                </span>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs mb-2">
-                                <div class="p-2 rounded bg-white border border-gray-100"><span class="text-gray-400">คำตอบที่นักเรียนเลือก:</span> <strong class="${isCorrect ? 'text-green-600' : 'text-red-600'}">${q.student_selected || 'ไม่ได้ตอบ'}</strong></div>
-                                <div class="p-2 rounded bg-white border border-gray-100"><span class="text-gray-400">เฉลยที่ถูกต้อง:</span> <strong class="text-green-600">${q.correct_answer}</strong></div>
-                            </div>
-                            ${q.explanation ? `<p class="text-xs text-gray-500 bg-white/80 p-2 rounded border border-gray-100 mt-1">💡 <strong>คำอธิบาย:</strong> ${escapeHtml(q.explanation)}</p>` : ''}
-                        </div>
-                    `;
-                }).join('')}
+    const isCorrect = q.is_correct;
+    const parsed = parseQuestionTextAndImage(q.question_text, q.image_url || q.image);
+    return `
+        <div class="p-4 rounded-xl border ${isCorrect ? 'border-green-200 bg-green-50/30' : 'border-red-200 bg-red-50/30'}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="font-bold text-sm text-gray-800">ข้อที่ ${idx + 1}: ${escapeHtml(parsed.text || (parsed.image ? '(ข้อสอบแบบรูปภาพ)' : ''))}</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                    ${isCorrect ? `+${q.points} คะแนน (ถูก)` : '0 คะแนน (ผิด)'}
+                </span>
+            </div>
+            ${parsed.image ? `
+                <div class="mb-3 p-2 bg-white rounded-xl border border-gray-200 inline-block">
+                    <img src="${parsed.image}" alt="รูปภาพโจทย์" class="max-h-48 max-w-full object-contain rounded-lg cursor-pointer hover:opacity-90 transition" onclick="openImageZoomModal('${parsed.image}')">
+                    <div class="text-[10px] text-gray-400 mt-1"><i class="fas fa-magnifying-glass-plus"></i> คลิกเพื่อดูรูปขนาดใหญ่</div>
+                </div>
+            ` : ''}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs mb-2">
+                <div class="p-2 rounded bg-white border border-gray-100"><span class="text-gray-400">คำตอบที่นักเรียนเลือก:</span> <strong class="${isCorrect ? 'text-green-600' : 'text-red-600'}">${q.student_selected || 'ไม่ได้ตอบ'}</strong></div>
+                <div class="p-2 rounded bg-white border border-gray-100"><span class="text-gray-400">เฉลยที่ถูกต้อง:</span> <strong class="text-green-600">${q.correct_answer}</strong></div>
+            </div>
+            ${q.explanation ? `<p class="text-xs text-gray-500 bg-white/80 p-2 rounded border border-gray-100 mt-1">💡 <strong>คำอธิบาย:</strong> ${escapeHtml(q.explanation)}</p>` : ''}
+        </div>
+    `;
+}).join('')}
+
             </div>
         `;
 
@@ -4059,10 +4214,11 @@ function renderTeacherExamViewModal(exam, questions) {
             </div>
         `;
     } else {
-        contentEl.innerHTML = questions.map((q, idx) => {
+                contentEl.innerHTML = questions.map((q, idx) => {
             const qNum = idx + 1;
             const points = q.points || 1;
             const correctOpt = (q.correct || q.correct_option_id || 'A').toUpperCase();
+            const parsed = parseQuestionTextAndImage(q.question_text, q.image_url || q.image);
 
             // Render 4 choices
             const optionsHtml = (q.options || []).map(opt => {
@@ -4098,8 +4254,20 @@ function renderTeacherExamViewModal(exam, questions) {
                         </button>
                     </div>
 
+                    ${parsed.image ? `
+                        <div class="p-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
+                            <img src="${parsed.image}" alt="ภาพโจทย์" class="w-24 h-24 object-contain bg-white rounded-lg border border-slate-200 shadow-2xs cursor-pointer" onclick="openImageZoomModal('${parsed.image}')">
+                            <div class="text-xs text-slate-500">
+                                <div class="font-bold text-slate-700 mb-1"><i class="far fa-image text-indigo-600 mr-1"></i> มีรูปภาพประกอบโจทย์</div>
+                                <button type="button" onclick="openImageZoomModal('${parsed.image}')" class="text-[11px] text-indigo-600 hover:underline font-semibold">
+                                    <i class="fas fa-magnifying-glass-plus"></i> คลิกเพื่อดูรูปขนาดใหญ่
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
+
                     <div class="text-sm font-bold text-slate-900 leading-snug">
-                        ${escapeHtml(q.question_text || '')}
+                        ${escapeHtml(parsed.text || (parsed.image ? '(ดูโจทย์จากภาพด้านบน)' : ''))}
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -4114,6 +4282,7 @@ function renderTeacherExamViewModal(exam, questions) {
                 </div>
             `;
         }).join('');
+
     }
 }
 
@@ -4745,12 +4914,12 @@ function setupGlobalFormEvents() {
     }
 
     // 9.3 ฟอร์มเพิ่มโจทย์เดี่ยวของอาจารย์
-    const formAddQ = document.getElementById('form-teacher-add-question');
+        const formAddQ = document.getElementById('form-teacher-add-question');
     if (formAddQ) {
         formAddQ.addEventListener('submit', async (e) => {
             e.preventDefault();
             const examId = document.getElementById('teacher-add-question-exam-select').value;
-            const qText = document.getElementById('teacher-add-question-text').value.trim();
+            let qText = document.getElementById('teacher-add-question-text').value.trim();
             const optA = document.getElementById('teacher-add-opt-a').value.trim();
             const optB = document.getElementById('teacher-add-opt-b').value.trim();
             const optC = document.getElementById('teacher-add-opt-c').value.trim();
@@ -4758,10 +4927,27 @@ function setupGlobalFormEvents() {
             const correctOpt = document.getElementById('teacher-add-correct-option').value;
             const points = document.getElementById('teacher-add-points').value;
             const explanation = document.getElementById('teacher-add-explanation').value.trim();
+            const attachedImg = state.currentAddQuestionImage;
 
-            if (!examId || !qText || !optA || !optB) {
-                showToast('กรุณากรอกโจทย์และตัวเลือกอย่างน้อย ก และ ข', 'warning');
+            if (!examId) {
+                showToast('กรุณาเลือกชุดข้อสอบ', 'warning');
                 return;
+            }
+
+            if (!qText && !attachedImg) {
+                showToast('กรุณาพิมพ์ข้อความคำถาม หรืออัปโหลดรูปภาพโจทย์', 'warning');
+                return;
+            }
+
+            if (!optA || !optB) {
+                showToast('กรุณากรอกตัวเลือกอย่างน้อย A และ B', 'warning');
+                return;
+            }
+
+            // If image is attached, embed tag [img:...] in question_text for seamless sync
+            let fullQuestionText = qText;
+            if (attachedImg) {
+                fullQuestionText = `[img:${attachedImg}]` + (qText ? `\n${qText}` : '');
             }
 
             const options = [
@@ -4774,7 +4960,8 @@ function setupGlobalFormEvents() {
             const newQ = {
                 id: generatePseudoUUID(),
                 exam_id: examId,
-                question_text: qText,
+                question_text: fullQuestionText,
+                image_url: attachedImg || null,
                 options: options,
                 points: Number(points) || 1.0,
                 correct: correctOpt,
@@ -4789,7 +4976,7 @@ function setupGlobalFormEvents() {
                 try {
                     await state.supabaseClient.rpc('create_question_with_answer', {
                         p_exam_id: examId,
-                        p_question_text: qText,
+                        p_question_text: fullQuestionText,
                         p_options: options,
                         p_points: Number(points) || 1.0,
                         p_correct_option_id: correctOpt,
@@ -4808,9 +4995,11 @@ function setupGlobalFormEvents() {
             document.getElementById('teacher-add-opt-c').value = '';
             document.getElementById('teacher-add-opt-d').value = '';
             document.getElementById('teacher-add-explanation').value = '';
+            removeTeacherQuestionImage();
         });
     }
-}
+
+    }
 
 // ==============================================================================
 // 10. CUSTOM IN-APP MODAL DIALOGS (REPLACE NATIVE POPUPS)
