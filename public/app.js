@@ -1303,6 +1303,11 @@ function isExamEligibleForStudent(exam, student) {
 
 // เริ่มการสอบ
 window.startExam = async function(examId) {
+    // ป้องกันกดซ้ำ
+    if (window._startExamLock) return;
+    window._startExamLock = true;
+    setTimeout(() => { window._startExamLock = false; }, 3000);
+
     try {
         let exam = getLocalExams().find(e => e.id === examId);
         let questions = getLocalQuestions(examId);
@@ -1457,67 +1462,95 @@ function renderExamQuestion() {
     const q = state.questions[state.currentQuestionIndex];
     if (!q) return;
 
-    const numEl = document.getElementById('exam-question-number');
-    const pointsEl = document.getElementById('exam-question-points');
-    const textEl = document.getElementById('exam-question-text');
-    const optionsContainer = document.getElementById('exam-options-container');
+    const card = document.getElementById('exam-question-card');
+    if (!card) return;
 
     const parsed = parseQuestionTextAndImage(q.question_text, q.image_url || q.image);
 
-    if (numEl) numEl.textContent = `ข้อที่ ${state.currentQuestionIndex + 1} จาก ${state.questions.length}`;
-    if (pointsEl) pointsEl.textContent = `(${q.points || 1} คะแนน)`;
-    
-    if (textEl) {
-        let questionMarkup = '';
-        if (parsed.image) {
-            questionMarkup += `
-                <div class="mb-4 p-2 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center">
-                    <img src="${parsed.image}" alt="ภาพประกอบข้อสอบ" class="max-h-80 max-w-full object-contain rounded-xl shadow-2xs cursor-pointer hover:opacity-95 transition" onclick="openImageZoomModal('${parsed.image}')">
-                    <div class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
-                        <i class="fas fa-magnifying-glass-plus"></i> คลิกที่รูปเพื่อขยายดูเต็มจอ
-                    </div>
-                </div>
-            `;
-        }
-        if (parsed.text) {
-            questionMarkup += `<div class="text-slate-800 text-base font-bold leading-relaxed">${escapeHtml(parsed.text)}</div>`;
-        } else if (!parsed.image) {
-            questionMarkup += `<div class="text-slate-800 text-base font-bold leading-relaxed">(ไม่มีข้อความคำถาม)</div>`;
-        }
-        textEl.innerHTML = questionMarkup;
+    // parse options safely (Supabase returns JSONB as object, localStorage as string)
+    let opts = q.options;
+    if (typeof opts === 'string') {
+        try { opts = JSON.parse(opts); } catch (e) { opts = []; }
+    }
+    if (!Array.isArray(opts)) opts = [];
+
+    const selectedOpt = state.answers[q.id];
+
+    let imageMarkup = '';
+    if (parsed.image) {
+        imageMarkup = `
+            <div class="mb-4 p-2 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center">
+                <img src="${parsed.image}" alt="ภาพประกอบข้อสอบ" class="max-h-80 max-w-full object-contain rounded-xl shadow-2xs cursor-pointer hover:opacity-95 transition" onclick="openImageZoomModal('${parsed.image}')">
+                <div class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1"><i class="fas fa-magnifying-glass-plus"></i> คลิกที่รูปเพื่อขยายดูเต็มจอ</div>
+            </div>`;
     }
 
-    if (optionsContainer) {
-        const selectedOpt = state.answers[q.id];
-        // options จาก Supabase อาจเป็น string JSON → ต้อง parse ก่อน
-        let opts = q.options;
-        if (typeof opts === 'string') {
-            try { opts = JSON.parse(opts); } catch (e) { opts = []; }
-        }
-        if (!Array.isArray(opts)) opts = [];
+    const textMarkup = parsed.text
+        ? `<div class="text-slate-800 text-base font-bold leading-relaxed mb-5">${escapeHtml(parsed.text)}</div>`
+        : (parsed.image ? '' : `<div class="text-slate-400 italic mb-5">(ไม่มีข้อความคำถาม)</div>`);
 
-        optionsContainer.innerHTML = opts.map(opt => {
-            const isChecked = selectedOpt === opt.id;
-            return `
-                <label class="p-4 rounded-2xl border-2 cursor-pointer transition flex items-start gap-3.5 ${
-                    isChecked
-                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 shadow-sm font-semibold'
-                        : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-                }">
-                    <input type="radio" name="option-choice" value="${opt.id}" ${isChecked ? 'checked' : ''} onchange="selectExamOption('${q.id}', '${opt.id}')" class="mt-1 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
-                    <span class="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-xs shrink-0 ${isChecked ? 'bg-indigo-600 text-white' : 'text-slate-600'}">
-                        ${opt.id}
-                    </span>
-                    <span class="text-sm pt-0.5 leading-relaxed">${escapeHtml(opt.text)}</span>
-                </label>
-            `;
-        }).join('');
-    }
+    const optionsMarkup = opts.map(opt => {
+        const isChecked = selectedOpt === opt.id;
+        return `
+            <label class="p-4 rounded-2xl border-2 cursor-pointer transition flex items-start gap-3.5 ${
+                isChecked
+                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-900 shadow-sm font-semibold'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+            }">
+                <input type="radio" name="option-choice" value="${opt.id}" ${isChecked ? 'checked' : ''} onchange="selectExamOption('${q.id}', '${opt.id}')" class="mt-1 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                <span class="w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${isChecked ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}">
+                    ${opt.id}
+                </span>
+                <span class="text-sm pt-0.5 leading-relaxed">${escapeHtml(opt.text || '')}</span>
+            </label>`;
+    }).join('');
 
-    updateExamNavButtons();
+    card.innerHTML = `
+        <div class="flex items-center justify-between mb-4">
+            <span id="exam-question-number" class="text-sm font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+                ข้อที่ ${state.currentQuestionIndex + 1} จาก ${state.questions.length}
+            </span>
+            <span id="exam-question-points" class="text-xs font-semibold text-slate-500">(${q.points || 1} คะแนน)</span>
+        </div>
+        <div id="exam-question-text" class="mb-1">
+            ${imageMarkup}
+            ${textMarkup}
+        </div>
+        <div id="exam-options-container" class="space-y-3">
+            ${optionsMarkup}
+        </div>
+        <div class="flex justify-between mt-6 pt-4 border-t border-slate-100 gap-3">
+            <button type="button" id="btn-exam-prev" onclick="prevExamQuestion()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition flex items-center gap-2 ${state.currentQuestionIndex === 0 ? 'opacity-40 pointer-events-none' : ''}">
+                <i class="fas fa-chevron-left text-xs"></i> ข้อก่อนหน้า
+            </button>
+            ${state.currentQuestionIndex === state.questions.length - 1
+                ? `<button type="button" onclick="confirmSubmitExam()" class="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition shadow-md shadow-green-100 flex items-center justify-center gap-2">
+                       <i class="fas fa-paper-plane text-xs"></i> ส่งข้อสอบ
+                   </button>`
+                : `<button type="button" id="btn-exam-next" onclick="nextExamQuestion()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition flex items-center gap-2">
+                       ข้อถัดไป <i class="fas fa-chevron-right text-xs"></i>
+                   </button>`
+            }
+        </div>
+    `;
+
+    // อัปเดต palette และปุ่มนำทาง
     renderQuestionPalette();
 }
 
+window.prevExamQuestion = function() {
+    if (state.currentQuestionIndex > 0) {
+        state.currentQuestionIndex--;
+        renderExamQuestion();
+    }
+};
+
+window.nextExamQuestion = function() {
+    if (state.questions && state.currentQuestionIndex < state.questions.length - 1) {
+        state.currentQuestionIndex++;
+        renderExamQuestion();
+    }
+};
 
 function selectExamOption(questionId, optionId) {
     state.answers[questionId] = optionId;
