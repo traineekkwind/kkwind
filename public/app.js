@@ -1258,9 +1258,15 @@ async function loadStudentLobby() {
                             <div class="text-xs font-bold text-emerald-800 flex items-center justify-center gap-1.5 mb-1">
                                 <i class="fas fa-circle-check text-emerald-600"></i> ทำข้อสอบเสร็จสิ้นแล้ว
                             </div>
-                            <div class="text-xs text-emerald-700">
-                                คะแนน: <strong>${pastSubmission.total_score} / ${pastSubmission.max_score}</strong> (${pastSubmission.percentage}%)
-                            </div>
+                            ${(exam.show_score_immediately !== false) ? `
+                                <div class="text-xs text-emerald-700">
+                                    คะแนน: <strong>${pastSubmission.total_score} / ${pastSubmission.max_score}</strong> (${pastSubmission.percentage}%)
+                                </div>
+                            ` : `
+                                <div class="text-xs text-blue-700 font-medium flex items-center justify-center gap-1">
+                                    <i class="fas fa-clock text-blue-500"></i> รอประกาศคะแนนจากอาจารย์
+                                </div>
+                            `}
                         </div>
 
                         <button disabled class="w-full py-2.5 px-4 bg-slate-100 text-slate-400 font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-not-allowed border border-slate-200">
@@ -3991,6 +3997,7 @@ async function loadTeacherExamsList() {
     container.innerHTML = Array.from(groupsMap.values()).map(group => {
         const cardsHtml = group.exams.map(exam => {
             const isActive = exam.is_active !== false;
+            const isShowScore = exam.show_score_immediately !== false;
             const targetTag = `${exam.target_year || 'ทุกชั้น'} | ${exam.target_department || 'ทุกแผนก'} | ${exam.target_room || 'ทุกห้อง'}`;
 
             return `
@@ -3999,6 +4006,9 @@ async function loadTeacherExamsList() {
                         <div class="flex flex-wrap items-center gap-2 mb-1.5">
                             <span class="px-2.5 py-0.5 text-xs font-bold rounded-full ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
                                 ${isActive ? '🟢 เปิดสอบอยู่' : '⚪ ปิดสอบอยู่'}
+                            </span>
+                            <span class="px-2.5 py-0.5 text-xs font-bold rounded-full ${isShowScore ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}">
+                                ${isShowScore ? '👁️ แสดงคะแนนทันที' : '🔒 ซ่อนคะแนน'}
                             </span>
                             <h4 class="font-bold text-slate-800 text-base">${escapeHtml(exam.title)}</h4>
                         </div>
@@ -4027,13 +4037,19 @@ async function loadTeacherExamsList() {
                             <span>ดูข้อสอบ</span>
                         </button>
 
-                        <!-- 2. ผลสอบ & ให้สอบใหม่ (Allow Retake) -->
-                        <button onclick="openExamSubmissionsUnlockModal('${exam.id}')" class="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs border border-amber-300" title="ดูผลสอบของชุดนี้ และกดปลดล็อกให้นักเรียนทำใหม่">
-                            <i class="fas fa-rotate-left text-amber-600"></i>
+                        <!-- 2. สลับ เปิด/ปิดแสดงคะแนนทันที (Toggle Show/Hide Score) -->
+                        <button onclick="toggleExamShowScore('${exam.id}')" class="px-3.5 py-2 ${isShowScore ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300' : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="คลิกเพื่อเปิดหรือปิดการแสดงคะแนนให้นักเรียนเห็นทันทีหลังส่ง">
+                            <i class="fas ${isShowScore ? 'fa-eye text-amber-600' : 'fa-eye-slash text-slate-400'}"></i>
+                            <span>${isShowScore ? 'แสดงคะแนน' : 'ซ่อนคะแนน'}</span>
+                        </button>
+
+                        <!-- 3. ผลสอบ & ให้สอบใหม่ (Allow Retake) -->
+                        <button onclick="openExamSubmissionsUnlockModal('${exam.id}')" class="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs border border-purple-200" title="ดูผลสอบของชุดนี้ และกดปลดล็อกให้นักเรียนทำใหม่">
+                            <i class="fas fa-rotate-left text-purple-600"></i>
                             <span>🔄 ให้สอบใหม่</span>
                         </button>
 
-                        <!-- 3. สลับ เปิด/ปิดสอบ ทันที -->
+                        <!-- 4. สลับ เปิด/ปิดสอบ ทันที -->
                         <button onclick="toggleExamActive('${exam.id}')" class="px-3.5 py-2 ${isActive ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="คลิกสลับเปิดหรือปิดสอบ">
                             <i class="fas ${isActive ? 'fa-toggle-on text-emerald-600 text-sm' : 'fa-toggle-off text-slate-400 text-sm'}"></i>
                             <span>${isActive ? 'ขอปิดสอบ' : 'เปิดสอบ'}</span>
@@ -4245,6 +4261,32 @@ window.toggleExamActive = async function(examId) {
     await loadTeacherExamsList();
 };
 
+window.toggleExamShowScore = async function(examId) {
+    const exams = getLocalExams();
+    const exam = exams.find(e => e.id === examId);
+    if (!exam) return;
+
+    const currentSetting = exam.show_score_immediately !== false;
+    const newSetting = !currentSetting;
+    exam.show_score_immediately = newSetting;
+    saveLocalExam(exam);
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            await state.supabaseClient
+                .from('exams')
+                .update({ show_score_immediately: newSetting })
+                .eq('id', examId);
+        } catch (e) {
+            console.warn('[toggleExamShowScore] Supabase update error:', e);
+        }
+    }
+
+    broadcastAppEvent('exam_updated', exam);
+    showToast(`ชุดข้อสอบ "${exam.title}" ${newSetting ? '👁️ เปิดให้นักเรียนเห็นคะแนนแล้ว' : '🔒 ซ่อนคะแนนจากนักเรียนแล้ว'}`, 'success');
+    await loadTeacherExamsList();
+};
+
 // 8.1.1 จัดการแก้ไขเวลาทำข้อสอบ (Duration Modal)
 window.openEditExamDurationModal = function(examId, currentMinutes, examTitle = '') {
     const modal = document.getElementById('modal-edit-exam-duration');
@@ -4383,10 +4425,18 @@ function renderTeacherExamViewModal(exam, questions) {
 
     const totalPoints = (questions || []).reduce((sum, q) => sum + (Number(q.points) || 1), 0);
 
+    const isShowScore = exam.show_score_immediately !== false;
+
     if (courseBadge) courseBadge.textContent = `[${courseCode}] ${courseName}`;
     if (statusBadge) {
-        statusBadge.textContent = isActive ? '🟢 เปิดสอบอยู่' : '⚪ ปิดสอบอยู่';
-        statusBadge.className = `px-2.5 py-0.5 text-xs font-bold rounded-full ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`;
+        statusBadge.innerHTML = `
+            <span class="px-2.5 py-0.5 text-xs font-bold rounded-full ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
+                ${isActive ? '🟢 เปิดสอบอยู่' : '⚪ ปิดสอบอยู่'}
+            </span>
+            <span class="ml-1 px-2.5 py-0.5 text-xs font-bold rounded-full ${isShowScore ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}">
+                ${isShowScore ? '👁️ แสดงคะแนน' : '🔒 ซ่อนคะแนน'}
+            </span>
+        `;
     }
     if (titleEl) titleEl.textContent = exam.title;
     if (metaEl) {
@@ -4400,7 +4450,11 @@ function renderTeacherExamViewModal(exam, questions) {
             <span><i class="fas fa-list-check text-emerald-500"></i> จำนวนข้อสอบ: <strong>${questions.length} ข้อ</strong> (${totalPoints} คะแนน)</span>
             <span><i class="fas fa-bullseye text-amber-500"></i> เป้าหมาย: <strong>${escapeHtml(exam.target_year || 'ทุกชั้น')} ${escapeHtml(exam.target_department || 'ทุกแผนก')} ${escapeHtml(exam.target_room || 'ทุกห้อง')}</strong></span>
             <span><i class="fas fa-shield-halved text-purple-500"></i> สลับจอ: <strong>${exam.max_tab_switches_allowed || 3} ครั้ง</strong></span>
-            <button type="button" onclick="closeTeacherExamViewModal(); openExamSubmissionsUnlockModal('${exam.id}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1 shadow-xs">
+            <button type="button" onclick="toggleExamShowScore('${exam.id}'); setTimeout(() => viewTeacherExam('${exam.id}'), 200);" class="px-2.5 py-1 ${isShowScore ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'} rounded-xl text-xs font-bold transition inline-flex items-center gap-1 shadow-xs" title="คลิกเพื่อเปิดหรือปิดการแสดงคะแนนให้นักเรียนเห็นทันทีหลังส่ง">
+                <i class="fas ${isShowScore ? 'fa-eye text-amber-600' : 'fa-eye-slash text-slate-500'}"></i>
+                <span>${isShowScore ? '👁️ แสดงคะแนน: เปิด' : '🔒 ซ่อนคะแนนอยู่'}</span>
+            </button>
+            <button type="button" onclick="closeTeacherExamViewModal(); openExamSubmissionsUnlockModal('${exam.id}')" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1 shadow-xs">
                 <i class="fas fa-rotate-left"></i> ผลสอบ & ให้สอบใหม่
             </button>
         `;
