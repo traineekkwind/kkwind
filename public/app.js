@@ -359,7 +359,21 @@ function deleteLocalCourse(courseId) {
     const list = getLocalCourses().filter(c => c.id !== courseId);
     localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(list));
     state.courses = list;
-    broadcastAppEvent('course_deleted', { courseId });
+
+    // ลบชุดข้อสอบทั้งหมดที่ผูกกับรายวิชานี้
+    const allExams = getLocalExams();
+    const removedExamIds = allExams.filter(e => e.course_id === courseId).map(e => e.id);
+    const remainingExams = allExams.filter(e => e.course_id !== courseId);
+    localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(remainingExams));
+    state.localExams = remainingExams;
+
+    // ลบคำถามทั้งหมดของชุดข้อสอบที่ถูกลบ
+    if (removedExamIds.length > 0) {
+        const remainingQuestions = getLocalQuestions().filter(q => !removedExamIds.includes(q.exam_id));
+        localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify(remainingQuestions));
+    }
+
+    broadcastAppEvent('course_deleted', { courseId, removedExamIds });
 }
 
 function getLocalExams() {
@@ -2631,21 +2645,32 @@ async function loadTeacherCourses() {
 window.deleteCourse = async function(courseId, courseName) {
     showCustomConfirm({
         title: 'ยืนยันการลบรายวิชา',
-        message: `คุณต้องการลบรายวิชา "${courseName}" ใช่หรือไม่?\n(ชุดข้อสอบที่ผูกกับวิชานี้จะยังคงอยู่ในระบบ)`,
+        message: `คุณต้องการลบรายวิชา "${courseName}" ใช่หรือไม่?\n(ชุดข้อสอบทั้งหมดที่ผูกกับวิชานี้จะถูกลบออกจากระบบด้วย)`,
         icon: 'fas fa-trash-can',
-        confirmText: 'ลบรายวิชา',
+        confirmText: 'ลบรายวิชาและข้อสอบ',
         cancelText: 'ยกเลิก',
         confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
         onConfirm: async () => {
             deleteLocalCourse(courseId);
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
-                    await state.supabaseClient.from('courses').delete().eq('id', courseId);
-                } catch (e) {}
+                    // ลบชุดข้อสอบที่ผูกกับรายวิชานี้ใน Supabase
+                    await state.supabaseClient.from('exams').delete().eq('course_id', courseId);
+                    // ลบรายวิชา
+                    const { error } = await state.supabaseClient.from('courses').delete().eq('id', courseId);
+                    if (error) {
+                        console.error('[deleteCourse] Supabase error:', error);
+                        showToast('ลบจากเซิร์ฟเวอร์ไม่สำเร็จ (ติดสิทธิ์ RLS): ' + error.message, 'warning');
+                    }
+                } catch (e) {
+                    console.error('[deleteCourse] Error:', e);
+                }
             }
-            showToast(`ลบรายวิชา "${courseName}" เรียบร้อยแล้ว`, 'info');
-            loadTeacherCourses();
+            showToast(`ลบรายวิชา "${courseName}" และชุดข้อสอบในวิชาเรียบร้อยแล้ว`, 'info');
+            await loadTeacherCourses();
+            await loadTeacherExamsList();
             populateCourseSelects();
+            populateTeacherExamSelects();
         }
     });
 };
