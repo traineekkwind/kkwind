@@ -949,9 +949,18 @@ function setupAuthEvents() {
     const formTeacher = document.getElementById('form-login-teacher');
     const formAdmin = document.getElementById('form-login-admin');
 
-    if (tabStudent) tabStudent.onclick = () => window.setLoginRoleTab('student');
-    if (tabTeacher) tabTeacher.onclick = () => window.setLoginRoleTab('teacher');
-    if (tabAdmin) tabAdmin.onclick = () => window.setLoginRoleTab('admin');
+    if (tabStudent) {
+        tabStudent.onclick = () => window.setLoginRoleTab('student');
+        tabStudent.addEventListener('pointerdown', () => window.setLoginRoleTab('student'));
+    }
+    if (tabTeacher) {
+        tabTeacher.onclick = () => window.setLoginRoleTab('teacher');
+        tabTeacher.addEventListener('pointerdown', () => window.setLoginRoleTab('teacher'));
+    }
+    if (tabAdmin) {
+        tabAdmin.onclick = () => window.setLoginRoleTab('admin');
+        tabAdmin.addEventListener('pointerdown', () => window.setLoginRoleTab('admin'));
+    }
 
     window.toggleStudentPasswordVisibility = function() {
         const input = document.getElementById('student-login-pass-input');
