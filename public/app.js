@@ -192,7 +192,7 @@ function getSupabaseCredentials() {
 
     return {
         url: cleanSupabaseUrl(savedUrl) || window.SUPABASE_URL || 'https://ividsfcwvhngsojtzwjt.supabase.co',
-        key: (savedKey ? savedKey.trim() : '') || window.SUPABASE_ANON_KEY || 'sb_publishable_7uhXNfvOOImPUONxRwId4w_4uONoAnO'
+        key: (savedKey ? savedKey.trim() : '') || window.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2aWRzZmN3dmhuZ3NvanR6d2p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2MTkyMDMsImV4cCI6MjEwMzE5NTIwM30.1_84Q7DSjJKT5WE0nyf2mBwr5u9Djo2EoNBBbpQF2_A'
     };
 }
 
