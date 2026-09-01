@@ -214,6 +214,73 @@ function initSupabase() {
     }
 }
 
+// ==============================================================================
+// 1.1.1 OFFLINE LAN LOCAL DATABASE SYNCHRONIZATION (/api/db)
+// ==============================================================================
+
+function mergeArraysById(localArr, remoteArr, key = 'id') {
+    const map = new Map();
+    (localArr || []).forEach(item => { if (item && item[key]) map.set(item[key], item); });
+    (remoteArr || []).forEach(item => { if (item && item[key]) map.set(item[key], { ...map.get(item[key]), ...item }); });
+    return Array.from(map.values());
+}
+
+async function syncWithLocalLanServer() {
+    if (!window.location.protocol.startsWith('http')) return;
+    try {
+        const res = await fetch('/api/db', { cache: 'no-store' });
+        if (!res.ok) return;
+        const cloudData = await res.json();
+        if (!cloudData || typeof cloudData !== 'object') return;
+
+        if (Array.isArray(cloudData.courses) && cloudData.courses.length > 0) {
+            const merged = mergeArraysById(getLocalCourses(), cloudData.courses);
+            localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(merged));
+        }
+
+        if (Array.isArray(cloudData.exams) && cloudData.exams.length > 0) {
+            const merged = mergeArraysById(getLocalExams(), cloudData.exams);
+            localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(merged));
+            state.localExams = merged;
+        }
+
+        if (Array.isArray(cloudData.questions) && cloudData.questions.length > 0) {
+            const merged = mergeArraysById(getLocalQuestions(), cloudData.questions);
+            localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify(merged));
+        }
+
+        if (Array.isArray(cloudData.students) && cloudData.students.length > 0) {
+            const merged = mergeArraysById(getLocalStudents(), cloudData.students, 'citizen_id');
+            localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(merged));
+        }
+
+        if (Array.isArray(cloudData.results) && cloudData.results.length > 0) {
+            const merged = mergeArraysById(getLocalSubmissions(), cloudData.results, 'id');
+            localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(merged));
+        }
+    } catch (e) {}
+}
+
+async function pushToLocalLanServer() {
+    if (!window.location.protocol.startsWith('http')) return;
+    try {
+        const payload = {
+            courses: getLocalCourses(),
+            exams: getLocalExams(),
+            questions: getLocalQuestions(),
+            students: getLocalStudents(),
+            results: getLocalSubmissions(),
+            teachers: getLocalTeachers(),
+            updated_at: new Date().toISOString()
+        };
+        await fetch('/api/db', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    } catch (e) {}
+}
+
 async function fetchCloudDataToLocal() {
     if (!isSupabaseConfigured() || !state.supabaseClient) return;
     try {
@@ -399,6 +466,7 @@ function saveLocalExam(exam) {
     localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(list));
     state.localExams = list;
     broadcastAppEvent('exam_updated', exam);
+    pushToLocalLanServer();
 }
 
 function deleteLocalExam(examId) {
@@ -406,6 +474,7 @@ function deleteLocalExam(examId) {
     localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(list));
     state.localExams = list;
     broadcastAppEvent('exam_deleted', { examId });
+    pushToLocalLanServer();
 }
 
 function getLocalQuestions(examId) {
@@ -425,6 +494,7 @@ function saveLocalQuestion(qObj) {
     list.unshift(qObj);
     localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify(list));
     broadcastAppEvent('question_updated', qObj);
+    pushToLocalLanServer();
 }
 
 function getLocalSubmissions() {
@@ -440,6 +510,7 @@ function saveLocalSubmission(sub) {
     list.unshift(sub);
     localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(list));
     broadcastAppEvent('student_submission', sub);
+    pushToLocalLanServer();
 }
 
 function getLocalStudents() {
@@ -462,6 +533,7 @@ function saveLocalStudent(student) {
     }
     localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(list));
     broadcastAppEvent('student_roster_updated', student);
+    pushToLocalLanServer();
 
     // Sync to Supabase students table
     if (isSupabaseConfigured() && state.supabaseClient && student.citizen_id) {
@@ -485,6 +557,7 @@ function deleteLocalStudent(studentId) {
     const list = getLocalStudents().filter(s => s.id !== studentId);
     localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(list));
     broadcastAppEvent('student_roster_updated', { studentId });
+    pushToLocalLanServer();
 
     if (isSupabaseConfigured() && state.supabaseClient) {
         state.supabaseClient
@@ -6139,6 +6212,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initGlobalRealtimeSync();
     setupAuthEvents();
     setupGlobalFormEvents();
+
+    // ซิงก์ข้อมูลกับ Local LAN Server ทันทีเมื่อเปิดหน้าเว็บ และตั้งเวลาอัปเดตอัตโนมัติ (สำหรับโหมด Offline / LAN)
+    syncWithLocalLanServer();
+    setInterval(syncWithLocalLanServer, 5000);
 
     // กู้คืน Session ของแท็บปัจจุบัน (เพื่อให้อาจารย์/นักเรียนไม่ต้องล็อกอินซ้ำเมื่อกด Refresh)
     try {
