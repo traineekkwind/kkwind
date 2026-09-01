@@ -3534,20 +3534,47 @@ window.handleExcelFileUpload = function(event) {
                 return '';
             };
 
+            const parseCorrectOption = (rawVal, optA, optB, optC, optD) => {
+                if (rawVal === undefined || rawVal === null) return 'A';
+                const s = String(rawVal).trim();
+                if (!s) return 'A';
+                const upper = s.toUpperCase();
+
+                // 1. Direct letter match (A, B, C, D)
+                if (upper === 'A' || upper.startsWith('A.') || upper.startsWith('A ') || upper.startsWith('A:') || upper.includes('ข้อ A') || upper.includes('ตัวเลือก A')) return 'A';
+                if (upper === 'B' || upper.startsWith('B.') || upper.startsWith('B ') || upper.startsWith('B:') || upper.includes('ข้อ B') || upper.includes('ตัวเลือก B')) return 'B';
+                if (upper === 'C' || upper.startsWith('C.') || upper.startsWith('C ') || upper.startsWith('C:') || upper.includes('ข้อ C') || upper.includes('ตัวเลือก C')) return 'C';
+                if (upper === 'D' || upper.startsWith('D.') || upper.startsWith('D ') || upper.startsWith('D:') || upper.includes('ข้อ D') || upper.includes('ตัวเลือก D')) return 'D';
+
+                // 2. Thai letter match (ก, ข, ค, ง) and numbers (1, 2, 3, 4)
+                if (s === 'ก' || s.startsWith('ก.') || s.startsWith('ก ') || s.startsWith('ก:') || s.includes('ข้อ ก') || s.includes('ตัวเลือก ก') || s === '1' || s.startsWith('1.') || s.includes('ข้อ 1') || s.includes('ตัวเลือก 1')) return 'A';
+                if (s === 'ข' || s.startsWith('ข.') || s.startsWith('ข ') || s.startsWith('ข:') || s.includes('ข้อ ข') || s.includes('ตัวเลือก ข') || s === '2' || s.startsWith('2.') || s.includes('ข้อ 2') || s.includes('ตัวเลือก 2')) return 'B';
+                if (s === 'ค' || s.startsWith('ค.') || s.startsWith('ค ') || s.startsWith('ค:') || s.includes('ข้อ ค') || s.includes('ตัวเลือก ค') || s === '3' || s.startsWith('3.') || s.includes('ข้อ 3') || s.includes('ตัวเลือก 3')) return 'C';
+                if (s === 'ง' || s.startsWith('ง.') || s.startsWith('ง ') || s.startsWith('ง:') || s.includes('ข้อ ง') || s.includes('ตัวเลือก ง') || s === '4' || s.startsWith('4.') || s.includes('ข้อ 4') || s.includes('ตัวเลือก 4')) return 'D';
+
+                // 3. Match answer text with option text
+                const cleanS = s.toLowerCase();
+                if (optA && optA.trim().toLowerCase() === cleanS) return 'A';
+                if (optB && optB.trim().toLowerCase() === cleanS) return 'B';
+                if (optC && optC.trim().toLowerCase() === cleanS) return 'C';
+                if (optD && optD.trim().toLowerCase() === cleanS) return 'D';
+
+                // 4. Any occurrence of A, B, C, D
+                for (const char of upper) {
+                    if (['A', 'B', 'C', 'D'].includes(char)) return char;
+                }
+
+                return 'A';
+            };
+
             const parsed = rows.map((r, idx) => {
                 const qText = getVal(r, ['โจทย์คำถาม', 'โจทย์', 'คำถาม', 'question', 'Question', 'text']);
-                const optA = getVal(r, ['ตัวเลือก A', 'ตัวเลือกA', 'ข้อ A', 'A', 'option_a', 'ตัวเลือก 1', 'ข้อ 1']);
-                const optB = getVal(r, ['ตัวเลือก B', 'ตัวเลือกB', 'ข้อ B', 'B', 'option_b', 'ตัวเลือก 2', 'ข้อ 2']);
-                const optC = getVal(r, ['ตัวเลือก C', 'ตัวเลือกC', 'ข้อ C', 'C', 'option_c', 'ตัวเลือก 3', 'ข้อ 3']);
-                const optD = getVal(r, ['ตัวเลือก D', 'ตัวเลือกD', 'ข้อ D', 'D', 'option_d', 'ตัวเลือก 4', 'ข้อ 4']);
-                let correct = getVal(r, ['เฉลยที่ถูกต้อง (A/B/C/D)', 'เฉลยที่ถูกต้อง', 'เฉลย', 'คำตอบ', 'correct', 'Answer', 'answer']).toUpperCase();
-                if (!['A', 'B', 'C', 'D'].includes(correct)) {
-                    if (correct === '1' || correct === 'ก') correct = 'A';
-                    else if (correct === '2' || correct === 'ข') correct = 'B';
-                    else if (correct === '3' || correct === 'ค') correct = 'C';
-                    else if (correct === '4' || correct === 'ง') correct = 'D';
-                    else correct = 'A';
-                }
+                const optA = getVal(r, ['ตัวเลือก A', 'ตัวเลือกA', 'ข้อ A', 'A', 'option_a', 'ตัวเลือก 1', 'ข้อ 1', 'ก']);
+                const optB = getVal(r, ['ตัวเลือก B', 'ตัวเลือกB', 'ข้อ B', 'B', 'option_b', 'ตัวเลือก 2', 'ข้อ 2', 'ข']);
+                const optC = getVal(r, ['ตัวเลือก C', 'ตัวเลือกC', 'ข้อ C', 'C', 'option_c', 'ตัวเลือก 3', 'ข้อ 3', 'ค']);
+                const optD = getVal(r, ['ตัวเลือก D', 'ตัวเลือกD', 'ข้อ D', 'D', 'option_d', 'ตัวเลือก 4', 'ข้อ 4', 'ง']);
+                const rawCorrect = getVal(r, ['เฉลยที่ถูกต้อง (A/B/C/D)', 'เฉลยที่ถูกต้อง', 'เฉลยคำตอบ', 'เฉลยข้อ', 'เฉลย', 'คำตอบที่ถูกต้อง', 'คำตอบ', 'ข้อที่ถูก', 'ข้อถูก', 'ตัวเลือกที่ถูกต้อง', 'correct', 'Answer', 'answer', 'Key', 'key', 'Ans']);
+                const correct = parseCorrectOption(rawCorrect, optA, optB, optC, optD);
                 const points = Number(getVal(r, ['คะแนน', 'points', 'point', 'score'])) || 1.0;
                 const explanation = getVal(r, ['คำอธิบายเฉลย', 'คำอธิบาย', 'explanation']);
 
@@ -3674,10 +3701,10 @@ window.executeExcelImport = async function() {
                 options: options,
                 points: Number(q.points) || 1.0,
                 correct: q.correct || 'A',
+                correct_option_id: q.correct || 'A',
                 explanation: q.explanation || '',
                 order_seq: currentOrder
             };
-            newLocalQuestions.push(newQ);
 
             if (loadingModal && (idx % 5 === 0 || idx === totalQ - 1)) {
                 document.getElementById('loading-modal-desc').textContent = `กำลังบันทึกข้อที่ ${idx + 1}/${totalQ}...`;
@@ -3698,6 +3725,9 @@ window.executeExcelImport = async function() {
                         console.error(`[Excel Import] ข้อ ${idx + 1} Supabase error:`, error);
                         failedRows.push({ order: idx + 1, error: error.message });
                     } else {
+                        if (data && data.question_id) {
+                            newQ.id = data.question_id;
+                        }
                         successCount++;
                     }
                 } catch (rpcErr) {
@@ -3707,6 +3737,8 @@ window.executeExcelImport = async function() {
             } else {
                 successCount++;
             }
+
+            newLocalQuestions.push(newQ);
         }
 
         const allLocal = getLocalQuestions();
@@ -4482,21 +4514,32 @@ window.viewTeacherExam = async function(examId) {
 
     if (isSupabaseConfigured() && state.supabaseClient) {
         try {
-            const { data: dbQ, error } = await state.supabaseClient
-                .from('questions')
-                .select('*')
-                .eq('exam_id', examId)
-                .order('order_seq', { ascending: true });
+            // 1. ดึงคำถามพร้อมเฉลยตรงจาก exam_answers ผ่าน RPC
+            const { data: rpcQ, error: rpcErr } = await state.supabaseClient
+                .rpc('get_teacher_exam_questions', { p_exam_id: examId });
 
-            if (!error && Array.isArray(dbQ) && dbQ.length > 0) {
-                const localMap = new Map(questions.map(q => [q.id, q]));
-                questions = dbQ.map(q => {
-                    const localQ = localMap.get(q.id);
-                    return {
-                        ...q,
-                        correct: localQ?.correct || localQ?.correct_option_id || q.correct_option_id || 'A'
-                    };
-                });
+            if (!rpcErr && Array.isArray(rpcQ) && rpcQ.length > 0) {
+                questions = rpcQ;
+            } else {
+                // 2. Fallback: ดึงจาก questions table และจับคู่กับข้อมูลเครื่องทั้งด้วย id และข้อความโจทย์
+                const { data: dbQ, error: dbErr } = await state.supabaseClient
+                    .from('questions')
+                    .select('*')
+                    .eq('exam_id', examId)
+                    .order('order_seq', { ascending: true });
+
+                if (!dbErr && Array.isArray(dbQ) && dbQ.length > 0) {
+                    const localById = new Map(questions.map(q => [q.id, q]));
+                    const localByText = new Map(questions.map(q => [q.question_text?.trim(), q]));
+                    questions = dbQ.map(q => {
+                        const localQ = localById.get(q.id) || localByText.get(q.question_text?.trim());
+                        return {
+                            ...q,
+                            correct: localQ?.correct || localQ?.correct_option_id || q.correct_option_id || 'A',
+                            explanation: localQ?.explanation || ''
+                        };
+                    });
+                }
             }
         } catch (err) {
             console.warn('[viewTeacherExam] Supabase fetch notice:', err);
