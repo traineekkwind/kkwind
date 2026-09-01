@@ -5016,7 +5016,170 @@ function loadAdminDashboard() {
 
     setupAdminConfigForm();
     loadAdminTeachersList();
+    loadAdminExamsList();
 }
+
+// 8.1.1 จัดการชุดข้อสอบทั้งหมดในหน้าแอดมิน (Admin Exam Management)
+let _adminAllExamsCache = [];
+
+window.loadAdminExamsList = async function() {
+    const tableBody = document.getElementById('admin-exams-table-body');
+    const badgeCount = document.getElementById('admin-exams-count-badge');
+    const teacherFilter = document.getElementById('admin-exam-teacher-filter');
+    if (!tableBody) return;
+
+    let exams = getLocalExams();
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            const { data, error } = await state.supabaseClient
+                .from('exams')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (!error && Array.isArray(data) && data.length > 0) {
+                exams = data;
+                localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(exams));
+            }
+        } catch (err) {
+            console.warn('[loadAdminExamsList] Remote fetch notice:', err);
+        }
+    }
+
+    _adminAllExamsCache = exams;
+
+    // เติมรายชื่ออาจารย์ลงใน Dropdown Filter
+    if (teacherFilter) {
+        const currentTeacherFilter = teacherFilter.value;
+        const teacherNames = Array.from(new Set(exams.map(e => (e.teacher_name || '').trim()).filter(Boolean))).sort();
+        teacherFilter.innerHTML = `<option value="ทั้งหมด">อาจารย์: ทั้งหมด</option>` + teacherNames.map(name => `
+            <option value="${escapeHtml(name)}">${escapeHtml(name)}</option>
+        `).join('');
+        if (teacherNames.includes(currentTeacherFilter)) {
+            teacherFilter.value = currentTeacherFilter;
+        }
+    }
+
+    renderAdminExamsTable(exams);
+};
+
+window.filterAdminExamsList = function() {
+    const search = (document.getElementById('admin-exam-search-input')?.value || '').trim().toLowerCase();
+    const teacher = document.getElementById('admin-exam-teacher-filter')?.value || 'ทั้งหมด';
+
+    let filtered = _adminAllExamsCache || [];
+
+    if (teacher !== 'ทั้งหมด') {
+        filtered = filtered.filter(e => (e.teacher_name || '').trim().toLowerCase() === teacher.toLowerCase());
+    }
+
+    if (search) {
+        filtered = filtered.filter(e => 
+            (e.title || '').toLowerCase().includes(search) ||
+            (e.teacher_name || '').toLowerCase().includes(search) ||
+            (e.target_year || '').toLowerCase().includes(search) ||
+            (e.target_department || '').toLowerCase().includes(search)
+        );
+    }
+
+    renderAdminExamsTable(filtered);
+};
+
+function renderAdminExamsTable(exams) {
+    const tableBody = document.getElementById('admin-exams-table-body');
+    const badgeCount = document.getElementById('admin-exams-count-badge');
+    if (!tableBody) return;
+
+    if (badgeCount) badgeCount.textContent = `${exams.length} ชุดข้อสอบ`;
+
+    if (!exams || exams.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-8 text-slate-400">
+                    <i class="fas fa-folder-open text-2xl text-slate-300 mb-2 block"></i>
+                    ไม่พบรายการชุดข้อสอบในระบบ
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tableBody.innerHTML = exams.map((e, idx) => {
+        const teacherDisplayName = e.teacher_name ? escapeHtml(e.teacher_name) : '<span class="text-slate-400 italic">ไม่ระบุอาจารย์ (ทั่วไป)</span>';
+        const isActive = e.is_active !== false;
+        const isShowScore = e.show_score_immediately !== false;
+
+        return `
+            <tr class="border-b border-slate-100 hover:bg-purple-50/30 transition">
+                <td class="py-3 px-3 text-slate-400 font-mono">${idx + 1}</td>
+                <td class="py-3 px-3">
+                    <div class="font-bold text-slate-900 text-xs">${escapeHtml(e.title)}</div>
+                    ${e.description ? `<div class="text-[11px] text-slate-400 line-clamp-1">${escapeHtml(e.description)}</div>` : ''}
+                </td>
+                <td class="py-3 px-3">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200/60 rounded-lg text-xs font-bold shadow-2xs">
+                        <i class="fas fa-chalkboard-user text-emerald-600"></i> ${teacherDisplayName}
+                    </span>
+                </td>
+                <td class="py-3 px-3">
+                    <span class="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-md text-[11px] font-bold">
+                        ${escapeHtml(e.target_year || 'ทุกชั้น')} | ${escapeHtml(e.target_department || 'ทุกแผนก')} ${escapeHtml(e.target_room || 'ทุกห้อง')}
+                    </span>
+                </td>
+                <td class="py-3 px-3 text-slate-600 font-medium">
+                    <div><i class="far fa-clock text-indigo-500 mr-1"></i>${e.duration_minutes || 60} นาที</div>
+                    <div class="text-[11px] text-purple-600"><i class="fas fa-shield-halved mr-1"></i>สลับจอ: ${e.max_tab_switches_allowed || 3} ครั้ง</div>
+                </td>
+                <td class="py-3 px-3">
+                    <div class="flex flex-col gap-1 items-start">
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
+                            ${isActive ? '🟢 เปิดสอบ' : '⚪ ปิดสอบ'}
+                        </span>
+                        <span class="px-2 py-0.5 text-[10px] font-bold rounded-full ${isShowScore ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500'}">
+                            ${isShowScore ? '👁️ แสดงคะแนน' : '🔒 ซ่อนคะแนน'}
+                        </span>
+                    </div>
+                </td>
+                <td class="py-3 px-3 text-right">
+                    <button onclick="deleteExamByAdmin('${e.id}', '${escapeHtml(e.title)}', '${escapeHtml(e.teacher_name || 'ไม่ระบุอาจารย์')}')" class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 rounded-xl text-xs font-bold transition flex items-center gap-1 ml-auto shadow-2xs" title="ลบชุดข้อสอบนี้">
+                        <i class="fas fa-trash-can"></i> ลบข้อสอบ
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.deleteExamByAdmin = function(examId, examTitle, teacherName) {
+    showCustomConfirm({
+        title: 'ยืนยันการลบชุดข้อสอบโดยแอดมิน',
+        message: `คุณต้องการลบชุดข้อสอบ "${examTitle}"\nของอาจารย์: "${teacherName}" ใช่หรือไม่?\n\n(คำถามและข้อมูลการสอบทั้งหมดของชุดนี้จะถูกลบออกจากระบบอย่างถาวร)`,
+        icon: 'fas fa-trash-can',
+        confirmText: 'ลบชุดข้อสอบนี้',
+        cancelText: 'ยกเลิก',
+        confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
+        onConfirm: async () => {
+            deleteLocalExam(examId);
+
+            if (isSupabaseConfigured() && state.supabaseClient) {
+                try {
+                    const { error } = await state.supabaseClient.from('exams').delete().eq('id', examId);
+                    if (error) {
+                        console.error('[deleteExamByAdmin] Supabase error:', error);
+                        showToast('ลบจากเซิร์ฟเวอร์ไม่สำเร็จ (ติดสิทธิ์ RLS): ' + error.message, 'warning');
+                    }
+                } catch (e) {
+                    console.error('[deleteExamByAdmin] Error:', e);
+                }
+            }
+
+            showToast(`ลบชุดข้อสอบ "${examTitle}" ของอาจารย์ ${teacherName} เรียบร้อยแล้ว`, 'info');
+            await loadAdminExamsList();
+            if (typeof loadTeacherExamsList === 'function') loadTeacherExamsList();
+            populateTeacherExamSelects();
+        }
+    });
+};
 
 // 8.1 จัดการรายชื่ออาจารย์ผู้สอนในหน้าแอดมิน (Admin Teacher Management)
 async function loadAdminTeachersList() {

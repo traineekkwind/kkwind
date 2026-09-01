@@ -847,6 +847,60 @@
                 </div>
             </div>
 
+            <!-- EXAM MANAGEMENT CARD (ADMIN PORTAL) -->
+            <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+                            <i class="fas fa-file-signature"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">จัดการชุดข้อสอบทั้งหมดในระบบ (All Exams Management)</h3>
+                            <p class="text-xs text-slate-500">ตรวจสอบและลบชุดข้อสอบของอาจารย์ทุกคน พร้อมระบุชื่ออาจารย์เจ้าของข้อสอบชัดเจน</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="admin-exams-count-badge" class="px-3 py-1.5 bg-purple-50 text-purple-700 text-xs font-bold rounded-xl border border-purple-100">
+                            0 ชุดข้อสอบ
+                        </span>
+                        <button onclick="loadAdminExamsList()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5" title="รีเฟรชรายการ">
+                            <i class="fas fa-rotate"></i> รีเฟรช
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search & Filters for Admin Exams -->
+                <div class="flex flex-col sm:flex-row items-center gap-3">
+                    <div class="relative flex-1 w-full">
+                        <i class="fas fa-search absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                        <input type="text" id="admin-exam-search-input" oninput="filterAdminExamsList()" placeholder="ค้นหาตามชื่อข้อสอบ หรือ ชื่ออาจารย์ผู้สอน..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <select id="admin-exam-teacher-filter" onchange="filterAdminExamsList()" class="w-full sm:w-auto px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-purple-500">
+                        <option value="ทั้งหมด">อาจารย์: ทั้งหมด</option>
+                    </select>
+                </div>
+
+                <!-- Admin Exams Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                                <th class="py-3 px-3">#</th>
+                                <th class="py-3 px-3">ชื่อชุดข้อสอบ / รายวิชา</th>
+                                <th class="py-3 px-3">อาจารย์ผู้สร้าง</th>
+                                <th class="py-3 px-3">ระดับชั้น & ห้อง</th>
+                                <th class="py-3 px-3">เวลา & สลับจอ</th>
+                                <th class="py-3 px-3">สถานะ</th>
+                                <th class="py-3 px-3 text-right">การจัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-exams-table-body" class="divide-y divide-slate-100">
+                            <tr><td colspan="7" class="text-center py-6 text-slate-400">กำลังโหลดรายการชุดข้อสอบทั้งหมด...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- SUPABASE CONFIGURATION CARD (ONLY IN ADMIN PORTAL!) -->
             <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">
                 <div class="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
@@ -1525,6 +1579,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.8.3"></script>
+    <script src="./public/app.js?v=2.8.4"></script>
 </body>
 </html>
