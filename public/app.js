@@ -2100,7 +2100,7 @@ async function submitExamFinal() {
     }
 
     try {
-        // 1. ระบบตรวจคะแนนอัตโนมัติ (Local Auto-Grading Engine)
+        // 1. ระบบตรวจคะแนนเบื้องต้นในเครื่อง (Smart Local Auto-Grading Engine)
         const questions = state.questions || [];
         const localQuestions = getLocalQuestions(state.currentExam?.id);
         let totalScore = 0;
@@ -2109,18 +2109,22 @@ async function submitExamFinal() {
         questions.forEach(q => {
             const points = Number(q.points) || 1.0;
             maxScore += points;
-            const selectedAns = state.answers[q.id];
+            const selectedAns = (state.answers[q.id] || '').trim().toUpperCase();
             
-            // ค้นหาเฉลยจาก local questions หรือ q
-            const foundQ = localQuestions.find(lq => lq.id === q.id) || q;
-            const correctAns = foundQ.correct || foundQ.correct_option_id || 'A';
+            // ค้นหาเฉลยจาก local questions โดยเทียบทั้ง id และข้อความโจทย์
+            const foundQ = localQuestions.find(lq => 
+                lq.id === q.id || 
+                (lq.question_text && q.question_text && lq.question_text.trim() === q.question_text.trim())
+            ) || q;
+            
+            const correctAns = (foundQ.correct || foundQ.correct_option_id || q.correct || q.correct_option_id || 'A').trim().toUpperCase();
 
             if (selectedAns && selectedAns === correctAns) {
                 totalScore += points;
             }
         });
 
-        const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+        let percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
         const isFlagged = state.antiCheat.tabSwitches > (state.currentExam?.max_tab_switches_allowed || 3) || state.antiCheat.fullscreenExits > 2;
         const cheatingReasons = [];
         if (state.antiCheat.tabSwitches > (state.currentExam?.max_tab_switches_allowed || 3)) {
@@ -2149,25 +2153,34 @@ async function submitExamFinal() {
             graded_at: new Date().toISOString()
         };
 
-        // บันทึกผลสอบลง Local Storage เพื่อให้อาจารย์ดูและ Export ได้ทันที
-        saveLocalSubmission(gradeResult);
-
-        // 2. ถ้าต่อ Supabase ได้ ให้ Sync ขึ้น DB
+        // 2. ถ้าต่อ Supabase ได้ ให้ใช้ RPC submit_and_grade_exam เพื่อตรวจกับ exam_answers บนฐานข้อมูลโดยตรง (แม่นยำ 100%)
         if (isSupabaseConfigured() && state.supabaseClient) {
-            // ลอง RPC grade_exam_secure ก่อน
             let rpcOk = false;
             try {
-                const rpcRes = await state.supabaseClient.rpc('grade_exam_secure', {
+                const { data: rpcRes, error: rpcErr } = await state.supabaseClient.rpc('submit_and_grade_exam', {
                     p_student_id: state.currentUser.id,
                     p_exam_id: state.currentExam.id,
-                    p_student_name: state.currentUser.name,
+                    p_student_name: state.currentUser.name || 'นักเรียน',
                     p_student_year: state.currentUser.year || 'ไม่ระบุ',
                     p_student_department: state.currentUser.dept || 'ไม่ระบุ',
-                    p_student_room: state.currentUser.room || 'ไม่ระบุ'
+                    p_student_room: state.currentUser.room || 'ไม่ระบุ',
+                    p_answers: state.answers,
+                    p_tab_switches: state.antiCheat.tabSwitches || 0,
+                    p_fullscreen_exits: state.antiCheat.fullscreenExits || 0,
+                    p_is_flagged: isFlagged,
+                    p_cheating_reasons: cheatingReasons
                 });
-                if (!rpcRes.error) rpcOk = true;
+
+                if (!rpcErr && rpcRes && rpcRes.success) {
+                    rpcOk = true;
+                    gradeResult.total_score = Number(rpcRes.total_score) != null ? Number(rpcRes.total_score) : gradeResult.total_score;
+                    gradeResult.max_score = Number(rpcRes.max_score) || gradeResult.max_score;
+                    gradeResult.percentage = Number(rpcRes.percentage) != null ? Number(rpcRes.percentage) : gradeResult.percentage;
+                    gradeResult.is_flagged_cheating = !!rpcRes.is_flagged_cheating;
+                    if (rpcRes.course_name) gradeResult.course_name = rpcRes.course_name;
+                }
             } catch (rpcErr) {
-                console.warn('[grade_exam_secure RPC warning]:', rpcErr);
+                console.warn('[submit_and_grade_exam RPC notice]:', rpcErr);
             }
 
             // ถ้า RPC ไม่สำเร็จ → บันทึกตรงลง exam_results เอง
@@ -2198,6 +2211,9 @@ async function submitExamFinal() {
                 }
             }
         }
+
+        // บันทึกผลสอบลง Local Storage เพื่อให้อาจารย์ดูและ Export ได้ทันที
+        saveLocalSubmission(gradeResult);
 
         // ล้างคำตอบร่างที่บันทึกไว้เมื่อส่งข้อสอบเสร็จสมบูรณ์
         clearStudentDraftAnswers();
