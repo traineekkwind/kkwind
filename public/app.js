@@ -3581,24 +3581,32 @@ window.executeExcelImport = async function() {
         return;
     }
 
+    const totalQ = state.excelParsedQuestions.length;
     const loadingModal = document.getElementById('modal-loading');
     if (loadingModal) {
         document.getElementById('loading-modal-title').textContent = 'กำลังนำเข้าข้อสอบ...';
-        document.getElementById('loading-modal-desc').textContent = `กำลังบันทึก ${state.excelParsedQuestions.length} ข้อลงฐานข้อมูลอย่างปลอดภัย`;
+        document.getElementById('loading-modal-desc').textContent = `กำลังบันทึก ${totalQ} ข้อลงฐานข้อมูลอย่างปลอดภัย`;
         loadingModal.classList.remove('hidden');
     }
 
-    let supabaseSuccess = 0;
-    let localSuccess = 0;
+    let successCount = 0;
     let failedRows = [];
 
     try {
-        // Build all question rows
-        const questionRows = state.excelParsedQuestions.map((q, idx) => {
+        for (let idx = 0; idx < state.excelParsedQuestions.length; idx++) {
+            const q = state.excelParsedQuestions[idx];
             const options = [{ id: 'A', text: q.optA }, { id: 'B', text: q.optB }];
             if (q.optC) options.push({ id: 'C', text: q.optC });
             if (q.optD) options.push({ id: 'D', text: q.optD });
-            return {
+
+            // อัปเดต progress
+            if (loadingModal) {
+                document.getElementById('loading-modal-desc').textContent =
+                    `กำลังบันทึกข้อ ${idx + 1}/${totalQ}...`;
+            }
+
+            // Local storage (ไม่มีเฉลยเก็บ — local ใช้แค่ preview)
+            const localQ = {
                 id: generatePseudoUUID(),
                 exam_id: examId,
                 question_text: q.questionText,
@@ -3608,51 +3616,40 @@ window.executeExcelImport = async function() {
                 explanation: q.explanation || '',
                 order_seq: idx + 1
             };
-        });
+            saveLocalQuestion(localQ);
 
-        // Save all to localStorage first
-        questionRows.forEach(q => { saveLocalQuestion(q); localSuccess++; });
-
-        // Batch upsert to Supabase (avoids RPC failures, sends all at once)
-        if (isSupabaseConfigured() && state.supabaseClient) {
-            const BATCH = 50; // safe batch size
-            for (let i = 0; i < questionRows.length; i += BATCH) {
-                const chunk = questionRows.slice(i, i + BATCH);
-                const { error } = await state.supabaseClient
-                    .from('questions')
-                    .insert(chunk);
+            // Supabase: ใช้ RPC ที่ insert ทั้ง questions + exam_answers พร้อมกัน
+            if (isSupabaseConfigured() && state.supabaseClient) {
+                const { data, error } = await state.supabaseClient.rpc('create_question_with_answer', {
+                    p_exam_id: examId,
+                    p_question_text: q.questionText,
+                    p_options: options,
+                    p_points: Number(q.points) || 1.0,
+                    p_correct_option_id: q.correct,
+                    p_explanation: q.explanation || '',
+                    p_order_seq: idx + 1
+                });
                 if (error) {
-                    console.warn('[Excel Import] Supabase batch insert error:', error);
-                    // Retry individually to find which ones fail
-                    for (const row of chunk) {
-                        const { error: singleErr } = await state.supabaseClient
-                            .from('questions')
-                            .insert(row);
-                        if (singleErr) {
-                            failedRows.push({ order: row.order_seq, error: singleErr.message });
-                            console.warn('[Excel Import] Row failed:', row.order_seq, singleErr.message);
-                        } else {
-                            supabaseSuccess++;
-                        }
-                    }
+                    failedRows.push({ order: idx + 1, error: error.message });
+                    console.warn(`[Excel Import] ข้อ ${idx + 1} fail:`, error.message);
                 } else {
-                    supabaseSuccess += chunk.length;
+                    successCount++;
                 }
+            } else {
+                successCount++;
             }
-        } else {
-            supabaseSuccess = localSuccess;
         }
 
         if (loadingModal) loadingModal.classList.add('hidden');
 
         const failMsg = failedRows.length > 0
-            ? `\n\n⚠️ บันทึกไม่สำเร็จ ${failedRows.length} ข้อ (ข้อ: ${failedRows.map(f => f.order).join(', ')})`
+            ? `\n\n⚠️ บันทึกไม่สำเร็จ ${failedRows.length} ข้อ:\nข้อ ${failedRows.map(f => f.order).join(', ')}\n\nError: ${failedRows[0].error}`
             : '';
 
         showCustomAlert({
-            title: 'นำเข้าสำเร็จ!',
-            message: `🎉 บันทึกข้อสอบเข้าสู่ชุดข้อสอบเรียบร้อยแล้ว จำนวน ${localSuccess} ข้อ (Supabase: ${supabaseSuccess}/${localSuccess})${failMsg}`,
-            icon: failedRows.length > 0 ? 'fas fa-triangle-exclamation' : 'fas fa-check-circle'
+            title: failedRows.length === 0 ? 'นำเข้าสำเร็จ!' : 'นำเข้าบางส่วน',
+            message: `${failedRows.length === 0 ? '🎉' : '⚠️'} บันทึกข้อสอบสำเร็จ ${successCount}/${totalQ} ข้อ${failMsg}`,
+            icon: failedRows.length === 0 ? 'fas fa-check-circle' : 'fas fa-triangle-exclamation'
         });
 
         clearExcelPreview();
