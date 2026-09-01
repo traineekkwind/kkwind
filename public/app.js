@@ -4532,27 +4532,38 @@ window.openExamSubmissionsUnlockModal = async function(examId) {
             <tr>
                 <td colspan="7" class="text-center py-8 text-slate-400">
                     <i class="fas fa-spinner fa-spin text-2xl text-indigo-500 mb-2 block"></i>
-                    กำลังโหลดรายชื่อนักเรียนที่ส่งข้อสอบชุดนี้...
+                    กำลังโหลดรายชื่อนักเรียนและสถานะการส่งข้อสอบ...
                 </td>
             </tr>
         `;
     }
 
     let subs = getLocalSubmissions();
+    let allStudents = getLocalStudents();
 
     if (isSupabaseConfigured() && state.supabaseClient) {
         try {
-            const { data, error } = await state.supabaseClient
-                .from('exam_results')
-                .select(`
-                    *,
-                    exam:exams(title, max_tab_switches_allowed, target_year, target_department, target_room)
-                `)
-                .eq('exam_id', examId)
-                .order('graded_at', { ascending: false });
+            const [resSubs, resStudents] = await Promise.all([
+                state.supabaseClient
+                    .from('exam_results')
+                    .select(`
+                        *,
+                        exam:exams(title, max_tab_switches_allowed, target_year, target_department, target_room)
+                    `)
+                    .eq('exam_id', examId)
+                    .order('graded_at', { ascending: false }),
+                state.supabaseClient
+                    .from('students')
+                    .select('*')
+                    .order('code', { ascending: true })
+            ]);
 
-            if (!error && Array.isArray(data)) {
-                subs = data;
+            if (!resSubs.error && Array.isArray(resSubs.data)) {
+                subs = resSubs.data;
+            }
+            if (!resStudents.error && Array.isArray(resStudents.data) && resStudents.data.length > 0) {
+                allStudents = resStudents.data;
+                localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(resStudents.data));
             }
         } catch (err) {
             console.warn('[openExamSubmissionsUnlockModal] Fetch notice:', err);
@@ -4561,35 +4572,84 @@ window.openExamSubmissionsUnlockModal = async function(examId) {
 
     const examSubs = (subs || []).filter(s => s.exam_id === examId);
 
+    // กรองนักเรียนที่ตรงกับเป้าหมายของชุดข้อสอบ
+    let targetStudents = allStudents.filter(st => isExamEligibleForStudent(exam, { role: 'student', year: st.year, dept: st.dept, room: st.room }));
+    if (targetStudents.length === 0 && allStudents.length > 0) {
+        targetStudents = allStudents;
+    }
+
+    // รวมรายชื่อนักเรียนที่มีการส่งข้อสอบแต่ไม่อยู่ในกลุ่มเป้าหมาย (ถ้ามี)
+    const combinedList = [];
+    const addedIds = new Set();
+
+    targetStudents.forEach(st => {
+        const sub = examSubs.find(s => 
+            s.student_id === st.id || 
+            (s.student_code && s.student_code === st.code) ||
+            (s.student_name && s.student_name.trim().toLowerCase() === (st.name || '').trim().toLowerCase())
+        );
+        combinedList.push({ student: st, sub: sub || null });
+        addedIds.add(st.id);
+        if (st.code) addedIds.add(st.code);
+    });
+
+    examSubs.forEach(sub => {
+        if (!addedIds.has(sub.student_id) && !addedIds.has(sub.student_code)) {
+            combinedList.push({
+                student: {
+                    id: sub.student_id,
+                    code: sub.student_code || sub.student_id,
+                    name: sub.student_name,
+                    year: sub.student_year,
+                    dept: sub.student_department,
+                    room: sub.student_room
+                },
+                sub: sub
+            });
+        }
+    });
+
     if (metaEl) {
         metaEl.innerHTML = `
-            <span><i class="fas fa-users text-indigo-500"></i> ส่งข้อสอบแล้ว: <strong>${examSubs.length} คน</strong></span>
-            <span><i class="fas fa-bullseye text-amber-500"></i> เป้าหมาย: <strong>${escapeHtml(exam.target_year || 'ทุกชั้น')} ${escapeHtml(exam.target_room || 'ทุกห้อง')}</strong></span>
+            <div class="flex flex-wrap items-center justify-between w-full gap-2">
+                <div class="flex flex-wrap items-center gap-3">
+                    <span><i class="fas fa-users text-indigo-500"></i> ส่งข้อสอบแล้ว: <strong>${examSubs.length} / ${combinedList.length} คน</strong></span>
+                    <span><i class="fas fa-bullseye text-amber-500"></i> เป้าหมาย: <strong>${escapeHtml(exam.target_year || 'ทุกชั้น')} ${escapeHtml(exam.target_room || 'ทุกห้อง')}</strong></span>
+                </div>
+                ${examSubs.length > 0 ? `
+                    <button onclick="unlockAllStudentsForExam('${exam.id}', '${escapeHtml(exam.title)}')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs">
+                        <i class="fas fa-rotate-left"></i> ปลดล็อกทุกคนในชุดนี้
+                    </button>
+                ` : ''}
+            </div>
         `;
     }
 
-    if (examSubs.length === 0) {
+    if (combinedList.length === 0) {
         tableBody.innerHTML = `
             <tr>
                 <td colspan="7" class="text-center py-10 text-slate-400">
-                    <i class="fas fa-user-clock text-3xl text-slate-300 mb-2 block"></i>
-                    ยังไม่มีนักเรียนส่งข้อสอบในชุดนี้
+                    <i class="fas fa-user-slash text-3xl text-slate-300 mb-2 block"></i>
+                    ยังไม่มีรายชื่อนักเรียนในระดับชั้นนี้ กรุณาเพิ่มรายชื่อนักเรียนในแท็บ "จัดการรายชื่อนักเรียน"
                 </td>
             </tr>
         `;
         return;
     }
 
-    tableBody.innerHTML = examSubs.map(sub => {
-        const isFlagged = sub.is_flagged_cheating;
-        const formattedDate = new Date(sub.graded_at).toLocaleString('th-TH');
-        const classInfo = `${sub.student_year || '-'} | ${sub.student_department || '-'} | ${sub.student_room || '-'}`;
+    tableBody.innerHTML = combinedList.map(item => {
+        const st = item.student;
+        const sub = item.sub;
+        const isSubmitted = !!sub;
+        const isFlagged = sub?.is_flagged_cheating;
+        const formattedDate = sub?.graded_at ? new Date(sub.graded_at).toLocaleString('th-TH') : '-';
+        const classInfo = `${st.year || '-'} | ${st.dept || '-'} | ${st.room || '-'}`;
 
         return `
-            <tr class="hover:bg-slate-50 transition">
+            <tr class="hover:bg-slate-50 transition ${isSubmitted ? 'bg-emerald-50/20' : ''}">
                 <td class="py-3.5 px-4 font-medium text-slate-800">
-                    <div class="font-bold text-slate-900">${escapeHtml(sub.student_name || 'นักเรียน')}</div>
-                    <div class="text-[11px] text-slate-400 font-mono">${sub.student_code || sub.student_id}</div>
+                    <div class="font-bold text-slate-900">${escapeHtml(st.name || 'นักเรียน')}</div>
+                    <div class="text-[11px] text-slate-400 font-mono">${st.code || st.id || '-'}</div>
                 </td>
                 <td class="py-3.5 px-4 text-xs font-semibold text-indigo-700">
                     <span class="px-2 py-0.5 bg-indigo-50 rounded-md border border-indigo-100">
@@ -4597,37 +4657,86 @@ window.openExamSubmissionsUnlockModal = async function(examId) {
                     </span>
                 </td>
                 <td class="py-3.5 px-4 font-bold text-slate-800">
-                    ${sub.total_score} / ${sub.max_score}
-                    <span class="text-xs font-normal text-slate-500">(${sub.percentage}%)</span>
-                </td>
-                <td class="py-3.5 px-4 text-center">
-                    <span class="px-2 py-0.5 rounded-md text-xs font-semibold ${
-                        sub.total_tab_switches > (exam.max_tab_switches_allowed || 3) ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
-                    }">
-                        ${sub.total_tab_switches} ครั้ง
-                    </span>
-                </td>
-                <td class="py-3.5 px-4 text-center">
-                    ${isFlagged ? `
-                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700">⚠️ สงสัยทุจริต</span>
+                    ${isSubmitted ? `
+                        ${sub.total_score} / ${sub.max_score}
+                        <span class="text-xs font-normal text-slate-500">(${sub.percentage}%)</span>
                     ` : `
-                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-700">✅ ปกติ</span>
+                        <span class="text-slate-400 font-normal text-xs">-</span>
+                    `}
+                </td>
+                <td class="py-3.5 px-4 text-center">
+                    ${isSubmitted ? `
+                        <span class="px-2 py-0.5 rounded-md text-xs font-semibold ${
+                            sub.total_tab_switches > (exam.max_tab_switches_allowed || 3) ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                        }">
+                            ${sub.total_tab_switches} ครั้ง
+                        </span>
+                    ` : `
+                        <span class="text-slate-400 text-xs">-</span>
+                    `}
+                </td>
+                <td class="py-3.5 px-4 text-center">
+                    ${isSubmitted ? (
+                        isFlagged ? `
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-700">⚠️ สงสัยทุจริต</span>
+                        ` : `
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">✅ ส่งข้อสอบแล้ว</span>
+                        `
+                    ) : `
+                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">⚪ พร้อมเข้าสอบ</span>
                     `}
                 </td>
                 <td class="py-3.5 px-4 text-slate-400 text-[11px]">${formattedDate}</td>
                 <td class="py-3.5 px-4 text-right">
                     <div class="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                        <button onclick="inspectStudentSubmission('${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}')" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1">
-                            <i class="fas fa-search"></i> ตรวจคำตอบ
-                        </button>
-                        <button onclick="allowStudentRetake('${sub.id || ''}', '${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}', '${escapeHtml(exam.title)}')" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1 border border-amber-300" title="ล้างผลสอบเดิมและเปิดสิทธิ์ให้นักเรียนทำใหม่ทันที">
-                            <i class="fas fa-rotate-left"></i> ให้สอบใหม่
-                        </button>
+                        ${isSubmitted ? `
+                            <button onclick="inspectStudentSubmission('${sub.student_id || st.id}', '${exam.id}', '${escapeHtml(st.name)}')" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1">
+                                <i class="fas fa-search"></i> ตรวจคำตอบ
+                            </button>
+                            <button onclick="allowStudentRetake('${sub.id || ''}', '${sub.student_id || st.id}', '${exam.id}', '${escapeHtml(st.name)}', '${escapeHtml(exam.title)}')" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1 border border-amber-300" title="ล้างผลสอบเดิมและเปิดสิทธิ์ให้นักเรียนทำใหม่ทันที">
+                                <i class="fas fa-rotate-left"></i> ให้สอบใหม่
+                            </button>
+                        ` : `
+                            <button onclick="allowStudentRetake('', '${st.id}', '${exam.id}', '${escapeHtml(st.name)}', '${escapeHtml(exam.title)}')" class="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1 border border-indigo-200" title="ปลดล็อกให้นักเรียนคนนี้">
+                                <i class="fas fa-unlock"></i> ปลดล็อก
+                            </button>
+                        `}
                     </div>
                 </td>
             </tr>
         `;
     }).join('');
+};
+
+window.unlockAllStudentsForExam = function(examId, examTitle) {
+    showCustomConfirm({
+        title: 'ปลดล็อกให้นักเรียนทุกคนสอบใหม่',
+        message: `คุณต้องการล้างผลคะแนนและปลดล็อกให้นักเรียนทุกคนในชุดข้อสอบ "${examTitle}" เข้าทำข้อสอบใหม่ได้ใช่หรือไม่?`,
+        icon: 'fas fa-rotate-left',
+        confirmText: 'ปลดล็อกทุกคน',
+        cancelText: 'ยกเลิก',
+        confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-100',
+        onConfirm: async () => {
+            const subs = getLocalSubmissions();
+            const updated = subs.filter(s => s.exam_id !== examId);
+            localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(updated));
+
+            if (isSupabaseConfigured() && state.supabaseClient) {
+                try {
+                    await state.supabaseClient.from('exam_results').delete().eq('exam_id', examId);
+                    await state.supabaseClient.from('student_submissions').delete().eq('exam_id', examId);
+                    await state.supabaseClient.from('anti_cheat_logs').delete().eq('exam_id', examId);
+                } catch (e) {
+                    console.warn('[unlockAllStudentsForExam] Supabase clear notice:', e);
+                }
+            }
+
+            broadcastAppEvent('student_retake_unlocked', { examId: examId });
+            showToast(`ปลดล็อกให้นักเรียนทุกคนในชุดข้อสอบ "${examTitle}" เรียบร้อยแล้ว!`, 'success');
+            await openExamSubmissionsUnlockModal(examId);
+            await loadTeacherSubmissions();
+        }
+    });
 };
 
 window.closeExamSubmissionsUnlockModal = function() {
