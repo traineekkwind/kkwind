@@ -2286,6 +2286,8 @@ async function submitExamFinal() {
 
         const gradeResult = {
             student_id: state.currentUser.id,
+            student_code: state.currentUser.student_code || state.currentUser.code || '',
+            student_citizen_id: state.currentUser.citizen_id || '',
             student_name: state.currentUser.name,
             student_year: state.currentUser.year || 'ไม่ระบุ',
             student_department: state.currentUser.dept || 'ไม่ระบุ',
@@ -3151,11 +3153,19 @@ async function loadTeacherSubmissions() {
 
         const classInfo = `${sub.student_year || '-'} | ${sub.student_department || '-'} | ${sub.student_room || '-'}`;
 
+        const linkedStudent = studentRosterMap.get(sub.student_id) || 
+                              studentRosterMap.get(String(sub.student_code).trim()) || 
+                              studentRosterMap.get((sub.student_name || '').trim().toLowerCase());
+        let displayCode = sub.student_code || linkedStudent?.code || '';
+        if (!displayCode || String(displayCode).includes('-')) {
+            displayCode = linkedStudent?.code || (sub.student_id && !String(sub.student_id).includes('-') ? sub.student_id : (linkedStudent?.citizen_id || '-'));
+        }
+
         return `
             <tr class="border-b border-gray-100 hover:bg-gray-50/70 transition">
                 <td class="py-4 px-4 font-medium text-gray-800">
                     <div class="font-bold text-slate-900">${escapeHtml(sub.student_name || 'นักเรียน')}</div>
-                    <div class="text-xs text-gray-400 font-mono">${(sub.student_id || '').slice(0, 8)}...</div>
+                    <div class="text-xs text-indigo-600 font-mono font-bold">${escapeHtml(String(displayCode))}</div>
                 </td>
                 <td class="py-4 px-4 text-xs font-semibold text-indigo-700">
                     <span class="px-2.5 py-1 bg-indigo-50 border border-indigo-100/60 rounded-lg">
@@ -3334,29 +3344,55 @@ window.exportTeacherScoresToExcel = async function() {
         });
     }
 
-    if (!filtered || filtered.length === 0) {
-        showToast('ไม่พบข้อมูลผลการสอบตามเงื่อนไขที่เลือกเพื่อส่งออก Excel', 'warning');
-        return;
-    }
+    const studentRoster = getLocalStudents();
+    const studentRosterMap = new Map();
+    studentRoster.forEach(s => {
+        if (s.id) studentRosterMap.set(s.id, s);
+        if (s.code) studentRosterMap.set(String(s.code).trim(), s);
+        if (s.citizen_id) studentRosterMap.set(String(s.citizen_id).trim(), s);
+        if (s.name) studentRosterMap.set(s.name.trim().toLowerCase(), s);
+    });
 
-    const excelRows = filtered.map((d, index) => ({
-        'ลำดับ': index + 1,
-        'ชื่อ-นามสกุล': d.student_name || 'นักเรียน',
-        'รหัสนักเรียน': d.student_id,
-        'ระดับชั้น/ปี': d.student_year || '-',
-        'แผนกวิชา/สาขา': d.student_department || '-',
-        'ห้องเรียน': d.student_room || '-',
-        'รายวิชา': d.course_name || d.exam?.course?.course_name || '-',
-        'ชุดข้อสอบ': d.exam_title || d.exam?.title || '-',
-        'คะแนนที่ได้': Number(d.total_score || 0),
-        'คะแนนเต็ม': Number(d.max_score || 0),
-        'ร้อยละ (%)': Number(d.percentage || 0),
-        'จำนวนสลับหน้าจอ (ครั้ง)': Number(d.total_tab_switches || 0),
-        'จำนวนออกจากเต็มจอ (ครั้ง)': Number(d.total_fullscreen_exits || 0),
-        'สถานะการตรวจ': d.is_flagged_cheating ? '⚠️ พบพฤติกรรมน่าสงสัย' : '✅ ผ่านการตรวจสอบ',
-        'สาเหตุที่ติดสถานะ': (d.cheating_reasons || []).join('; ') || '-',
-        'วันที่และเวลาที่ส่ง': new Date(d.graded_at).toLocaleString('th-TH')
-    }));
+    const excelRows = filtered.map((d, index) => {
+        const cleanName = (d.student_name || '').trim().toLowerCase();
+        const cleanNameNoPrefix = cleanName.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '');
+        
+        const linkedStudent = studentRosterMap.get(d.student_id) || 
+                              studentRosterMap.get(String(d.student_code).trim()) || 
+                              studentRosterMap.get(cleanName) ||
+                              studentRoster.find(st => {
+                                  const stName = (st.name || '').trim().toLowerCase().replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '');
+                                  return stName && cleanNameNoPrefix && (stName === cleanNameNoPrefix || stName.includes(cleanNameNoPrefix) || cleanNameNoPrefix.includes(stName));
+                              });
+
+        let realStudentCode = d.student_code || linkedStudent?.code || '';
+        if (!realStudentCode || String(realStudentCode).includes('-')) {
+            realStudentCode = linkedStudent?.code || linkedStudent?.citizen_id || (d.student_id && !String(d.student_id).includes('-') ? d.student_id : (linkedStudent?.citizen_id || '-'));
+        }
+
+        const realYear = d.student_year || linkedStudent?.year || '-';
+        const realDept = d.student_department || linkedStudent?.dept || '-';
+        const realRoom = d.student_room || linkedStudent?.room || '-';
+
+        return {
+            'ลำดับ': index + 1,
+            'ชื่อ-นามสกุล': d.student_name || linkedStudent?.name || 'นักเรียน',
+            'รหัสนักเรียน': String(realStudentCode),
+            'ระดับชั้น/ปี': realYear,
+            'แผนกวิชา/สาขา': realDept,
+            'ห้องเรียน': realRoom,
+            'รายวิชา': d.course_name || d.exam?.course?.course_name || '-',
+            'ชุดข้อสอบ': d.exam_title || d.exam?.title || '-',
+            'คะแนนที่ได้': Number(d.total_score || 0),
+            'คะแนนเต็ม': Number(d.max_score || 0),
+            'ร้อยละ (%)': Number(d.percentage || 0),
+            'จำนวนสลับหน้าจอ (ครั้ง)': Number(d.total_tab_switches || 0),
+            'จำนวนออกจากเต็มจอ (ครั้ง)': Number(d.total_fullscreen_exits || 0),
+            'สถานะการตรวจ': d.is_flagged_cheating ? '⚠️ พบพฤติกรรมน่าสงสัย' : '✅ ผ่านการตรวจสอบ',
+            'สาเหตุที่ติดสถานะ': (d.cheating_reasons || []).join('; ') || '-',
+            'วันที่และเวลาที่ส่ง': new Date(d.graded_at).toLocaleString('th-TH')
+        };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
     const workbook = XLSX.utils.book_new();
