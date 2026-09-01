@@ -14,6 +14,48 @@
     <script>
         window.SUPABASE_URL = "https://ividsfcwvhngsojtzwjt.supabase.co";
         window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2aWRzZmN3dmhuZ3NvanR6d2p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2MTkyMDMsImV4cCI6MjEwMzE5NTIwM30.1_84Q7DSjJKT5WE0nyf2mBwr5u9Djo2EoNBBbpQF2_A";
+
+        // Global Early Role Tab Switcher
+        window.setLoginRoleTab = function(role) {
+            const tabStudent = document.getElementById('tab-login-student');
+            const tabTeacher = document.getElementById('tab-login-teacher');
+            const tabAdmin = document.getElementById('tab-login-admin');
+
+            const formStudent = document.getElementById('form-login-student');
+            const formTeacher = document.getElementById('form-login-teacher');
+            const formAdmin = document.getElementById('form-login-admin');
+
+            [tabStudent, tabTeacher, tabAdmin].forEach(tab => {
+                if (tab) {
+                    tab.classList.remove('border-indigo-600', 'border-emerald-600', 'border-purple-600', 'text-indigo-600', 'text-emerald-600', 'text-purple-600');
+                    tab.classList.add('border-transparent', 'text-slate-400');
+                }
+            });
+
+            if (formStudent) formStudent.classList.add('hidden');
+            if (formTeacher) formTeacher.classList.add('hidden');
+            if (formAdmin) formAdmin.classList.add('hidden');
+
+            if (role === 'student') {
+                if (tabStudent) {
+                    tabStudent.classList.add('border-indigo-600', 'text-indigo-600');
+                    tabStudent.classList.remove('border-transparent', 'text-slate-400');
+                }
+                if (formStudent) formStudent.classList.remove('hidden');
+            } else if (role === 'teacher') {
+                if (tabTeacher) {
+                    tabTeacher.classList.add('border-emerald-600', 'text-emerald-600');
+                    tabTeacher.classList.remove('border-transparent', 'text-slate-400');
+                }
+                if (formTeacher) formTeacher.classList.remove('hidden');
+            } else if (role === 'admin') {
+                if (tabAdmin) {
+                    tabAdmin.classList.add('border-purple-600', 'text-purple-600');
+                    tabAdmin.classList.remove('border-transparent', 'text-slate-400');
+                }
+                if (formAdmin) formAdmin.classList.remove('hidden');
+            }
+        };
     </script>
     <!-- SheetJS (XLSX) CDN สำหรับ Import & Export Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -71,15 +113,15 @@
                 </div>
 
                 <!-- Role Selection 3 Tabs -->
-                <div class="grid grid-cols-3 border-b border-slate-200 mb-6 text-xs font-semibold">
-                    <button type="button" id="tab-login-student" onclick="setLoginRoleTab('student')" class="pb-3 text-center border-b-2 border-indigo-600 text-indigo-600 font-bold transition cursor-pointer">
-                        <i class="fas fa-graduation-cap block text-sm mb-1"></i> นักเรียน
+                <div class="grid grid-cols-3 border-b border-slate-200 mb-6 text-xs font-semibold select-none">
+                    <button type="button" id="tab-login-student" onclick="window.setLoginRoleTab('student')" class="pb-3 text-center border-b-2 border-indigo-600 text-indigo-600 font-bold transition cursor-pointer select-none">
+                        <i class="fas fa-graduation-cap block text-sm mb-1 pointer-events-none"></i> นักเรียน
                     </button>
-                    <button type="button" id="tab-login-teacher" onclick="setLoginRoleTab('teacher')" class="pb-3 text-center border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition cursor-pointer">
-                        <i class="fas fa-chalkboard-user block text-sm mb-1"></i> อาจารย์
+                    <button type="button" id="tab-login-teacher" onclick="window.setLoginRoleTab('teacher')" class="pb-3 text-center border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition cursor-pointer select-none">
+                        <i class="fas fa-chalkboard-user block text-sm mb-1 pointer-events-none"></i> อาจารย์
                     </button>
-                    <button type="button" id="tab-login-admin" onclick="setLoginRoleTab('admin')" class="pb-3 text-center border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition cursor-pointer">
-                        <i class="fas fa-gears block text-sm mb-1"></i> แอดมิน
+                    <button type="button" id="tab-login-admin" onclick="window.setLoginRoleTab('admin')" class="pb-3 text-center border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition cursor-pointer select-none">
+                        <i class="fas fa-gears block text-sm mb-1 pointer-events-none"></i> แอดมิน
                     </button>
                 </div>
 
@@ -1652,6 +1694,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.8.14"></script>
+    <script src="./public/app.js?v=2.8.15"></script>
 </body>
 </html>
