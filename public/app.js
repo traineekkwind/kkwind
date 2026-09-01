@@ -1,12 +1,12 @@
-﻿/**
+/**
  * ==============================================================================
  * EXAMSECURE PRO - MAIN FRONTEND APPLICATION (SPA)
  * ==============================================================================
- * 1. 3-Role Access: Student (เธเธฑเธเน€เธฃเธตเธขเธ), Teacher (เธญเธฒเธเธฒเธฃเธขเน), Admin (เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ)
- * 2. Teacher Course Management: เธเธฑเธ”เธเธฒเธฃเธฃเธฒเธขเธงเธดเธเธฒเธเธญเธเธเธฃเธนเนเธ•เนเธฅเธฐเธเธ
- * 3. Classroom Targeting: เธเธณเธซเธเธ”เธฃเธฐเธ”เธฑเธเธเธฑเนเธ (Year), เนเธเธเธเธงเธดเธเธฒ (Dept), เธซเนเธญเธเน€เธฃเธตเธขเธ (Room)
- * 4. Student Auto-Filtering: เธเธฑเธเน€เธฃเธตเธขเธเน€เธซเนเธเน€เธเธเธฒเธฐเธเนเธญเธชเธญเธเธเธญเธเธเธฅเธธเนเธกเธ•เธเน€เธญเธ
- * 5. Excel Import & Export (SheetJS Engine): เธเธณเน€เธเนเธฒเธเนเธญเธชเธญเธ & เธชเนเธเธญเธญเธเธเธฐเนเธเธเธเธณเนเธเธเธซเนเธญเธ
+ * 1. 3-Role Access: Student (นักเรียน), Teacher (อาจารย์), Admin (ผู้ดูแลระบบ)
+ * 2. Teacher Course Management: จัดการรายวิชาของครูแต่ละคน
+ * 3. Classroom Targeting: กำหนดระดับชั้น (Year), แผนกวิชา (Dept), ห้องเรียน (Room)
+ * 4. Student Auto-Filtering: นักเรียนเห็นเฉพาะข้อสอบของกลุ่มตนเอง
+ * 5. Excel Import & Export (SheetJS Engine): นำเข้าข้อสอบ & ส่งออกคะแนนจำแนกห้อง
  * 6. Anti-Cheating Engine: Fullscreen, Split-Screen Detect, Tab Switch Telemetry
  * 7. Custom In-App Modal Dialogs: No more native browser popups!
  */
@@ -79,7 +79,7 @@ window.handleQuestionImageSelect = function(event) {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-        showToast('เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเนเธเธฅเนเธฃเธนเธเธ เธฒเธเน€เธ—เนเธฒเธเธฑเนเธ (JPG, PNG, WebP)', 'warning');
+        showToast('กรุณาเลือกไฟล์รูปภาพเท่านั้น (JPG, PNG, WebP)', 'warning');
         return;
     }
 
@@ -122,7 +122,7 @@ window.handleQuestionImageSelect = function(event) {
             if (containerEl) containerEl.classList.remove('hidden');
             if (uploadBoxEl) uploadBoxEl.classList.add('hidden');
 
-            showToast('เธญเธฑเธเนเธซเธฅเธ”เนเธฅเธฐเธเธตเธเธญเธฑเธ”เธฃเธนเธเธ เธฒเธเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง!', 'success');
+            showToast('อัปโหลดและบีบอัดรูปภาพเรียบร้อยแล้ว!', 'success');
         };
         img.src = e.target.result;
     };
@@ -152,13 +152,13 @@ window.fillQuickChoices = function(type) {
         if (optC) optC.value = 'C';
         if (optD) optD.value = 'D';
     } else if (type === 'THAI') {
-        if (optA) optA.value = 'เธ';
-        if (optB) optB.value = 'เธ';
-        if (optC) optC.value = 'เธ';
-        if (optD) optD.value = 'เธ';
+        if (optA) optA.value = 'ก';
+        if (optB) optB.value = 'ข';
+        if (optC) optC.value = 'ค';
+        if (optD) optD.value = 'ง';
     } else if (type === 'TF') {
-        if (optA) optA.value = 'เธ–เธนเธ (True)';
-        if (optB) optB.value = 'เธเธดเธ” (False)';
+        if (optA) optA.value = 'ถูก (True)';
+        if (optB) optB.value = 'ผิด (False)';
         if (optC) optC.value = '';
         if (optD) optD.value = '';
     }
@@ -172,17 +172,17 @@ window.fillQuickChoices = function(type) {
 function cleanSupabaseUrl(rawUrl) {
     if (!rawUrl) return '';
     let url = String(rawUrl).trim();
-    // เธ–เนเธฒเธเธนเนเนเธเนเธงเธฒเธ URL เธซเธเนเธฒ Dashboard เน€เธเนเธ https://supabase.com/dashboard/project/ividsfcwvhngsojtzwjt...
+    // ถ้าผู้ใช้วาง URL หน้า Dashboard เช่น https://supabase.com/dashboard/project/ividsfcwvhngsojtzwjt...
     const dashboardMatch = url.match(/dashboard\/project\/([a-zA-Z0-9_-]+)/);
     if (dashboardMatch && dashboardMatch[1]) {
         return `https://${dashboardMatch[1]}.supabase.co`;
     }
-    // เธ–เนเธฒเธเธนเนเนเธเนเธกเธต path เธ•เนเธญเธ—เนเธฒเธข เน€เธเนเธ https://ividsfcwvhngsojtzwjt.supabase.co/settings/api-keys
+    // ถ้าผู้ใช้มี path ต่อท้าย เช่น https://ividsfcwvhngsojtzwjt.supabase.co/settings/api-keys
     const coMatch = url.match(/(https?:\/\/[a-zA-Z0-9_-]+\.supabase\.co)/);
     if (coMatch && coMatch[1]) {
         return coMatch[1];
     }
-    // เธ•เธฑเธ” trailing slash
+    // ตัด trailing slash
     return url.replace(/\/+$/, '');
 }
 
@@ -217,7 +217,7 @@ function initSupabase() {
 async function fetchCloudDataToLocal() {
     if (!isSupabaseConfigured() || !state.supabaseClient) return;
     try {
-        // 1. เธ”เธถเธเธเนเธญเธกเธนเธฅเธฃเธฒเธขเธเธทเนเธญเธญเธฒเธเธฒเธฃเธขเนเธเธฒเธเธเธฅเธฒเธงเธ”เนเธฅเธเธกเธทเธญเธ–เธทเธญ/เธ—เธธเธเธญเธธเธเธเธฃเธ“เน
+        // 1. ดึงข้อมูลรายชื่ออาจารย์จากคลาวด์ลงมือถือ/ทุกอุปกรณ์
         const { data: dbTeachers, error: tErr } = await state.supabaseClient
             .from('teachers')
             .select('*');
@@ -225,7 +225,7 @@ async function fetchCloudDataToLocal() {
             localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(dbTeachers));
         }
 
-        // 2. เธ”เธถเธเธฃเธฒเธขเธงเธดเธเธฒ
+        // 2. ดึงรายวิชา
         const { data: dbCourses, error: cErr } = await state.supabaseClient
             .from('courses')
             .select('*');
@@ -234,7 +234,7 @@ async function fetchCloudDataToLocal() {
             state.courses = dbCourses;
         }
 
-        // 3. เธ”เธถเธเธเธธเธ”เธเนเธญเธชเธญเธ
+        // 3. ดึงชุดข้อสอบ
         const { data: dbExams, error: eErr } = await state.supabaseClient
             .from('exams')
             .select('*');
@@ -258,7 +258,7 @@ async function syncLocalDataToSupabase() {
                     id: t.id,
                     teacher_code: t.teacher_code || t.code,
                     name: t.name,
-                    department: t.department || t.dept || 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ',
+                    department: t.department || t.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
                     password: t.password || 'teacher1234'
                 }, { onConflict: 'id' });
             }
@@ -273,10 +273,10 @@ async function syncLocalDataToSupabase() {
                     course_code: c.course_code,
                     course_name: c.course_name,
                     description: c.description || '',
-                    target_year: c.target_year || 'เธ—เธฑเนเธเธซเธกเธ”',
-                    target_department: c.target_department || 'เธ—เธฑเนเธเธซเธกเธ”',
+                    target_year: c.target_year || 'ทั้งหมด',
+                    target_department: c.target_department || 'ทั้งหมด',
                     teacher_id: c.teacher_id || '11111111-0000-0000-0000-000000000001',
-                    teacher_name: c.teacher_name || 'เธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธ'
+                    teacher_name: c.teacher_name || 'อาจารย์ผู้สอน'
                 }, { onConflict: 'id' });
             }
         }
@@ -288,15 +288,15 @@ async function syncLocalDataToSupabase() {
                 await state.supabaseClient.from('exams').upsert({
                     id: e.id,
                     course_id: e.course_id || null,
-                    teacher_name: e.teacher_name || 'เธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธ',
+                    teacher_name: e.teacher_name || 'อาจารย์ผู้สอน',
                     title: e.title,
                     description: e.description || '',
                     duration_minutes: Number(e.duration_minutes) || 60,
                     is_active: e.is_active !== false,
                     max_tab_switches_allowed: Number(e.max_tab_switches_allowed) || 3,
-                    target_year: e.target_year || 'เธ—เธฑเนเธเธซเธกเธ”',
-                    target_department: e.target_department || 'เธ—เธฑเนเธเธซเธกเธ”',
-                    target_room: e.target_room || 'เธ—เธฑเนเธเธซเธกเธ”'
+                    target_year: e.target_year || 'ทั้งหมด',
+                    target_department: e.target_department || 'ทั้งหมด',
+                    target_room: e.target_room || 'ทั้งหมด'
                 }, { onConflict: 'id' });
             }
         }
@@ -560,7 +560,7 @@ function handleIncomingAppSync(message) {
             console.log('[Realtime] Auto-updating Student Lobby cards...');
             loadStudentLobby();
             if (type === 'exam_updated') {
-                showToast(`๐”” เธกเธตเธเธธเธ”เธเนเธญเธชเธญเธเนเธซเธกเนเน€เธเธดเธ”เนเธซเนเน€เธเนเธฒเธชเธญเธ: "${payload.title || 'เธเธธเธ”เธเนเธญเธชเธญเธ'}"`, 'info');
+                showToast(`🔔 มีชุดข้อสอบใหม่เปิดให้เข้าสอบ: "${payload.title || 'ชุดข้อสอบ'}"`, 'info');
             }
         }
 
@@ -575,7 +575,7 @@ function handleIncomingAppSync(message) {
     }
 
     // 2. Student Submission Event
-        // 1.1 Student Retake Unlocked Event (เธญเธฒเธเธฒเธฃเธขเนเธเธฅเธ”เธฅเนเธญเธเนเธซเนเธชเธญเธเนเธซเธกเน)
+        // 1.1 Student Retake Unlocked Event (อาจารย์ปลดล็อกให้สอบใหม่)
     if (type === 'student_retake_unlocked') {
         const isStudentLobby = state.currentView === 'view-student-lobby' || (document.getElementById('view-student-lobby') && !document.getElementById('view-student-lobby').classList.contains('hidden'));
         if (isStudentLobby && state.currentUser?.role === 'student') {
@@ -583,7 +583,7 @@ function handleIncomingAppSync(message) {
             const currentStudentCode = state.currentUser.student_code || state.currentUser.code;
             if (!payload || payload.studentId === currentStudentId || payload.studentId === currentStudentCode) {
                 loadStudentLobby();
-                showToast('เธญเธฒเธเธฒเธฃเธขเนเนเธ”เนเธเธฅเธ”เธฅเนเธญเธเนเธซเนเธเธธเธ“เน€เธเนเธฒเธ—เธณเธเนเธญเธชเธญเธเนเธซเธกเนเธญเธตเธเธเธฃเธฑเนเธเนเธฅเนเธง!', 'success');
+                showToast('อาจารย์ได้ปลดล็อกให้คุณเข้าทำข้อสอบใหม่อีกครั้งแล้ว!', 'success');
             }
         }
     }
@@ -593,10 +593,10 @@ function handleIncomingAppSync(message) {
         if (isTeacherView) {
             console.log('[Realtime] Student submitted exam, auto-updating submissions table...');
             loadTeacherSubmissions();
-            const studentName = payload.student_name || 'เธเธฑเธเน€เธฃเธตเธขเธ';
-            const examTitle = payload.exam_title || 'เธเธธเธ”เธเนเธญเธชเธญเธ';
+            const studentName = payload.student_name || 'นักเรียน';
+            const examTitle = payload.exam_title || 'ชุดข้อสอบ';
             const scoreText = `${payload.total_score}/${payload.max_score} (${payload.percentage}%)`;
-            showToast(`๐“ ${studentName} เธชเนเธเธเนเธญเธชเธญเธ "${examTitle}" เนเธฅเนเธง [${scoreText}]`, 'success');
+            showToast(`📝 ${studentName} ส่งข้อสอบ "${examTitle}" แล้ว [${scoreText}]`, 'success');
         }
     }
 
@@ -719,13 +719,13 @@ function updateUserInfoBar() {
         if (nameEl) nameEl.textContent = state.currentUser.name;
         if (roleBadge) {
             if (state.currentUser.role === 'admin') {
-                roleBadge.textContent = 'โ๏ธ เนเธญเธ”เธกเธดเธ';
+                roleBadge.textContent = '⚙️ แอดมิน';
                 roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 border border-purple-300';
             } else if (state.currentUser.role === 'teacher') {
-                roleBadge.textContent = `๐‘จโ€๐ซ ${state.currentUser.name}`;
+                roleBadge.textContent = `👨‍🏫 ${state.currentUser.name}`;
                 roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300';
             } else {
-                roleBadge.textContent = `๐‘จโ€๐“ ${state.currentUser.year} ${state.currentUser.room}`;
+                roleBadge.textContent = `👨‍🎓 ${state.currentUser.year} ${state.currentUser.room}`;
                 roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 border border-blue-300';
             }
         }
@@ -817,7 +817,7 @@ function setupAuthEvents() {
         }
     };
 
-    // 3.1 เธเธญเธฃเนเธกเธเธฑเธเน€เธฃเธตเธขเธ (เธฅเนเธญเธเธญเธดเธเธ”เนเธงเธข เธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธ/เธเธทเนเธญ เนเธฅเธฐ เน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธ 13 เธซเธฅเธฑเธ)
+    // 3.1 ฟอร์มนักเรียน (ล็อกอินด้วย รหัสนักเรียน/ชื่อ และ เลขบัตรประชาชน 13 หลัก)
     if (formStudent) {
         formStudent.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -825,14 +825,14 @@ function setupAuthEvents() {
             const citizenPass = document.getElementById('student-login-pass-input')?.value.trim();
 
             if (!loginId) {
-                showToast('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธ เธซเธฃเธทเธญ เธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ', 'warning');
+                showToast('กรุณากรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล', 'warning');
                 return;
             }
 
             if (!citizenPass || citizenPass.length !== 13) {
                 showCustomAlert({
-                    title: 'เน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ',
-                    message: 'เธเธฃเธธเธ“เธฒเธเธฃเธญเธเน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธณเธ•เธฑเธงเธเธฃเธฐเธเธฒเธเธเนเธซเนเธเธฃเธ 13 เธซเธฅเธฑเธ\n(เนเธเนเน€เธเนเธเธฃเธซเธฑเธชเธเนเธฒเธเน€เธเนเธฒเธชเธญเธ)',
+                    title: 'เลขบัตรประชาชนไม่ถูกต้อง',
+                    message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลัก\n(ใช้เป็นรหัสผ่านเข้าสอบ)',
                     icon: 'fas fa-id-card'
                 });
                 return;
@@ -862,16 +862,16 @@ function setupAuthEvents() {
                     const studentById = registeredStudents.find(s => s.code === loginId || s.name.trim().toLowerCase() === loginId.toLowerCase());
                     if (studentById) {
                         showCustomAlert({
-                            title: 'เธฃเธซเธฑเธชเธเนเธฒเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ',
-                            message: `เธเธเธฃเธฒเธขเธเธทเนเธญ "${studentById.name}" เนเธเธฃเธฐเธเธ\nเนเธ•เนเน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธณเธ•เธฑเธงเธเธฃเธฐเธเธฒเธเธ 13 เธซเธฅเธฑเธ (เธฃเธซเธฑเธชเธเนเธฒเธ) เนเธกเนเธ–เธนเธเธ•เนเธญเธ เธเธฃเธธเธ“เธฒเธฅเธญเธเนเธซเธกเนเธญเธตเธเธเธฃเธฑเนเธ`,
+                            title: 'รหัสผ่านไม่ถูกต้อง',
+                            message: `พบรายชื่อ "${studentById.name}" ในระบบ\nแต่เลขบัตรประจำตัวประชาชน 13 หลัก (รหัสผ่าน) ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง`,
                             icon: 'fas fa-lock'
                         });
                         return;
                     }
 
                     showCustomAlert({
-                        title: 'เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธฑเธเน€เธฃเธตเธขเธเนเธเธฃเธฐเธเธ',
-                        message: `เนเธกเนเธเธเธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธเธซเธฃเธทเธญเธเธทเนเธญ "${loginId}" เธ—เธตเนเธญเธฒเธเธฒเธฃเธขเนเนเธ”เนเธฅเธเธ—เธฐเน€เธเธตเธขเธเนเธงเน\nเธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเธซเธฃเธทเธญเธ•เธดเธ”เธ•เนเธญเธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธเน€เธเธทเนเธญเน€เธเธดเนเธกเธฃเธฒเธขเธเธทเนเธญเธเนเธญเธเน€เธเนเธฒเธชเธญเธ`,
+                        title: 'ไม่พบข้อมูลนักเรียนในระบบ',
+                        message: `ไม่พบรหัสนักเรียนหรือชื่อ "${loginId}" ที่อาจารย์ได้ลงทะเบียนไว้\nกรุณาตรวจสอบหรือติดต่ออาจารย์ผู้สอนเพื่อเพิ่มรายชื่อก่อนเข้าสอบ`,
                         icon: 'fas fa-user-xmark'
                     });
                     return;
@@ -882,9 +882,9 @@ function setupAuthEvents() {
                     code: loginId,
                     name: loginId,
                     citizen_id: citizenPass,
-                    year: 'เธเธงเธ.2',
-                    dept: 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ',
-                    room: 'เธซเนเธญเธ 1'
+                    year: 'ปวช.2',
+                    dept: 'เทคโนโลยีธุรกิจดิจิทัล',
+                    room: 'ห้อง 1'
                 };
                 saveLocalStudent(matchedStudent);
             }
@@ -895,21 +895,21 @@ function setupAuthEvents() {
                 student_code: matchedStudent.code,
                 name: matchedStudent.name,
                 citizen_id: matchedStudent.citizen_id,
-                year: matchedStudent.year || 'เธเธงเธ.2',
-                dept: matchedStudent.dept || 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ',
-                room: matchedStudent.room || 'เธซเนเธญเธ 1'
+                year: matchedStudent.year || 'ปวช.2',
+                dept: matchedStudent.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
+                room: matchedStudent.room || 'ห้อง 1'
             };
             try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
 
             const badge = document.getElementById('student-class-badge');
             if (badge) badge.textContent = `${state.currentUser.year} | ${state.currentUser.dept} | ${state.currentUser.room}`;
 
-            showToast(`เธขเธดเธเธ”เธตเธ•เนเธญเธเธฃเธฑเธเธเธธเธ“ ${state.currentUser.name} (${state.currentUser.year} ${state.currentUser.room})`, 'success');
+            showToast(`ยินดีต้อนรับคุณ ${state.currentUser.name} (${state.currentUser.year} ${state.currentUser.room})`, 'success');
             loadStudentLobby();
         });
     }
 
-    // 3.2 เธเธญเธฃเนเธกเธญเธฒเธเธฒเธฃเธขเน (เธฃเธฐเธเธธเธเธทเนเธญเธญเธฒเธเธฒเธฃเธขเน/เธฃเธซเธฑเธชเธญเธฒเธเธฒเธฃเธขเน เนเธฅเธฐ เธฃเธซเธฑเธชเธเนเธฒเธเธเธฃเธฐเธเธณเธ•เธฑเธง)
+    // 3.2 ฟอร์มอาจารย์ (ระบุชื่ออาจารย์/รหัสอาจารย์ และ รหัสผ่านประจำตัว)
     if (formTeacher) {
         formTeacher.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -917,13 +917,13 @@ function setupAuthEvents() {
             const password = document.getElementById('teacher-password-input').value.trim();
 
             if (!loginInput || !password) {
-                showToast('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ เธซเธฃเธทเธญ เธฃเธซเธฑเธชเธญเธฒเธเธฒเธฃเธขเน เนเธฅเธฐ เธฃเธซเธฑเธชเธเนเธฒเธ', 'warning');
+                showToast('กรุณากรอกชื่อ-นามสกุล หรือ รหัสอาจารย์ และ รหัสผ่าน', 'warning');
                 return;
             }
 
             let registeredTeachers = getLocalTeachers();
 
-            // เธ”เธถเธเธเนเธญเธกเธนเธฅเธญเธฒเธเธฒเธฃเธขเนเธฅเนเธฒเธชเธธเธ”เธเธฒเธ Supabase Cloud (เธชเธณเธซเธฃเธฑเธเธกเธทเธญเธ–เธทเธญเธซเธฃเธทเธญเน€เธเธฃเธทเนเธญเธเธญเธทเนเธเธ—เธตเนเน€เธเธดเนเธเน€เธเธดเธ”เน€เธงเนเธ)
+            // ดึงข้อมูลอาจารย์ล่าสุดจาก Supabase Cloud (สำหรับมือถือหรือเครื่องอื่นที่เพิ่งเปิดเว็บ)
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
                     const { data: dbTeachers, error: fetchErr } = await state.supabaseClient
@@ -953,19 +953,19 @@ function setupAuthEvents() {
                         id: matchedTeacher.id,
                         name: matchedTeacher.name,
                         code: matchedTeacher.teacher_code || matchedTeacher.code,
-                        dept: matchedTeacher.department || matchedTeacher.dept || 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ'
+                        dept: matchedTeacher.department || matchedTeacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
                     };
                     try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
 
                     const portalNameEl = document.getElementById('teacher-portal-name');
-                    if (portalNameEl) portalNameEl.textContent = `${matchedTeacher.name} (${matchedTeacher.department || 'เธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธ'})`;
+                    if (portalNameEl) portalNameEl.textContent = `${matchedTeacher.name} (${matchedTeacher.department || 'อาจารย์ผู้สอน'})`;
 
-                    showToast(`เธขเธดเธเธ”เธตเธ•เนเธญเธเธฃเธฑเธ ${matchedTeacher.name}`, 'success');
+                    showToast(`ยินดีต้อนรับ ${matchedTeacher.name}`, 'success');
                     loadTeacherDashboard();
                     return;
                 }
 
-                // เน€เธเนเธเธงเนเธฒเธเธทเนเธญเธญเธฒเธเธฒเธฃเธขเนเธกเธตเนเธเธฃเธฐเธเธเนเธ•เนเธฃเธซเธฑเธชเธเนเธฒเธเธเธดเธ”เธซเธฃเธทเธญเนเธกเน
+                // เช็คว่าชื่ออาจารย์มีในระบบแต่รหัสผ่านผิดหรือไม่
                 const teacherExists = registeredTeachers.find(t => 
                     t.name.trim().toLowerCase() === cleanLogin || 
                     (t.teacher_code && t.teacher_code.trim().toLowerCase() === cleanLogin) ||
@@ -974,21 +974,21 @@ function setupAuthEvents() {
 
                 if (teacherExists) {
                     showCustomAlert({
-                        title: 'เธฃเธซเธฑเธชเธเนเธฒเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ',
-                        message: `เธเธเธเนเธญเธกเธนเธฅเธญเธฒเธเธฒเธฃเธขเน "${teacherExists.name}" เนเธเธฃเธฐเธเธ\nเนเธ•เนเธฃเธซเธฑเธชเธเนเธฒเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเนเธฅเธฐเธฅเธญเธเนเธซเธกเนเธญเธตเธเธเธฃเธฑเนเธ`,
+                        title: 'รหัสผ่านไม่ถูกต้อง',
+                        message: `พบข้อมูลอาจารย์ "${teacherExists.name}" ในระบบ\nแต่รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง`,
                         icon: 'fas fa-lock'
                     });
                     return;
                 }
 
                 showCustomAlert({
-                    title: 'เนเธกเนเธเธเธเธฑเธเธเธตเธญเธฒเธเธฒเธฃเธขเนเนเธเธฃเธฐเธเธ',
-                    message: `เนเธกเนเธเธเธเธทเนเธญเธซเธฃเธทเธญเธฃเธซเธฑเธชเธญเธฒเธเธฒเธฃเธขเน "${loginInput}" เนเธเธฃเธฐเธเธ\nเธเธฃเธธเธ“เธฒเธ•เธดเธ”เธ•เนเธญเธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ (Admin) เน€เธเธทเนเธญเน€เธเธดเนเธกเธฃเธฒเธขเธเธทเนเธญเธญเธฒเธเธฒเธฃเธขเนเน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธ`,
+                    title: 'ไม่พบบัญชีอาจารย์ในระบบ',
+                    message: `ไม่พบชื่อหรือรหัสอาจารย์ "${loginInput}" ในระบบ\nกรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อเพิ่มรายชื่ออาจารย์เข้าสู่ระบบ`,
                     icon: 'fas fa-user-xmark'
                 });
                 return;
             } else {
-                // เธเธฃเธ“เธตเธฃเธฐเธเธเธขเธฑเธเนเธกเนเธกเธตเธเธฒเธฃเธฅเธเธ—เธฐเน€เธเธตเธขเธเธญเธฒเธเธฒเธฃเธขเนเน€เธฅเธข เนเธซเนเนเธเนเธเนเธฒเน€เธฃเธดเนเธกเธ•เนเธ
+                // กรณีระบบยังไม่มีการลงทะเบียนอาจารย์เลย ให้ใช้ค่าเริ่มต้น
                 if (password === 'teacher1234' || password === 'teacher' || password === 'admin1234') {
                     const teacherId = generateTeacherUUID(loginInput);
 
@@ -997,19 +997,19 @@ function setupAuthEvents() {
                         id: teacherId,
                         name: loginInput,
                         code: 'T001',
-                        dept: 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ'
+                        dept: 'เทคโนโลยีธุรกิจดิจิทัล'
                     };
                     try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
 
                     const portalNameEl = document.getElementById('teacher-portal-name');
                     if (portalNameEl) portalNameEl.textContent = loginInput;
 
-                    showToast(`เธขเธดเธเธ”เธตเธ•เนเธญเธเธฃเธฑเธ ${loginInput}`, 'success');
+                    showToast(`ยินดีต้อนรับ ${loginInput}`, 'success');
                     loadTeacherDashboard();
                 } else {
                     showCustomAlert({
-                        title: 'เธฃเธซเธฑเธชเธเนเธฒเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ',
-                        message: 'เธฃเธซเธฑเธชเธเนเธฒเธเธชเธณเธซเธฃเธฑเธเธญเธฒเธเธฒเธฃเธขเนเนเธกเนเธ–เธนเธเธ•เนเธญเธ เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเนเธฅเธฐเธฅเธญเธเนเธซเธกเนเธญเธตเธเธเธฃเธฑเนเธ',
+                        title: 'รหัสผ่านไม่ถูกต้อง',
+                        message: 'รหัสผ่านสำหรับอาจารย์ไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง',
                         icon: 'fas fa-lock'
                     });
                 }
@@ -1017,7 +1017,7 @@ function setupAuthEvents() {
         });
     }
 
-    // 3.3 เธเธญเธฃเนเธกเนเธญเธ”เธกเธดเธ
+    // 3.3 ฟอร์มแอดมิน
     if (formAdmin) {
         formAdmin.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -1027,31 +1027,31 @@ function setupAuthEvents() {
                 state.currentUser = {
                     role: 'admin',
                     id: '00000000-0000-0000-0000-000000000001',
-                    name: 'เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธเธชเธนเธเธชเธธเธ” (Admin)'
+                    name: 'ผู้ดูแลระบบสูงสุด (Admin)'
                 };
                 try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (e) {}
-                showToast('เน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธเนเธญเธ”เธกเธดเธเธชเธณเน€เธฃเนเธ', 'success');
+                showToast('เข้าสู่ระบบแอดมินสำเร็จ', 'success');
                 loadAdminDashboard();
             } else {
                 showCustomAlert({
-                    title: 'เธฃเธซเธฑเธชเธเนเธฒเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ',
-                    message: 'เธฃเธซเธฑเธชเธเนเธฒเธเธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเนเธฅเธฐเธฅเธญเธเนเธซเธกเนเธญเธตเธเธเธฃเธฑเนเธ',
+                    title: 'รหัสผ่านไม่ถูกต้อง',
+                    message: 'รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง',
                     icon: 'fas fa-shield-cat'
                 });
             }
         });
     }
 
-    // เธเธธเนเธกเธญเธญเธเธเธฒเธเธฃเธฐเธเธ (Custom In-App Modal - No browser popup!)
+    // ปุ่มออกจากระบบ (Custom In-App Modal - No browser popup!)
     const btnLogout = document.getElementById('btn-logout');
     if (btnLogout) {
         btnLogout.addEventListener('click', () => {
             showCustomConfirm({
-                title: 'เธญเธญเธเธเธฒเธเธฃเธฐเธเธ',
-                message: 'เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธญเธญเธเธเธฒเธเธฃเธฐเธเธเนเธฅเธฐเธเธฅเธฑเธเธชเธนเนเธซเธเนเธฒเธซเธฅเธฑเธเธซเธฃเธทเธญเนเธกเน?',
+                title: 'ออกจากระบบ',
+                message: 'คุณต้องการออกจากระบบและกลับสู่หน้าหลักหรือไม่?',
                 icon: 'fas fa-arrow-right-from-bracket',
-                confirmText: 'เธญเธญเธเธเธฒเธเธฃเธฐเธเธ',
-                cancelText: 'เธขเธเน€เธฅเธดเธ',
+                confirmText: 'ออกจากระบบ',
+                cancelText: 'ยกเลิก',
                 confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
                 onConfirm: () => {
                     stopAntiCheatMonitor();
@@ -1062,7 +1062,7 @@ function setupAuthEvents() {
                     state.questions = [];
                     state.answers = {};
                     showView('view-auth');
-                    showToast('เธญเธญเธเธเธฒเธเธฃเธฐเธเธเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง', 'info');
+                    showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
                 }
             });
         });
@@ -1108,7 +1108,7 @@ window.refreshStudentLobby = async function(btn) {
     }
 
     await loadStudentLobby();
-    showToast('๐” เธญเธฑเธเน€เธ”เธ•เธเนเธญเธกเธนเธฅเนเธฅเธฐเธชเธดเธ—เธเธดเนเธเธฒเธฃเธชเธญเธเธฅเนเธฒเธชเธธเธ”เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง!', 'success');
+    showToast('🔄 อัปเดตข้อมูลและสิทธิ์การสอบล่าสุดเรียบร้อยแล้ว!', 'success');
 
     if (btn) {
         setTimeout(() => {
@@ -1142,7 +1142,7 @@ async function loadStudentLobby() {
         }
     }
 
-    // เธ”เธถเธเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธชเนเธเธเนเธญเธชเธญเธเธเธญเธเธเธฑเธเน€เธฃเธตเธขเธเธเธเธเธตเน เน€เธเธทเนเธญเธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเน€เธเธขเธ—เธณเธเนเธญเธชเธญเธเนเธเนเธฅเนเธงเธซเธฃเธทเธญเนเธกเน
+    // ดึงประวัติการส่งข้อสอบของนักเรียนคนนี้ เพื่อตรวจสอบว่าเคยทำข้อสอบไปแล้วหรือไม่
     let studentSubmissions = [];
     if (isSupabaseConfigured() && state.supabaseClient && state.currentUser) {
         try {
@@ -1166,8 +1166,8 @@ async function loadStudentLobby() {
 
             if (Array.isArray(dbSubmissions)) {
                 studentSubmissions = dbSubmissions;
-                // เธ–เนเธฒ Supabase เธเธทเธเธเนเธฒเธกเธฒเนเธฅเนเธง (เธฃเธงเธกเธ–เธถเธเธเธฃเธ“เธตเน€เธเนเธ 0 เธเธ/เธเธฅเธ”เธฅเนเธญเธเนเธฅเนเธง)
-                // เนเธซเนเธฅเธเนเธเธเธเนเธญเธชเธญเธเธ—เธตเนเนเธกเนเธกเธตเนเธ Cloud เธญเธญเธเธเธฒเธ LocalStorage เธเธญเธเน€เธเธฃเธทเนเธญเธเธเธตเนเธ—เธฑเธเธ—เธต!
+                // ถ้า Supabase คืนค่ามาแล้ว (รวมถึงกรณีเป็น 0 คน/ปลดล็อกแล้ว)
+                // ให้ลบแคชข้อสอบที่ไม่มีใน Cloud ออกจาก LocalStorage ของเครื่องนี้ทันที!
                 const activeDbExamIds = new Set(dbSubmissions.map(s => s.exam_id));
                 const allLocal = getLocalSubmissions();
                 const filteredLocal = allLocal.filter(s => {
@@ -1181,7 +1181,7 @@ async function loadStudentLobby() {
             console.warn('[loadStudentLobby] Submissions check notice:', subErr);
         }
     } else {
-        // เธญเธญเธเนเธฅเธเน fallback
+        // ออฟไลน์ fallback
         const localSubs = getLocalSubmissions();
         const currentName = (state.currentUser?.name || '').trim().toLowerCase();
         const currentId = state.currentUser?.id;
@@ -1193,18 +1193,18 @@ async function loadStudentLobby() {
         );
     }
 
-    // เธเธฑเธ”เธเธฃเธญเธเน€เธเธเธฒเธฐเธเนเธญเธชเธญเธเธ—เธตเนเธ•เธฃเธเธเธฑเธเธเธฅเธธเนเธกเธเธญเธเธเธฑเธเน€เธฃเธตเธขเธ (เธซเธฃเธทเธญเน€เธเนเธ 'เธ—เธฑเนเธเธซเธกเธ”')
+    // คัดกรองเฉพาะข้อสอบที่ตรงกับกลุ่มของนักเรียน (หรือเป็น 'ทั้งหมด')
     const eligibleExams = (exams || []).filter(exam => isExamEligibleForStudent(exam, state.currentUser));
 
     if (eligibleExams.length === 0) {
         listContainer.innerHTML = `
             <div class="col-span-full bg-white rounded-3xl p-10 text-center border border-slate-100 shadow-sm">
                 <i class="fas fa-file-signature text-5xl text-slate-300 mb-4"></i>
-                <h3 class="text-lg font-bold text-slate-800">เธขเธฑเธเนเธกเนเธกเธตเธเธธเธ”เธเนเธญเธชเธญเธเธชเธณเธซเธฃเธฑเธเธเธฅเธธเนเธกเธเธญเธเธเธธเธ“เนเธเธเธ“เธฐเธเธตเน</h3>
+                <h3 class="text-lg font-bold text-slate-800">ยังไม่มีชุดข้อสอบสำหรับกลุ่มของคุณในขณะนี้</h3>
                 <p class="text-slate-500 text-xs mt-1">
-                    เธเธฅเธธเนเธกเธเธญเธเธเธธเธ“: <strong>${state.currentUser?.year || ''} | ${state.currentUser?.dept || ''} | ${state.currentUser?.room || ''}</strong>
+                    กลุ่มของคุณ: <strong>${state.currentUser?.year || ''} | ${state.currentUser?.dept || ''} | ${state.currentUser?.room || ''}</strong>
                 </p>
-                <p class="text-slate-400 text-xs mt-2">เธเธฃเธธเธ“เธฒเธฃเธญเธญเธฒเธเธฒเธฃเธขเนเธเธฃเธฐเธเธณเธงเธดเธเธฒเน€เธเธดเธ”เธเธธเธ”เธเนเธญเธชเธญเธ</p>
+                <p class="text-slate-400 text-xs mt-2">กรุณารออาจารย์ประจำวิชาเปิดชุดข้อสอบ</p>
             </div>
         `;
         return;
@@ -1212,13 +1212,13 @@ async function loadStudentLobby() {
 
     listContainer.innerHTML = eligibleExams.map(exam => {
         const matchedCourse = getLocalCourses().find(c => c.id === exam.course_id);
-        const courseCode = matchedCourse?.course_code || exam.course?.course_code || 'เธ—เธฑเนเธงเนเธ';
-        const courseName = matchedCourse?.course_name || exam.course?.course_name || 'เธงเธดเธเธฒเธ—เธฑเนเธงเนเธ';
-        const teacher = exam.teacher_name || 'เธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธ';
+        const courseCode = matchedCourse?.course_code || exam.course?.course_code || 'ทั่วไป';
+        const courseName = matchedCourse?.course_name || exam.course?.course_name || 'วิชาทั่วไป';
+        const teacher = exam.teacher_name || 'อาจารย์ผู้สอน';
 
-        const targetTag = `${exam.target_year || 'เธ—เธธเธเธเธฑเนเธ'} | ${exam.target_department || 'เธ—เธธเธเนเธเธเธ'} | ${exam.target_room || 'เธ—เธธเธเธซเนเธญเธ'}`;
+        const targetTag = `${exam.target_year || 'ทุกชั้น'} | ${exam.target_department || 'ทุกแผนก'} | ${exam.target_room || 'ทุกห้อง'}`;
 
-        // เน€เธเนเธเธงเนเธฒเธ—เธณเธเนเธญเธชเธญเธเธเธธเธ”เธเธตเนเนเธเนเธฅเนเธงเธซเธฃเธทเธญเนเธกเน
+        // เช็คว่าทำข้อสอบชุดนี้ไปแล้วหรือไม่
         const pastSubmission = studentSubmissions.find(s => s.exam_id === exam.id);
         const isCompleted = !!pastSubmission;
 
@@ -1232,23 +1232,23 @@ async function loadStudentLobby() {
                         </span>
                         ${isCompleted ? `
                             <span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
-                                <i class="fas fa-check-circle"></i> เธ—เธณเนเธฅเนเธง
+                                <i class="fas fa-check-circle"></i> ทำแล้ว
                             </span>
                         ` : `
-                            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700">เน€เธเธดเธ”เธชเธญเธ</span>
+                            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700">เปิดสอบ</span>
                         `}
                     </div>
 
                     <h3 class="text-base font-bold text-slate-900 mb-1.5 leading-snug">${escapeHtml(exam.title)}</h3>
                     <p class="text-xs text-slate-500 mb-3 flex items-center gap-1.5">
-                        <i class="fas fa-chalkboard-user text-slate-400"></i> เธชเธญเธเนเธ”เธข: <strong class="text-slate-700">${escapeHtml(teacher)}</strong>
+                        <i class="fas fa-chalkboard-user text-slate-400"></i> สอนโดย: <strong class="text-slate-700">${escapeHtml(teacher)}</strong>
                     </p>
-                    <p class="text-slate-600 text-xs mb-4 line-clamp-2">${escapeHtml(exam.description || 'เนเธกเนเธกเธตเธเธณเธญเธเธดเธเธฒเธขเน€เธเธดเนเธกเน€เธ•เธดเธก')}</p>
+                    <p class="text-slate-600 text-xs mb-4 line-clamp-2">${escapeHtml(exam.description || 'ไม่มีคำอธิบายเพิ่มเติม')}</p>
                     
                     <!-- Target Audience Badge -->
                     <div class="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60 text-[11px] text-amber-900 mb-4 flex items-center gap-1.5">
                         <i class="fas fa-bullseye text-amber-600"></i>
-                        <span>เน€เธเนเธฒเธซเธกเธฒเธข: <strong>${escapeHtml(targetTag)}</strong></span>
+                        <span>เป้าหมาย: <strong>${escapeHtml(targetTag)}</strong></span>
                     </div>
                 </div>
 
@@ -1256,36 +1256,36 @@ async function loadStudentLobby() {
                     <div class="pt-4 border-t border-emerald-100">
                         <div class="p-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl mb-3 text-center">
                             <div class="text-xs font-bold text-emerald-800 flex items-center justify-center gap-1.5 mb-1">
-                                <i class="fas fa-circle-check text-emerald-600"></i> เธ—เธณเธเนเธญเธชเธญเธเน€เธชเธฃเนเธเธชเธดเนเธเนเธฅเนเธง
+                                <i class="fas fa-circle-check text-emerald-600"></i> ทำข้อสอบเสร็จสิ้นแล้ว
                             </div>
                             ${(exam.show_score_immediately !== false) ? `
                                 <div class="text-xs text-emerald-700">
-                                    เธเธฐเนเธเธ: <strong>${pastSubmission.total_score} / ${pastSubmission.max_score}</strong> (${pastSubmission.percentage}%)
+                                    คะแนน: <strong>${pastSubmission.total_score} / ${pastSubmission.max_score}</strong> (${pastSubmission.percentage}%)
                                 </div>
                             ` : `
                                 <div class="text-xs text-blue-700 font-medium flex items-center justify-center gap-1">
-                                    <i class="fas fa-clock text-blue-500"></i> เธฃเธญเธเธฃเธฐเธเธฒเธจเธเธฐเนเธเธเธเธฒเธเธญเธฒเธเธฒเธฃเธขเน
+                                    <i class="fas fa-clock text-blue-500"></i> รอประกาศคะแนนจากอาจารย์
                                 </div>
                             `}
                         </div>
 
                         <button disabled class="w-full py-2.5 px-4 bg-slate-100 text-slate-400 font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-not-allowed border border-slate-200">
-                            <i class="fas fa-lock text-slate-400"></i> เธชเธญเธเนเธเนเธฅเนเธง (เนเธกเนเธญเธเธธเธเธฒเธ•เนเธซเนเธ—เธณเธเนเธณ)
+                            <i class="fas fa-lock text-slate-400"></i> สอบไปแล้ว (ไม่อนุญาตให้ทำซ้ำ)
                         </button>
                         <p class="text-[10px] text-slate-400 text-center mt-1.5">
-                            * เธซเธฒเธเธ•เนเธญเธเธเธฒเธฃเธ—เธณเนเธซเธกเน เธเธฃเธธเธ“เธฒเธ•เธดเธ”เธ•เนเธญเธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธเน€เธเธทเนเธญเธเธฅเธ”เธฅเนเธญเธ
+                            * หากต้องการทำใหม่ กรุณาติดต่ออาจารย์ผู้สอนเพื่อปลดล็อก
                         </p>
                     </div>
                 ` : `
                     <div class="pt-4 border-t border-slate-100">
                         <div class="grid grid-cols-2 gap-2 text-xs text-slate-500 mb-4">
-                            <div><i class="far fa-clock mr-1 text-indigo-500"></i> เน€เธงเธฅเธฒ: <strong>${exam.duration_minutes || 60} เธเธฒเธ—เธต</strong></div>
-                            <div><i class="far fa-question-circle mr-1 text-indigo-500"></i> เธเธธเธ”เธเนเธญเธชเธญเธ: <strong>เธเธฃเนเธญเธกเธ—เธณ</strong></div>
-                            <div class="col-span-2 text-amber-700 text-[11px]"><i class="fas fa-eye mr-1"></i> เธญเธเธธเธเธฒเธ•เธชเธฅเธฑเธเธเธญ: <strong>${exam.max_tab_switches_allowed || 3} เธเธฃเธฑเนเธ</strong></div>
+                            <div><i class="far fa-clock mr-1 text-indigo-500"></i> เวลา: <strong>${exam.duration_minutes || 60} นาที</strong></div>
+                            <div><i class="far fa-question-circle mr-1 text-indigo-500"></i> ชุดข้อสอบ: <strong>พร้อมทำ</strong></div>
+                            <div class="col-span-2 text-amber-700 text-[11px]"><i class="fas fa-eye mr-1"></i> อนุญาตสลับจอ: <strong>${exam.max_tab_switches_allowed || 3} ครั้ง</strong></div>
                         </div>
 
                         <button onclick="startExam('${exam.id}')" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-sm">
-                            <i class="fas fa-play text-xs"></i> เน€เธเนเธฒเธ—เธณเธเนเธญเธชเธญเธ
+                            <i class="fas fa-play text-xs"></i> เข้าทำข้อสอบ
                         </button>
                     </div>
                 `}
@@ -1297,19 +1297,19 @@ async function loadStudentLobby() {
 function isExamEligibleForStudent(exam, student) {
     if (!student || student.role !== 'student') return true;
 
-    // เธ•เธฃเธงเธเธชเธญเธเธฃเธฐเธ”เธฑเธเธเธฑเนเธ
-    const yearMatch = !exam.target_year || exam.target_year === 'เธ—เธฑเนเธเธซเธกเธ”' || exam.target_year === student.year;
-    // เธ•เธฃเธงเธเธชเธญเธเนเธเธเธเธงเธดเธเธฒ
-    const deptMatch = !exam.target_department || exam.target_department === 'เธ—เธฑเนเธเธซเธกเธ”' || exam.target_department === student.dept;
-    // เธ•เธฃเธงเธเธชเธญเธเธซเนเธญเธเน€เธฃเธตเธขเธ
-    const roomMatch = !exam.target_room || exam.target_room === 'เธ—เธฑเนเธเธซเธกเธ”' || exam.target_room === student.room;
+    // ตรวจสอบระดับชั้น
+    const yearMatch = !exam.target_year || exam.target_year === 'ทั้งหมด' || exam.target_year === student.year;
+    // ตรวจสอบแผนกวิชา
+    const deptMatch = !exam.target_department || exam.target_department === 'ทั้งหมด' || exam.target_department === student.dept;
+    // ตรวจสอบห้องเรียน
+    const roomMatch = !exam.target_room || exam.target_room === 'ทั้งหมด' || exam.target_room === student.room;
 
     return yearMatch && deptMatch && roomMatch;
 }
 
-// เน€เธฃเธดเนเธกเธเธฒเธฃเธชเธญเธ
+// เริ่มการสอบ
 window.startExam = async function(examId) {
-    // เธเนเธญเธเธเธฑเธเธเธ”เธเนเธณ
+    // ป้องกันกดซ้ำ
     if (window._startExamLock) return;
     window._startExamLock = true;
     setTimeout(() => { window._startExamLock = false; }, 3000);
@@ -1339,25 +1339,25 @@ window.startExam = async function(examId) {
         }
 
         if (!exam) {
-            showToast('เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธธเธ”เธเนเธญเธชเธญเธ', 'error');
+            showToast('ไม่พบข้อมูลชุดข้อสอบ', 'error');
             return;
         }
 
-        // เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเธเธฑเธเน€เธฃเธตเธขเธเน€เธเธขเธชเนเธเธเนเธญเธชเธญเธเธเธธเธ”เธเธตเนเนเธเนเธฅเนเธงเธซเธฃเธทเธญเนเธกเน
+        // ตรวจสอบว่านักเรียนเคยส่งข้อสอบชุดนี้ไปแล้วหรือไม่
         let isAlreadySubmitted = false;
         if (isSupabaseConfigured() && state.supabaseClient && state.currentUser) {
             try {
                 const studentId = state.currentUser.id;
                 const studentName = state.currentUser.name || '';
 
-                // เธเนเธเธซเธฒเธ”เนเธงเธขเธเธทเนเธญเธเนเธญเธ (เธชเธณเธเธฑเธเธ—เธตเนเธชเธธเธ”)
+                // ค้นหาด้วยชื่อก่อน (สำคัญที่สุด)
                 let { data: byName } = await state.supabaseClient
                     .from('exam_results')
                     .select('id')
                     .eq('exam_id', examId)
                     .eq('student_name', studentName);
 
-                // เธ–เนเธฒเนเธกเนเน€เธเธญเธ”เนเธงเธขเธเธทเนเธญ เธฅเธญเธเธ”เนเธงเธข UUID
+                // ถ้าไม่เจอด้วยชื่อ ลองด้วย UUID
                 if ((!byName || byName.length === 0) && isValidUUID(studentId)) {
                     const res = await state.supabaseClient
                         .from('exam_results')
@@ -1370,7 +1370,7 @@ window.startExam = async function(examId) {
                 if (byName && byName.length > 0) {
                     isAlreadySubmitted = true;
                 } else {
-                    // Cloud เธขเธทเธเธขเธฑเธเธงเนเธฒเนเธกเนเธกเธตเธเธฅเธชเธญเธเนเธฅเนเธง โ’ เธฅเนเธฒเธเนเธเธเน€เธเนเธฒเธญเธญเธ
+                    // Cloud ยืนยันว่าไม่มีผลสอบแล้ว → ล้างแคชเก่าออก
                     const localSubs = getLocalSubmissions();
                     const cleanName = (studentName || '').trim().toLowerCase();
                     const filtered = localSubs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || (s.student_name && s.student_name.trim().toLowerCase() === cleanName))));
@@ -1394,8 +1394,8 @@ window.startExam = async function(examId) {
 
         if (isAlreadySubmitted) {
             showCustomAlert({
-                title: 'เธเธธเธ“เนเธ”เนเธ—เธณเธเนเธญเธชเธญเธเธเธธเธ”เธเธตเนเนเธเนเธฅเนเธง',
-                message: `เธเธธเธ“เนเธ”เนเธชเนเธเธเธณเธ•เธญเธเธชเธณเธซเธฃเธฑเธเธเธธเธ”เธเนเธญเธชเธญเธ "${exam.title}" เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง เนเธฅเธฐเนเธกเนเธญเธเธธเธเธฒเธ•เนเธซเนเธ—เธณเธเนเธณ\n\nเธซเธฒเธเธกเธตเน€เธซเธ•เธธเธเธณเน€เธเนเธเธ•เนเธญเธเธชเธญเธเนเธซเธกเน เธเธฃเธธเธ“เธฒเธ•เธดเธ”เธ•เนเธญเธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธเน€เธเธทเนเธญเธเธ”เน€เธเธดเธ”/เธเธฅเธ”เธฅเนเธญเธเนเธซเนเธชเธญเธเนเธซเธกเนเธเธฃเธฑเธ`,
+                title: 'คุณได้ทำข้อสอบชุดนี้ไปแล้ว',
+                message: `คุณได้ส่งคำตอบสำหรับชุดข้อสอบ "${exam.title}" เรียบร้อยแล้ว และไม่อนุญาตให้ทำซ้ำ\n\nหากมีเหตุจำเป็นต้องสอบใหม่ กรุณาติดต่ออาจารย์ผู้สอนเพื่อกดเปิด/ปลดล็อกให้สอบใหม่ครับ`,
                 icon: 'fas fa-lock'
             });
             return;
@@ -1403,29 +1403,29 @@ window.startExam = async function(examId) {
 
         if (!questions || questions.length === 0) {
             showCustomAlert({
-                title: 'เธขเธฑเธเนเธกเนเธกเธตเธเธณเธ–เธฒเธก',
-                message: 'เธเธธเธ”เธเนเธญเธชเธญเธเธเธตเนเธขเธฑเธเนเธกเนเธกเธตเธเธณเธ–เธฒเธก เธเธฃเธธเธ“เธฒเธ•เธดเธ”เธ•เนเธญเธญเธฒเธเธฒเธฃเธขเนเธเธฃเธฐเธเธณเธงเธดเธเธฒเน€เธเธทเนเธญเน€เธเธดเนเธกเนเธเธ—เธขเนเธซเธฃเธทเธญเธเธณเน€เธเนเธฒ Excel',
+                title: 'ยังไม่มีคำถาม',
+                message: 'ชุดข้อสอบนี้ยังไม่มีคำถาม กรุณาติดต่ออาจารย์ประจำวิชาเพื่อเพิ่มโจทย์หรือนำเข้า Excel',
                 icon: 'fas fa-circle-info'
             });
             return;
         }
 
-        // เธ•เธฃเธงเธเธเธฑเธ Split Screen
+        // ตรวจจับ Split Screen
         if (isSplitScreenDetected()) {
             showCustomAlert({
-                title: 'เธ•เธฃเธงเธเธเธเธเธฒเธฃเนเธเนเธเธซเธเนเธฒเธเธญ',
-                message: 'เธ•เธฃเธงเธเธเธเธงเนเธฒเธกเธตเธเธฒเธฃเนเธเนเธเธฒเธเนเธเนเธเธซเธเนเธฒเธเธญ (Split Screen / Pop-up Window)\n\nเธฃเธฐเธเธเนเธกเนเธญเธเธธเธเธฒเธ•เนเธซเนเน€เธเนเธฒเธ—เธณเธเนเธญเธชเธญเธ เธเธฃเธธเธ“เธฒเธเธขเธฒเธขเน€เธ•เนเธกเธซเธเนเธฒเธเธญเธเนเธญเธเน€เธฃเธดเนเธกเธชเธญเธ',
+                title: 'ตรวจพบการแบ่งหน้าจอ',
+                message: 'ตรวจพบว่ามีการใช้งานแบ่งหน้าจอ (Split Screen / Pop-up Window)\n\nระบบไม่อนุญาตให้เข้าทำข้อสอบ กรุณาขยายเต็มหน้าจอก่อนเริ่มสอบ',
                 icon: 'fas fa-triangle-exclamation'
             });
             return;
         }
 
         showCustomConfirm({
-            title: 'เน€เธฃเธดเนเธกเน€เธเนเธฒเธ—เธณเธเนเธญเธชเธญเธ?',
-            message: `เธเธธเธ”เธเนเธญเธชเธญเธ: ${exam.title}\nเธงเธดเธเธฒ: ${exam.course?.course_name || 'เธ—เธฑเนเธงเนเธ'}\nเน€เธงเธฅเธฒเธ—เธณเธเนเธญเธชเธญเธ: ${exam.duration_minutes || 60} เธเธฒเธ—เธต (${questions.length} เธเนเธญ)\n\n๐ก๏ธ เธเธเธฃเธฐเน€เธเธตเธขเธเธฃเธฐเธซเธงเนเธฒเธเธเธฒเธฃเธชเธญเธ:\n1. เธเธฃเธธเธ“เธฒเธเธดเธ”เธซเธเนเธฒเธ•เนเธฒเธเนเธเธ—เธฅเธญเธข (Messenger / LINE Bubbles) เธ—เธฑเนเธเธซเธกเธ”เธเนเธญเธเน€เธฃเธดเนเธก\n2. เธซเนเธฒเธกเธชเธฅเธฑเธเธซเธเนเธฒเธเธญ เธซเนเธฒเธกเนเธเธเธเธญ เนเธฅเธฐเธซเนเธฒเธกเธญเธญเธเธเธฒเธเนเธซเธกเธ”เน€เธ•เนเธกเธเธญเน€เธ”เนเธ”เธเธฒเธ”\n3. เธเธฒเธฃเน€เธเธดเธ”เนเธเธ—เธฃเธฐเธซเธงเนเธฒเธเธชเธญเธเธเธฐเธ–เธนเธเธเธฑเธเธ—เธถเธเน€เธเนเธเธเธคเธ•เธดเธเธฃเธฃเธกเธ—เธธเธเธฃเธดเธ•เธ—เธฑเธเธ—เธต`,
+            title: 'เริ่มเข้าทำข้อสอบ?',
+            message: `ชุดข้อสอบ: ${exam.title}\nวิชา: ${exam.course?.course_name || 'ทั่วไป'}\nเวลาทำข้อสอบ: ${exam.duration_minutes || 60} นาที (${questions.length} ข้อ)\n\n🛡️ กฎระเบียบระหว่างการสอบ:\n1. กรุณาปิดหน้าต่างแชทลอย (Messenger / LINE Bubbles) ทั้งหมดก่อนเริ่ม\n2. ห้ามสลับหน้าจอ ห้ามแคปจอ และห้ามออกจากโหมดเต็มจอเด็ดขาด\n3. การเปิดแชทระหว่างสอบจะถูกบันทึกเป็นพฤติกรรมทุจริตทันที`,
             icon: 'fas fa-shield-halved',
-            confirmText: 'เธฃเธฑเธเธ—เธฃเธฒเธเนเธฅเธฐเน€เธฃเธดเนเธกเธชเธญเธเธ—เธฑเธเธ—เธต',
-            cancelText: 'เธขเธฑเธเนเธกเนเธเธฃเนเธญเธก',
+            confirmText: 'รับทราบและเริ่มสอบทันที',
+            cancelText: 'ยังไม่พร้อม',
             confirmClass: 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-100',
             onConfirm: async () => {
                 try {
@@ -1450,14 +1450,14 @@ window.startExam = async function(examId) {
                 renderQuestionPalette();
                 startCountdownTimer();
                 startAntiCheatMonitor();
-                showToast('เน€เธฃเธดเนเธกเธ—เธณเธเนเธญเธชเธญเธ เธเธญเนเธซเนเนเธเธเธ”เธตเนเธเธเธฒเธฃเธชเธญเธเธเธฃเธฑเธ!', 'success');
+                showToast('เริ่มทำข้อสอบ ขอให้โชคดีในการสอบครับ!', 'success');
             }
         });
 
     } catch (err) {
         showCustomAlert({
-            title: 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”',
-            message: 'เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เนเธซเธฅเธ”เธเธธเธ”เธเนเธญเธชเธญเธเนเธ”เน: ' + err.message,
+            title: 'เกิดข้อผิดพลาด',
+            message: 'ไม่สามารถโหลดชุดข้อสอบได้: ' + err.message,
             icon: 'fas fa-triangle-exclamation'
         });
     }
@@ -1486,14 +1486,14 @@ function renderExamQuestion() {
     if (parsed.image) {
         imageMarkup = `
             <div class="mb-4 p-2 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center">
-                <img src="${parsed.image}" alt="เธ เธฒเธเธเธฃเธฐเธเธญเธเธเนเธญเธชเธญเธ" class="max-h-80 max-w-full object-contain rounded-xl shadow-2xs cursor-pointer hover:opacity-95 transition" onclick="openImageZoomModal('${parsed.image}')">
-                <div class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1"><i class="fas fa-magnifying-glass-plus"></i> เธเธฅเธดเธเธ—เธตเนเธฃเธนเธเน€เธเธทเนเธญเธเธขเธฒเธขเธ”เธนเน€เธ•เนเธกเธเธญ</div>
+                <img src="${parsed.image}" alt="ภาพประกอบข้อสอบ" class="max-h-80 max-w-full object-contain rounded-xl shadow-2xs cursor-pointer hover:opacity-95 transition" onclick="openImageZoomModal('${parsed.image}')">
+                <div class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1"><i class="fas fa-magnifying-glass-plus"></i> คลิกที่รูปเพื่อขยายดูเต็มจอ</div>
             </div>`;
     }
 
     const textMarkup = parsed.text
         ? `<div class="text-slate-800 text-base font-bold leading-relaxed mb-5">${escapeHtml(parsed.text)}</div>`
-        : (parsed.image ? '' : `<div class="text-slate-400 italic mb-5">(เนเธกเนเธกเธตเธเนเธญเธเธงเธฒเธกเธเธณเธ–เธฒเธก)</div>`);
+        : (parsed.image ? '' : `<div class="text-slate-400 italic mb-5">(ไม่มีข้อความคำถาม)</div>`);
 
     const optionsMarkup = opts.map(opt => {
         const isChecked = selectedOpt === opt.id;
@@ -1514,9 +1514,9 @@ function renderExamQuestion() {
     card.innerHTML = `
         <div class="flex items-center justify-between mb-4">
             <span id="exam-question-number" class="text-sm font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
-                เธเนเธญเธ—เธตเน ${state.currentQuestionIndex + 1} เธเธฒเธ ${state.questions.length}
+                ข้อที่ ${state.currentQuestionIndex + 1} จาก ${state.questions.length}
             </span>
-            <span id="exam-question-points" class="text-xs font-semibold text-slate-500">(${q.points || 1} เธเธฐเนเธเธ)</span>
+            <span id="exam-question-points" class="text-xs font-semibold text-slate-500">(${q.points || 1} คะแนน)</span>
         </div>
         <div id="exam-question-text" class="mb-1">
             ${imageMarkup}
@@ -1527,20 +1527,20 @@ function renderExamQuestion() {
         </div>
         <div class="flex justify-between mt-6 pt-4 border-t border-slate-100 gap-3">
             <button type="button" id="btn-exam-prev" onclick="prevExamQuestion()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition flex items-center gap-2 ${state.currentQuestionIndex === 0 ? 'opacity-40 pointer-events-none' : ''}">
-                <i class="fas fa-chevron-left text-xs"></i> เธเนเธญเธเนเธญเธเธซเธเนเธฒ
+                <i class="fas fa-chevron-left text-xs"></i> ข้อก่อนหน้า
             </button>
             ${state.currentQuestionIndex === state.questions.length - 1
                 ? `<button type="button" onclick="confirmSubmitExam()" class="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-sm transition shadow-md shadow-green-100 flex items-center justify-center gap-2">
-                       <i class="fas fa-paper-plane text-xs"></i> เธชเนเธเธเนเธญเธชเธญเธ
+                       <i class="fas fa-paper-plane text-xs"></i> ส่งข้อสอบ
                    </button>`
                 : `<button type="button" id="btn-exam-next" onclick="nextExamQuestion()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition flex items-center gap-2">
-                       เธเนเธญเธ–เธฑเธ”เนเธ <i class="fas fa-chevron-right text-xs"></i>
+                       ข้อถัดไป <i class="fas fa-chevron-right text-xs"></i>
                    </button>`
             }
         </div>
     `;
 
-    // เธญเธฑเธเน€เธ”เธ• palette เนเธฅเธฐเธเธธเนเธกเธเธณเธ—เธฒเธ
+    // อัปเดต palette และปุ่มนำทาง
     renderQuestionPalette();
 }
 
@@ -1685,7 +1685,7 @@ function startAntiCheatMonitor() {
     document.addEventListener('keydown', preventExamShortcuts);
     document.addEventListener('selectstart', preventSelectStart);
 
-    // ๐“ฑ Active Mobile & Overlay Watchdog (เธ•เธฃเธงเธเธเธฑเธ Messenger Bubble, Line Popup, Notification Shade)
+    // 📱 Active Mobile & Overlay Watchdog (ตรวจจับ Messenger Bubble, Line Popup, Notification Shade)
     if (focusWatchdogInterval) clearInterval(focusWatchdogInterval);
     focusWatchdogInterval = setInterval(() => {
         if (!state.antiCheat.isMonitoring) return;
@@ -1697,8 +1697,8 @@ function startAntiCheatMonitor() {
             if (!focusLostStartTime) {
                 focusLostStartTime = Date.now();
             } else if (Date.now() - focusLostStartTime >= 300) {
-                // เธซเธฅเธธเธ”เนเธเธเธฑเธชเน€เธเธดเธ 300ms (เธเธณเธฅเธฑเธเนเธ•เธฐเธซเธฃเธทเธญเนเธเธ—เนเธ Messenger Bubble เธซเธฃเธทเธญเนเธ–เธเนเธเนเธเน€เธ•เธทเธญเธ)
-                registerTabSwitch('เธ•เธฃเธงเธเธเธเธเธฒเธฃเน€เธเธดเธ”เธซเธเนเธฒเธ•เนเธฒเธเนเธเธ—เธฅเธญเธข (Messenger Bubble) / เนเธ–เธเนเธเนเธเน€เธ•เธทเธญเธ / เธชเธฅเธฑเธเนเธเธเธฑเธชเธญเธญเธเธเธฒเธเธเนเธญเธชเธญเธ');
+                // หลุดโฟกัสเกิน 300ms (กำลังแตะหรือแชทใน Messenger Bubble หรือแถบแจ้งเตือน)
+                registerTabSwitch('ตรวจพบการเปิดหน้าต่างแชทลอย (Messenger Bubble) / แถบแจ้งเตือน / สลับโฟกัสออกจากข้อสอบ');
             }
         } else {
             focusLostStartTime = 0;
@@ -1743,7 +1743,7 @@ function handleVisualViewportResize() {
         const heightRatio = window.visualViewport.height / window.innerHeight;
         const isInputFocused = document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
         if (heightRatio < 0.70 && !isInputFocused) {
-            registerTabSwitch('เธ•เธฃเธงเธเธเธเธเธฒเธฃเน€เธเธดเธ”เนเธเนเธเธเธดเธกเธเนเธ เธฒเธขเธเธญเธเธซเธเนเธฒเธ•เนเธฒเธเธชเธญเธ (เนเธเธ—เธฅเธญเธข Messenger/LINE)');
+            registerTabSwitch('ตรวจพบการเปิดแป้นพิมพ์ภายนอกหน้าต่างสอบ (แชทลอย Messenger/LINE)');
         }
     }
 }
@@ -1752,35 +1752,35 @@ function handleWindowResize() {
     if (!state.antiCheat.isMonitoring) return;
     if (isSplitScreenDetected()) {
         state.antiCheat.tabSwitches++;
-        triggerCheatWarning('เธ•เธฃเธงเธเธเธเธเธฒเธฃเน€เธเธดเธ”เนเธเนเธเธฒเธเนเธซเธกเธ”เนเธเนเธเธซเธเนเธฒเธเธญ (Split Screen / Pop-up Window)');
+        triggerCheatWarning('ตรวจพบการเปิดใช้งานโหมดแบ่งหน้าจอ (Split Screen / Pop-up Window)');
     }
 }
 
 function handlePageHide() {
     if (!state.antiCheat.isMonitoring) return;
-    registerTabSwitch('เธ•เธฃเธงเธเธเธเธเธฒเธฃเธชเธฅเธฑเธเนเธญเธเธเธฅเธดเน€เธเธเธฑเธเธซเธฃเธทเธญเธญเธญเธเธเธฒเธเธซเธเนเธฒเธเธญเน€เธเธฃเธฒเธงเนเน€เธเธญเธฃเน');
+    registerTabSwitch('ตรวจพบการสลับแอปพลิเคชันหรือออกจากหน้าจอเบราว์เซอร์');
 }
 
 function handlePageShow() {
     if (!state.antiCheat.isMonitoring) return;
     if (focusLostStartTime && Date.now() - focusLostStartTime >= 300) {
-        registerTabSwitch('เธ•เธฃเธงเธเธเธเธเธฒเธฃเธเธฅเธฑเธเน€เธเนเธฒเธชเธนเนเธซเนเธญเธเธชเธญเธเธซเธฅเธฑเธเธชเธฅเธฑเธเนเธเนเธญเธเธญเธทเนเธ');
+        registerTabSwitch('ตรวจพบการกลับเข้าสู่ห้องสอบหลังสลับไปแอปอื่น');
     }
     focusLostStartTime = 0;
 }
 
 function handleDocumentFocusOut(e) {
     if (!state.antiCheat.isMonitoring) return;
-    // เธซเธฒเธเนเธเธเธฑเธชเธซเธฅเธธเธ”เธญเธญเธเธเธฒเธ document เนเธ”เธขเนเธกเนเนเธ”เนเธขเนเธฒเธขเนเธเธขเธฑเธ element เธ เธฒเธขเนเธเน€เธงเนเธ
+    // หากโฟกัสหลุดออกจาก document โดยไม่ได้ย้ายไปยัง element ภายในเว็บ
     if (!e.relatedTarget && typeof document.hasFocus === 'function' && !document.hasFocus()) {
-        registerTabSwitch('เธ•เธฃเธงเธเธเธเธเธฒเธฃเธเธฅเธดเธเธญเธญเธเธเธญเธเธซเธเนเธฒเธ•เนเธฒเธเธเนเธญเธชเธญเธ เธซเธฃเธทเธญเน€เธเธดเธ”เธซเธเนเธฒเธ•เนเธฒเธเนเธเธ—เธฅเธญเธข');
+        registerTabSwitch('ตรวจพบการคลิกออกนอกหน้าต่างข้อสอบ หรือเปิดหน้าต่างแชทลอย');
     }
 }
 
 function handleDocumentFocusIn() {
     if (!state.antiCheat.isMonitoring) return;
     if (focusLostStartTime && Date.now() - focusLostStartTime >= 350) {
-        registerTabSwitch('เธ•เธฃเธงเธเธเธเธเธฒเธฃเธเธฅเธฑเธเน€เธเนเธฒเธชเธนเนเธซเนเธญเธเธชเธญเธเธซเธฅเธฑเธเธชเธฅเธฑเธเนเธเธเธฑเธช');
+        registerTabSwitch('ตรวจพบการกลับเข้าสู่ห้องสอบหลังสลับโฟกัส');
     }
     focusLostStartTime = 0;
 }
@@ -1788,7 +1788,7 @@ function handleDocumentFocusIn() {
 function handleWindowFocus() {
     if (!state.antiCheat.isMonitoring) return;
     if (focusLostStartTime && Date.now() - focusLostStartTime >= 350) {
-        registerTabSwitch('เธ•เธฃเธงเธเธเธเธเธฒเธฃเธชเธฅเธฑเธเธเธฅเธฑเธเธกเธฒเธเธฒเธเธซเธเนเธฒเธ•เนเธฒเธเธญเธทเนเธ / เนเธเธ—เธฅเธญเธข');
+        registerTabSwitch('ตรวจพบการสลับกลับมาจากหน้าต่างอื่น / แชทลอย');
     }
     focusLostStartTime = 0;
 }
@@ -1796,18 +1796,18 @@ function handleWindowFocus() {
 function preventContextMenu(e) {
     if (state.antiCheat.isMonitoring) {
         e.preventDefault();
-        showToast('โ ๏ธ เนเธกเนเธญเธเธธเธเธฒเธ•เนเธซเนเธเธฅเธดเธเธเธงเธฒเนเธเธซเนเธญเธเธชเธญเธ', 'warning');
+        showToast('⚠️ ไม่อนุญาตให้คลิกขวาในห้องสอบ', 'warning');
     }
 }
 
 function preventCopy(e) {
     if (state.antiCheat.isMonitoring) {
         e.preventDefault();
-        showToast('โ ๏ธ เนเธกเนเธญเธเธธเธเธฒเธ•เนเธซเนเธเธฑเธ”เธฅเธญเธ เธ•เธฑเธ” เธซเธฃเธทเธญเธงเธฒเธเธเนเธญเธเธงเธฒเธกเธฃเธฐเธซเธงเนเธฒเธเธ—เธณเธเนเธญเธชเธญเธ', 'warning');
+        showToast('⚠️ ไม่อนุญาตให้คัดลอก ตัด หรือวางข้อความระหว่างทำข้อสอบ', 'warning');
     }
 }
 
-// ๐ซ เธเธดเธ”เธเธธเนเธกเธฅเธฑเธ” Developer Tools / เธเธฑเธ”เธฅเธญเธ / เธเธฃเธดเนเธเธ—เน / เธเธฑเธเธ—เธถเธเธซเธเนเธฒเธเธญ
+// 🚫 ปิดปุ่มลัด Developer Tools / คัดลอก / ปริ้นท์ / บันทึกหน้าจอ
 function preventExamShortcuts(e) {
     if (!state.antiCheat.isMonitoring) return;
 
@@ -1817,7 +1817,7 @@ function preventExamShortcuts(e) {
         (e.ctrlKey && ['u', 'U', 'p', 'P', 's', 'S', 'a', 'A'].includes(e.key))) {
         e.preventDefault();
         e.stopPropagation();
-        showToast('โ ๏ธ เนเธกเนเธญเธเธธเธเธฒเธ•เนเธซเนเนเธเนเธเธธเนเธกเธฅเธฑเธ”เธซเธฃเธทเธญเน€เธเธดเธ” Developer Tools เนเธเธซเนเธญเธเธชเธญเธ', 'warning');
+        showToast('⚠️ ไม่อนุญาตให้ใช้ปุ่มลัดหรือเปิด Developer Tools ในห้องสอบ', 'warning');
         return false;
     }
 
@@ -1825,7 +1825,7 @@ function preventExamShortcuts(e) {
     if (e.ctrlKey && ['c', 'C', 'v', 'V', 'x', 'X'].includes(e.key)) {
         e.preventDefault();
         e.stopPropagation();
-        showToast('โ ๏ธ เนเธกเนเธญเธเธธเธเธฒเธ•เนเธซเนเธเธฑเธ”เธฅเธญเธเธซเธฃเธทเธญเธงเธฒเธเธเนเธญเธเธงเธฒเธกเธฃเธฐเธซเธงเนเธฒเธเธ—เธณเธเนเธญเธชเธญเธ', 'warning');
+        showToast('⚠️ ไม่อนุญาตให้คัดลอกหรือวางข้อความระหว่างทำข้อสอบ', 'warning');
         return false;
     }
 }
@@ -1842,7 +1842,7 @@ function preventSelectStart(e) {
 function registerTabSwitch(reason) {
     if (!state.antiCheat.isMonitoring) return;
     const now = Date.now();
-    // Debounce 600ms เน€เธเธทเนเธญเธเนเธญเธเธเธฑเธ event เธเนเธณเธเนเธญเธเธ•เธญเธเธชเธฅเธฑเธเธซเธเนเธฒเธ•เนเธฒเธเธเธฃเนเธญเธกเธเธฑเธ
+    // Debounce 600ms เพื่อป้องกัน event ซ้ำซ้อนตอนสลับหน้าต่างพร้อมกัน
     if (now - lastCheatWarningTime < 600) return;
     lastCheatWarningTime = now;
 
@@ -1853,13 +1853,13 @@ function registerTabSwitch(reason) {
 function handleVisibilityChange() {
     if (!state.antiCheat.isMonitoring) return;
     if (document.hidden) {
-        registerTabSwitch('เธ•เธฃเธงเธเธเธเธเธฒเธฃเธชเธฅเธฑเธเธซเธเนเธฒเธเธญ / เธชเธฅเธฑเธเนเธ—เนเธเน€เธเธฃเธฒเธงเนเน€เธเธญเธฃเน');
+        registerTabSwitch('ตรวจพบการสลับหน้าจอ / สลับแท็บเบราว์เซอร์');
     }
 }
 
 function handleWindowBlur() {
     if (!state.antiCheat.isMonitoring) return;
-    registerTabSwitch('เธ•เธฃเธงเธเธเธเธเธฒเธฃเธเธฅเธดเธเธญเธญเธเธเธฒเธเธซเธเนเธฒเธ•เนเธฒเธเธเนเธญเธชเธญเธ / เน€เธเธดเธ”เนเธเธ—เธฅเธญเธข');
+    registerTabSwitch('ตรวจพบการคลิกออกจากหน้าต่างข้อสอบ / เปิดแชทลอย');
 }
 
 function handleFullscreenChange() {
@@ -1867,14 +1867,14 @@ function handleFullscreenChange() {
 
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
         state.antiCheat.fullscreenExits++;
-        registerTabSwitch('เธ•เธฃเธงเธเธเธเธเธฒเธฃเธญเธญเธเธเธฒเธเนเธซเธกเธ”เน€เธ•เนเธกเธซเธเนเธฒเธเธญ');
+        registerTabSwitch('ตรวจพบการออกจากโหมดเต็มหน้าจอ');
     }
 }
 
 function triggerCheatWarning(reason) {
     const badgeEl = document.getElementById('exam-room-tab-badge');
     if (badgeEl && state.currentExam) {
-        badgeEl.textContent = `เธชเธฅเธฑเธเธเธญ: ${state.antiCheat.tabSwitches}/${state.currentExam.max_tab_switches_allowed}`;
+        badgeEl.textContent = `สลับจอ: ${state.antiCheat.tabSwitches}/${state.currentExam.max_tab_switches_allowed}`;
         if (state.antiCheat.tabSwitches > state.currentExam.max_tab_switches_allowed) {
             badgeEl.className = 'px-3 py-1 text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-300 warning-pulse';
         }
@@ -1883,12 +1883,12 @@ function triggerCheatWarning(reason) {
     const cheatPayload = {
         event_id: `cheat_${state.currentUser?.id}_${state.antiCheat.tabSwitches}_${Date.now()}`,
         student_id: state.currentUser?.id,
-        student_name: state.currentUser?.name || 'เธเธฑเธเน€เธฃเธตเธขเธ',
-        student_year: state.currentUser?.year || 'เธเธงเธ./เธเธงเธช.',
-        student_department: state.currentUser?.dept || 'เนเธกเนเธฃเธฐเธเธธเนเธเธเธ',
-        student_room: state.currentUser?.room || 'เธซเนเธญเธ 1',
+        student_name: state.currentUser?.name || 'นักเรียน',
+        student_year: state.currentUser?.year || 'ปวช./ปวส.',
+        student_department: state.currentUser?.dept || 'ไม่ระบุแผนก',
+        student_room: state.currentUser?.room || 'ห้อง 1',
         exam_id: state.currentExam?.id,
-        exam_title: state.currentExam?.title || 'เธเธธเธ”เธเนเธญเธชเธญเธ',
+        exam_title: state.currentExam?.title || 'ชุดข้อสอบ',
         reason: reason,
         tabSwitches: state.antiCheat.tabSwitches,
         fullscreenExits: state.antiCheat.fullscreenExits,
@@ -1918,7 +1918,7 @@ function triggerCheatWarning(reason) {
 
     if (modal) {
         if (reasonEl) reasonEl.textContent = reason;
-        if (countEl) countEl.textContent = `เธเธณเธเธงเธเธเธฃเธฑเนเธเธ—เธตเนเธชเธฅเธฑเธเธซเธเนเธฒเธเธญ: ${state.antiCheat.tabSwitches} เธเธฃเธฑเนเธ (เธเธณเธซเธเธ”เนเธงเนเนเธกเนเน€เธเธดเธ ${state.currentExam.max_tab_switches_allowed} เธเธฃเธฑเนเธ)`;
+        if (countEl) countEl.textContent = `จำนวนครั้งที่สลับหน้าจอ: ${state.antiCheat.tabSwitches} ครั้ง (กำหนดไว้ไม่เกิน ${state.currentExam.max_tab_switches_allowed} ครั้ง)`;
         modal.classList.remove('hidden');
     }
 }
@@ -1946,7 +1946,7 @@ function startCountdownTimer() {
 
         if (state.remainingSeconds <= 0) {
             clearInterval(state.examTimer);
-            showToast('โฐ เธซเธกเธ”เน€เธงเธฅเธฒเธ—เธณเธเนเธญเธชเธญเธเนเธฅเนเธง! เธฃเธฐเธเธเธเธณเธฅเธฑเธเธชเนเธเธเนเธญเธชเธญเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธด', 'warning');
+            showToast('⏰ หมดเวลาทำข้อสอบแล้ว! ระบบกำลังส่งข้อสอบอัตโนมัติ', 'warning');
             submitExamFinal();
         }
     }, 1000);
@@ -1974,18 +1974,18 @@ window.confirmSubmitExam = function() {
     const totalCount = state.questions.length;
     const unansweredCount = totalCount - answeredCount;
 
-    let confirmMsg = `เธเธธเธ“เธ•เธญเธเนเธเนเธฅเนเธง ${answeredCount} เธเธฒเธ ${totalCount} เธเนเธญ\n`;
+    let confirmMsg = `คุณตอบไปแล้ว ${answeredCount} จาก ${totalCount} ข้อ\n`;
     if (unansweredCount > 0) {
-        confirmMsg += `โ ๏ธ เธขเธฑเธเธกเธตเธเนเธญเธ—เธตเนเธขเธฑเธเนเธกเนเนเธ”เนเธ•เธญเธเธญเธตเธ ${unansweredCount} เธเนเธญ!\n`;
+        confirmMsg += `⚠️ ยังมีข้อที่ยังไม่ได้ตอบอีก ${unansweredCount} ข้อ!\n`;
     }
-    confirmMsg += `\nเธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธขเธทเธเธขเธฑเธเธเธฒเธฃเธชเนเธเธเนเธญเธชเธญเธเนเธฅเธฐเธ•เธฃเธงเธเธเธฐเนเธเธเนเธเนเธซเธฃเธทเธญเนเธกเน?`;
+    confirmMsg += `\nคุณต้องการยืนยันการส่งข้อสอบและตรวจคะแนนใช่หรือไม่?`;
 
     showCustomConfirm({
-        title: 'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธชเนเธเธเนเธญเธชเธญเธ',
+        title: 'ยืนยันการส่งข้อสอบ',
         message: confirmMsg,
         icon: 'fas fa-paper-plane',
-        confirmText: 'เธชเนเธเธเนเธญเธชเธญเธเธ—เธฑเธเธ—เธต',
-        cancelText: 'เธเธฅเธฑเธเนเธเธ•เธฃเธงเธเธ—เธฒเธ',
+        confirmText: 'ส่งข้อสอบทันที',
+        cancelText: 'กลับไปตรวจทาน',
         confirmClass: 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-100',
         onConfirm: () => {
             submitExamFinal();
@@ -2003,13 +2003,13 @@ async function submitExamFinal() {
 
     const loadingModal = document.getElementById('modal-loading');
     if (loadingModal) {
-        document.getElementById('loading-modal-title').textContent = 'เธเธณเธฅเธฑเธเธ•เธฃเธงเธเธเนเธญเธชเธญเธ...';
-        document.getElementById('loading-modal-desc').textContent = 'เธเธณเธฅเธฑเธเธเธณเธเธงเธ“เธเธฐเนเธเธเนเธฅเธฐเธ•เธฃเธงเธเธชเธญเธเธเธงเธฒเธกเธเธฅเธญเธ”เธ เธฑเธข';
+        document.getElementById('loading-modal-title').textContent = 'กำลังตรวจข้อสอบ...';
+        document.getElementById('loading-modal-desc').textContent = 'กำลังคำนวณคะแนนและตรวจสอบความปลอดภัย';
         loadingModal.classList.remove('hidden');
     }
 
     try {
-        // 1. เธฃเธฐเธเธเธ•เธฃเธงเธเธเธฐเนเธเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธด (Local Auto-Grading Engine)
+        // 1. ระบบตรวจคะแนนอัตโนมัติ (Local Auto-Grading Engine)
         const questions = state.questions || [];
         const localQuestions = getLocalQuestions(state.currentExam?.id);
         let totalScore = 0;
@@ -2020,7 +2020,7 @@ async function submitExamFinal() {
             maxScore += points;
             const selectedAns = state.answers[q.id];
             
-            // เธเนเธเธซเธฒเน€เธเธฅเธขเธเธฒเธ local questions เธซเธฃเธทเธญ q
+            // ค้นหาเฉลยจาก local questions หรือ q
             const foundQ = localQuestions.find(lq => lq.id === q.id) || q;
             const correctAns = foundQ.correct || foundQ.correct_option_id || 'A';
 
@@ -2033,21 +2033,21 @@ async function submitExamFinal() {
         const isFlagged = state.antiCheat.tabSwitches > (state.currentExam?.max_tab_switches_allowed || 3) || state.antiCheat.fullscreenExits > 2;
         const cheatingReasons = [];
         if (state.antiCheat.tabSwitches > (state.currentExam?.max_tab_switches_allowed || 3)) {
-            cheatingReasons.push(`เธชเธฅเธฑเธเธซเธเนเธฒเธเธญเน€เธเธดเธเธเธณเธซเธเธ” (${state.antiCheat.tabSwitches}/${state.currentExam?.max_tab_switches_allowed} เธเธฃเธฑเนเธ)`);
+            cheatingReasons.push(`สลับหน้าจอเกินกำหนด (${state.antiCheat.tabSwitches}/${state.currentExam?.max_tab_switches_allowed} ครั้ง)`);
         }
         if (state.antiCheat.fullscreenExits > 2) {
-            cheatingReasons.push(`เธญเธญเธเธเธฒเธเนเธซเธกเธ”เน€เธ•เนเธกเธซเธเนเธฒเธเธญ (${state.antiCheat.fullscreenExits} เธเธฃเธฑเนเธ)`);
+            cheatingReasons.push(`ออกจากโหมดเต็มหน้าจอ (${state.antiCheat.fullscreenExits} ครั้ง)`);
         }
 
         const gradeResult = {
             student_id: state.currentUser.id,
             student_name: state.currentUser.name,
-            student_year: state.currentUser.year || 'เนเธกเนเธฃเธฐเธเธธ',
-            student_department: state.currentUser.dept || 'เนเธกเนเธฃเธฐเธเธธ',
-            student_room: state.currentUser.room || 'เนเธกเนเธฃเธฐเธเธธ',
+            student_year: state.currentUser.year || 'ไม่ระบุ',
+            student_department: state.currentUser.dept || 'ไม่ระบุ',
+            student_room: state.currentUser.room || 'ไม่ระบุ',
             exam_id: state.currentExam?.id,
             exam_title: state.currentExam?.title,
-            course_name: state.currentExam?.course?.course_name || 'เธงเธดเธเธฒเธ—เธฑเนเธงเนเธ',
+            course_name: state.currentExam?.course?.course_name || 'วิชาทั่วไป',
             total_score: totalScore,
             max_score: maxScore,
             percentage: percentage,
@@ -2058,28 +2058,28 @@ async function submitExamFinal() {
             graded_at: new Date().toISOString()
         };
 
-        // เธเธฑเธเธ—เธถเธเธเธฅเธชเธญเธเธฅเธ Local Storage เน€เธเธทเนเธญเนเธซเนเธญเธฒเธเธฒเธฃเธขเนเธ”เธนเนเธฅเธฐ Export เนเธ”เนเธ—เธฑเธเธ—เธต
+        // บันทึกผลสอบลง Local Storage เพื่อให้อาจารย์ดูและ Export ได้ทันที
         saveLocalSubmission(gradeResult);
 
-        // 2. เธ–เนเธฒเธ•เนเธญ Supabase เนเธ”เน เนเธซเน Sync เธเธถเนเธ DB
+        // 2. ถ้าต่อ Supabase ได้ ให้ Sync ขึ้น DB
         if (isSupabaseConfigured() && state.supabaseClient) {
-            // เธฅเธญเธ RPC grade_exam_secure เธเนเธญเธ
+            // ลอง RPC grade_exam_secure ก่อน
             let rpcOk = false;
             try {
                 const rpcRes = await state.supabaseClient.rpc('grade_exam_secure', {
                     p_student_id: state.currentUser.id,
                     p_exam_id: state.currentExam.id,
                     p_student_name: state.currentUser.name,
-                    p_student_year: state.currentUser.year || 'เนเธกเนเธฃเธฐเธเธธ',
-                    p_student_department: state.currentUser.dept || 'เนเธกเนเธฃเธฐเธเธธ',
-                    p_student_room: state.currentUser.room || 'เนเธกเนเธฃเธฐเธเธธ'
+                    p_student_year: state.currentUser.year || 'ไม่ระบุ',
+                    p_student_department: state.currentUser.dept || 'ไม่ระบุ',
+                    p_student_room: state.currentUser.room || 'ไม่ระบุ'
                 });
                 if (!rpcRes.error) rpcOk = true;
             } catch (rpcErr) {
                 console.warn('[grade_exam_secure RPC warning]:', rpcErr);
             }
 
-            // เธ–เนเธฒ RPC เนเธกเนเธชเธณเน€เธฃเนเธ โ’ เธเธฑเธเธ—เธถเธเธ•เธฃเธเธฅเธ exam_results เน€เธญเธ
+            // ถ้า RPC ไม่สำเร็จ → บันทึกตรงลง exam_results เอง
             if (!rpcOk) {
                 try {
                     await state.supabaseClient
@@ -2087,11 +2087,11 @@ async function submitExamFinal() {
                         .upsert({
                             student_id: state.currentUser.id,
                             student_name: state.currentUser.name,
-                            student_year: state.currentUser.year || 'เนเธกเนเธฃเธฐเธเธธ',
-                            student_department: state.currentUser.dept || 'เนเธกเนเธฃเธฐเธเธธ',
-                            student_room: state.currentUser.room || 'เนเธกเนเธฃเธฐเธเธธ',
+                            student_year: state.currentUser.year || 'ไม่ระบุ',
+                            student_department: state.currentUser.dept || 'ไม่ระบุ',
+                            student_room: state.currentUser.room || 'ไม่ระบุ',
                             exam_id: state.currentExam.id,
-                            course_name: state.currentExam?.course?.course_name || 'เธงเธดเธเธฒเธ—เธฑเนเธงเนเธ',
+                            course_name: state.currentExam?.course?.course_name || 'วิชาทั่วไป',
                             total_score: gradeResult.total_score,
                             max_score: gradeResult.max_score,
                             percentage: gradeResult.percentage,
@@ -2108,7 +2108,7 @@ async function submitExamFinal() {
             }
         }
 
-        // เธฅเนเธฒเธเธเธณเธ•เธญเธเธฃเนเธฒเธเธ—เธตเนเธเธฑเธเธ—เธถเธเนเธงเนเน€เธกเธทเนเธญเธชเนเธเธเนเธญเธชเธญเธเน€เธชเธฃเนเธเธชเธกเธเธนเธฃเธ“เน
+        // ล้างคำตอบร่างที่บันทึกไว้เมื่อส่งข้อสอบเสร็จสมบูรณ์
         clearStudentDraftAnswers();
 
         if (loadingModal) loadingModal.classList.add('hidden');
@@ -2117,8 +2117,8 @@ async function submitExamFinal() {
     } catch (err) {
         if (loadingModal) loadingModal.classList.add('hidden');
         showCustomAlert({
-            title: 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”',
-            message: 'เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธ•เธฃเธงเธเธเนเธญเธชเธญเธ: ' + err.message,
+            title: 'เกิดข้อผิดพลาด',
+            message: 'เกิดข้อผิดพลาดในการตรวจข้อสอบ: ' + err.message,
             icon: 'fas fa-triangle-exclamation'
         });
     }
@@ -2137,58 +2137,58 @@ function renderResultView(res) {
 
     if (examNameEl) examNameEl.textContent = state.currentExam?.title || '';
 
-    // เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเธญเธฒเธเธฒเธฃเธขเนเธญเธเธธเธเธฒเธ•เนเธซเนเนเธชเธ”เธเธเธฐเนเธเธเธซเธฃเธทเธญเนเธกเน
+    // ตรวจสอบว่าอาจารย์อนุญาตให้แสดงคะแนนหรือไม่
     const showScore = state.currentExam?.show_score_immediately !== false; // default = true
 
     if (!showScore) {
-        // เธเนเธญเธเธเธฐเนเธเธ โ’ เนเธชเธ”เธเนเธเน "เธชเนเธเน€เธฃเธตเธขเธเธฃเนเธญเธข เธฃเธญเธเธฃเธฐเธเธฒเธจเธเธฅ" (เน€เธญเธฒเธเธณเธงเนเธฒ เธเธดเธ”เน€เธเนเธเธฃเนเธญเธขเธฅเธฐ: เธญเธญเธ)
-        if (scoreTitleEl) scoreTitleEl.textContent = 'เธชเธ–เธฒเธเธฐเธเธฒเธฃเธชเนเธเธเนเธญเธชเธญเธ';
-        if (scoreEl) scoreEl.innerHTML = `<span class="text-3xl text-emerald-600">๐</span><br><span class="text-xl font-bold text-slate-800">เธชเนเธเธเนเธญเธชเธญเธเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง</span>`;
+        // ซ่อนคะแนน → แสดงแค่ "ส่งเรียบร้อย รอประกาศผล" (เอาคำว่า คิดเป็นร้อยละ: ออก)
+        if (scoreTitleEl) scoreTitleEl.textContent = 'สถานะการส่งข้อสอบ';
+        if (scoreEl) scoreEl.innerHTML = `<span class="text-3xl text-emerald-600">🎉</span><br><span class="text-xl font-bold text-slate-800">ส่งข้อสอบเรียบร้อยแล้ว</span>`;
         if (percentPrefix) percentPrefix.textContent = '';
-        if (percentEl) percentEl.innerHTML = '<span class="text-xs font-medium text-slate-500">เธฃเธฐเธเธเธเธฑเธเธ—เธถเธเธเธณเธ•เธญเธเธเธญเธเธเธธเธ“เนเธฅเนเธง เธเธฃเธธเธ“เธฒเธฃเธญเธญเธฒเธเธฒเธฃเธขเนเธ•เธฃเธงเธเนเธฅเธฐเธเธฃเธฐเธเธฒเธจเธเธฐเนเธเธ</span>';
+        if (percentEl) percentEl.innerHTML = '<span class="text-xs font-medium text-slate-500">ระบบบันทึกคำตอบของคุณแล้ว กรุณารออาจารย์ตรวจและประกาศคะแนน</span>';
         if (statusEl) {
-            statusEl.textContent = '๐“ เธเธฑเธเธ—เธถเธเธเนเธญเธชเธญเธเน€เธฃเธตเธขเธเธฃเนเธญเธข (เธฃเธญเธเธฃเธฐเธเธฒเธจเธเธฅ)';
+            statusEl.textContent = '📋 บันทึกข้อสอบเรียบร้อย (รอประกาศผล)';
             statusEl.className = 'px-4 py-1.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-300';
         }
         if (cheatAuditEl) cheatAuditEl.innerHTML = '';
         return;
     }
 
-    if (scoreTitleEl) scoreTitleEl.textContent = 'เธเธฐเนเธเธเธฃเธงเธกเธ—เธตเนเธ—เธณเนเธ”เน';
+    if (scoreTitleEl) scoreTitleEl.textContent = 'คะแนนรวมที่ทำได้';
     if (scoreEl) scoreEl.textContent = `${res.total_score} / ${res.max_score}`;
-    if (percentPrefix) percentPrefix.textContent = 'เธเธดเธ”เน€เธเนเธเธฃเนเธญเธขเธฅเธฐ: ';
+    if (percentPrefix) percentPrefix.textContent = 'คิดเป็นร้อยละ: ';
     if (percentEl) percentEl.textContent = `${res.percentage}%`;
 
     if (res.is_flagged_cheating) {
         if (statusEl) {
-            statusEl.textContent = 'โ ๏ธ เธ•เธดเธ”เธชเธ–เธฒเธเธฐเธ•เธฃเธงเธเธชเธญเธเธเธฒเธฃเธ—เธธเธเธฃเธดเธ• (Flagged)';
+            statusEl.textContent = '⚠️ ติดสถานะตรวจสอบการทุจริต (Flagged)';
             statusEl.className = 'px-4 py-1.5 rounded-full text-sm font-bold bg-red-100 text-red-700 border border-red-300';
         }
         if (cheatAuditEl) {
             cheatAuditEl.innerHTML = `
                 <div class="bg-red-50 border border-red-200 rounded-xl p-4 text-left">
                     <h4 class="font-bold text-red-800 text-sm mb-2 flex items-center gap-2">
-                        <i class="fas fa-exclamation-triangle"></i> เธเธเธเธคเธ•เธดเธเธฃเธฃเธกเธเธดเธ”เธเธเธ•เธดเธฃเธฐเธซเธงเนเธฒเธเธเธฒเธฃเธชเธญเธ:
+                        <i class="fas fa-exclamation-triangle"></i> พบพฤติกรรมผิดปกติระหว่างการสอบ:
                     </h4>
                     <ul class="list-disc list-inside text-xs text-red-700 space-y-1">
                         ${(res.cheating_reasons || []).map(r => `<li>${escapeHtml(r)}</li>`).join('')}
-                        <li>เธเธณเธเธงเธเธเธฒเธฃเธชเธฅเธฑเธเธซเธเนเธฒเธเธญเธ—เธฑเนเธเธซเธกเธ”: ${res.total_tab_switches || state.antiCheat.tabSwitches} เธเธฃเธฑเนเธ</li>
+                        <li>จำนวนการสลับหน้าจอทั้งหมด: ${res.total_tab_switches || state.antiCheat.tabSwitches} ครั้ง</li>
                     </ul>
-                    <p class="text-xs text-gray-500 mt-2">เธเธฅเธเธฐเนเธเธเธเธตเนเธเธฐเธ–เธนเธเธชเนเธเนเธซเนเธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธเธ•เธฃเธงเธเธชเธญเธ</p>
+                    <p class="text-xs text-gray-500 mt-2">ผลคะแนนนี้จะถูกส่งให้อาจารย์ผู้สอนตรวจสอบ</p>
                 </div>
             `;
         }
     } else {
         if (statusEl) {
-            statusEl.textContent = 'โ… เธเนเธฒเธเธเธฒเธฃเธ•เธฃเธงเธเธชเธญเธเธเธงเธฒเธกเธเธทเนเธญเธชเธฑเธ•เธขเน (Verified)';
+            statusEl.textContent = '✅ ผ่านการตรวจสอบความซื่อสัตย์ (Verified)';
             statusEl.className = 'px-4 py-1.5 rounded-full text-sm font-bold bg-green-100 text-green-700 border border-green-300';
         }
         if (cheatAuditEl) {
             cheatAuditEl.innerHTML = `
                 <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center text-xs text-green-800">
                     <i class="fas fa-check-circle text-green-600 text-lg mb-1"></i>
-                    <p class="font-medium">เนเธกเนเธเธเธเธคเธ•เธดเธเธฃเธฃเธกเธ•เนเธญเธเธชเธเธชเธฑเธข เธเธฒเธฃเธชเธญเธเธชเธกเธเธนเธฃเธ“เน</p>
-                    <p class="text-gray-500 mt-0.5">เธชเธฅเธฑเธเธเธญเธ—เธฑเนเธเธซเธกเธ”: ${res.total_tab_switches || state.antiCheat.tabSwitches} เธเธฃเธฑเนเธ (เธญเธขเธนเนเนเธเน€เธเธ“เธ‘เน)</p>
+                    <p class="font-medium">ไม่พบพฤติกรรมต้องสงสัย การสอบสมบูรณ์</p>
+                    <p class="text-gray-500 mt-0.5">สลับจอทั้งหมด: ${res.total_tab_switches || state.antiCheat.tabSwitches} ครั้ง (อยู่ในเกณฑ์)</p>
                 </div>
             `;
         }
@@ -2209,9 +2209,9 @@ window.toggleLiveAlerts = function() {
     updateLiveAlertToggleUI();
 
     if (state.realtimeAlertsEnabled) {
-        showToast('๐”” เน€เธเธดเธ”เธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธเธชเธฅเธฑเธเธซเธเนเธฒเธเธญเนเธเธเน€เธฃเธตเธขเธฅเนเธ—เธกเนเนเธฅเนเธง', 'success');
+        showToast('🔔 เปิดการแจ้งเตือนสลับหน้าจอแบบเรียลไทม์แล้ว', 'success');
     } else {
-        showToast('๐”• เธเธดเธ”เธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธเธชเธฅเธฑเธเธซเธเนเธฒเธเธญเนเธเธเน€เธฃเธตเธขเธฅเนเธ—เธกเนเนเธฅเนเธง', 'info');
+        showToast('🔕 ปิดการแจ้งเตือนสลับหน้าจอแบบเรียลไทม์แล้ว', 'info');
     }
 };
 
@@ -2222,9 +2222,9 @@ window.toggleAlertSound = function() {
 
     if (state.realtimeAlertsSoundEnabled) {
         playAlertChime();
-        showToast('๐” เน€เธเธดเธ”เน€เธชเธตเธขเธเน€เธ•เธทเธญเธเธชเธฅเธฑเธเธซเธเนเธฒเธเธญเนเธฅเนเธง', 'success');
+        showToast('🔊 เปิดเสียงเตือนสลับหน้าจอแล้ว', 'success');
     } else {
-        showToast('๐” เธเธดเธ”เน€เธชเธตเธขเธเน€เธ•เธทเธญเธเธชเธฅเธฑเธเธซเธเนเธฒเธเธญเนเธฅเนเธง', 'info');
+        showToast('🔇 ปิดเสียงเตือนสลับหน้าจอแล้ว', 'info');
     }
 };
 
@@ -2237,11 +2237,11 @@ function updateLiveAlertToggleUI() {
     if (btnToggle && textEl && dotEl) {
         if (state.realtimeAlertsEnabled) {
             btnToggle.className = 'px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm';
-            textEl.textContent = 'เนเธเนเธเน€เธ•เธทเธญเธเธชเธฅเธฑเธเธเธญ: เน€เธเธดเธ”';
+            textEl.textContent = 'แจ้งเตือนสลับจอ: เปิด';
             dotEl.className = 'w-2 h-2 rounded-full bg-white animate-ping';
         } else {
             btnToggle.className = 'px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-200 hover:bg-slate-300 text-slate-600 shadow-sm';
-            textEl.textContent = 'เนเธเนเธเน€เธ•เธทเธญเธเธชเธฅเธฑเธเธเธญ: เธเธดเธ”';
+            textEl.textContent = 'แจ้งเตือนสลับจอ: ปิด';
             dotEl.className = 'w-2 h-2 rounded-full bg-slate-400';
         }
     }
@@ -2294,7 +2294,7 @@ function handleIncomingCheatingAlert(data) {
     if (!data) return;
     if (!state.realtimeAlertsEnabled) return;
 
-    // เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเน€เธเธดเธ”เธซเธเนเธฒเธซเนเธญเธเธญเธฒเธเธฒเธฃเธขเนเธญเธขเธนเนเธซเธฃเธทเธญเนเธกเน
+    // ตรวจสอบว่าเปิดหน้าห้องอาจารย์อยู่หรือไม่
     const isTeacher = state.currentUser?.role === 'teacher' || 
                       state.currentUser?.role === 'admin' || 
                       state.currentView === 'view-teacher' || 
@@ -2305,12 +2305,12 @@ function handleIncomingCheatingAlert(data) {
         return;
     }
 
-    const studentName = data.student_name || 'เธเธฑเธเน€เธฃเธตเธขเธ';
-    const studentYear = data.student_year || 'เธเธงเธ./เธเธงเธช.';
-    const studentDept = data.student_department || 'เนเธกเนเธฃเธฐเธเธธเนเธเธเธ';
-    const studentRoom = data.student_room || 'เธซเนเธญเธ 1';
-    const examTitle = data.exam_title || 'เธเธธเธ”เธเนเธญเธชเธญเธ';
-    const reason = data.reason || 'เธ•เธฃเธงเธเธเธเธเธฒเธฃเธชเธฅเธฑเธเธซเธเนเธฒเธเธญ';
+    const studentName = data.student_name || 'นักเรียน';
+    const studentYear = data.student_year || 'ปวช./ปวส.';
+    const studentDept = data.student_department || 'ไม่ระบุแผนก';
+    const studentRoom = data.student_room || 'ห้อง 1';
+    const examTitle = data.exam_title || 'ชุดข้อสอบ';
+    const reason = data.reason || 'ตรวจพบการสลับหน้าจอ';
     const tabSwitches = data.tabSwitches || 1;
     const timeStr = new Date(data.timestamp || Date.now()).toLocaleTimeString('th-TH');
 
@@ -2365,7 +2365,7 @@ function renderLiveCheatToast({ studentName, studentYear, studentDept, studentRo
                 <div>
                     <h4 class="font-black text-red-700 text-xs uppercase tracking-wider flex items-center gap-1.5">
                         <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
-                        เน€เธ•เธทเธญเธเธชเธฅเธฑเธเธซเธเนเธฒเธเธญเธชเธ”!
+                        เตือนสลับหน้าจอสด!
                     </h4>
                     <p class="text-[10px] text-slate-400">${escapeHtml(timeStr)}</p>
                 </div>
@@ -2378,11 +2378,11 @@ function renderLiveCheatToast({ studentName, studentYear, studentDept, studentRo
             <div class="font-extrabold text-slate-900 text-sm mb-0.5">${escapeHtml(studentName)}</div>
             <div class="text-[11px] text-indigo-700 font-bold mb-1.5">${escapeHtml(studentYear)} | ${escapeHtml(studentDept)} | ${escapeHtml(studentRoom)}</div>
             <div class="text-[11px] text-slate-600 mb-1">
-                <i class="fas fa-book-open text-slate-400 mr-1"></i> เธงเธดเธเธฒ/เธเนเธญเธชเธญเธ: <strong>${escapeHtml(examTitle)}</strong>
+                <i class="fas fa-book-open text-slate-400 mr-1"></i> วิชา/ข้อสอบ: <strong>${escapeHtml(examTitle)}</strong>
             </div>
             <div class="flex items-center justify-between pt-1 mt-1 border-t border-red-200/50">
                 <span class="text-[11px] text-red-600 font-medium">${escapeHtml(reason)}</span>
-                <span class="text-red-700 font-bold bg-red-200/70 px-2 py-0.5 rounded-full text-[10px]">เธชเธฅเธฑเธเธเธฃเธฑเนเธเธ—เธตเน ${tabSwitches}</span>
+                <span class="text-red-700 font-bold bg-red-200/70 px-2 py-0.5 rounded-full text-[10px]">สลับครั้งที่ ${tabSwitches}</span>
             </div>
         </div>
     `;
@@ -2414,7 +2414,7 @@ function addLiveFeedEntry(entry) {
     if (!listEl) return;
 
     state.liveFeedLogs.unshift(entry);
-    if (countEl) countEl.textContent = `${state.liveFeedLogs.length} เธเธดเธเธเธฃเธฃเธก`;
+    if (countEl) countEl.textContent = `${state.liveFeedLogs.length} กิจกรรม`;
 
     listEl.innerHTML = state.liveFeedLogs.slice(0, 15).map(item => `
         <div class="p-2.5 bg-white rounded-xl border border-red-100 flex items-center justify-between gap-3 shadow-xs">
@@ -2429,7 +2429,7 @@ function addLiveFeedEntry(entry) {
                 </div>
             </div>
             <div class="text-right whitespace-nowrap">
-                <span class="px-2 py-0.5 rounded-md bg-red-50 text-red-700 font-bold text-[10px]">เธเธฃเธฑเนเธเธ—เธตเน ${item.tabSwitches}</span>
+                <span class="px-2 py-0.5 rounded-md bg-red-50 text-red-700 font-bold text-[10px]">ครั้งที่ ${item.tabSwitches}</span>
                 <div class="text-[10px] text-slate-400 mt-0.5">${escapeHtml(item.timeStr)}</div>
             </div>
         </div>
@@ -2440,9 +2440,9 @@ window.clearLiveFeedLogs = function() {
     state.liveFeedLogs = [];
     const listEl = document.getElementById('live-cheat-feed-list');
     const countEl = document.getElementById('live-cheat-feed-count');
-    if (countEl) countEl.textContent = '0 เธเธดเธเธเธฃเธฃเธก';
+    if (countEl) countEl.textContent = '0 กิจกรรม';
     if (listEl) {
-        listEl.innerHTML = `<p class="text-slate-400 text-xs italic py-2 text-center">เธฃเธฐเธเธเธเธณเธฅเธฑเธเธกเธญเธเธดเน€เธ•เธญเธฃเนเธชเธ”... (เธซเธฒเธเธกเธตเธเธฑเธเน€เธฃเธตเธขเธเธชเธฅเธฑเธเธซเธเนเธฒเธเธญ เธเธฐเธเธฃเธฒเธเธเธเธถเนเธเธ—เธตเนเธเธตเนเธ—เธฑเธเธ—เธต)</p>`;
+        listEl.innerHTML = `<p class="text-slate-400 text-xs italic py-2 text-center">ระบบกำลังมอนิเตอร์สด... (หากมีนักเรียนสลับหน้าจอ จะปรากฏขึ้นที่นี่ทันที)</p>`;
     }
 };
 
@@ -2544,7 +2544,7 @@ function setupTeacherTabs() {
     if (btnExcel) btnExcel.onclick = () => setTab('excel-import');
 }
 
-// 7.1 เธเธฑเธ”เธเธฒเธฃเธฃเธฒเธขเธงเธดเธเธฒเธเธญเธเธญเธฒเธเธฒเธฃเธขเน (Courses)
+// 7.1 จัดการรายวิชาของอาจารย์ (Courses)
 async function loadTeacherCourses() {
     const container = document.getElementById('teacher-courses-list-container');
     const badgeCount = document.getElementById('teacher-courses-count-badge');
@@ -2568,7 +2568,7 @@ async function loadTeacherCourses() {
         }
     }
 
-    // ๐”’ Teacher Isolation: เนเธชเธ”เธเน€เธเธเธฒเธฐเธฃเธฒเธขเธงเธดเธเธฒเธเธญเธเธญเธฒเธเธฒเธฃเธขเนเธ—เนเธฒเธเธเธตเนเน€เธ—เนเธฒเธเธฑเนเธ (เน€เธงเนเธเนเธ•เน Admin)
+    // 🔒 Teacher Isolation: แสดงเฉพาะรายวิชาของอาจารย์ท่านนี้เท่านั้น (เว้นแต่ Admin)
     if (state.currentUser?.role === 'teacher') {
         const currentTeacherId = state.currentUser.id;
         const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
@@ -2579,16 +2579,16 @@ async function loadTeacherCourses() {
     }
 
     state.courses = courses;
-    if (badgeCount) badgeCount.textContent = `${courses.length} เธฃเธฒเธขเธงเธดเธเธฒ`;
+    if (badgeCount) badgeCount.textContent = `${courses.length} รายวิชา`;
 
     if (courses.length === 0) {
         container.innerHTML = `
             <div class="col-span-full bg-white p-8 rounded-3xl border border-slate-100 text-center">
                 <i class="fas fa-book-open text-4xl text-slate-300 mb-3"></i>
-                <h4 class="font-bold text-slate-700">เธเธธเธ“เธขเธฑเธเนเธกเนเธกเธตเธฃเธฒเธขเธงเธดเธเธฒเนเธเธฃเธฐเธเธ</h4>
-                <p class="text-xs text-slate-400 mt-1 mb-4">เธเธ”เธเธธเนเธกเธชเธฃเนเธฒเธเธฃเธฒเธขเธงเธดเธเธฒเนเธซเธกเนเน€เธเธทเนเธญเน€เธฃเธดเนเธกเธ•เนเธเน€เธเธดเธ”เธชเธญเธเนเธฅเธฐเธชเธฃเนเธฒเธเธเธธเธ”เธเนเธญเธชเธญเธเธเธญเธเธเธธเธ“</p>
+                <h4 class="font-bold text-slate-700">คุณยังไม่มีรายวิชาในระบบ</h4>
+                <p class="text-xs text-slate-400 mt-1 mb-4">กดปุ่มสร้างรายวิชาใหม่เพื่อเริ่มต้นเปิดสอนและสร้างชุดข้อสอบของคุณ</p>
                 <button onclick="document.getElementById('modal-create-course').classList.remove('hidden')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-sm">
-                    <i class="fas fa-plus mr-1"></i> เธชเธฃเนเธฒเธเธฃเธฒเธขเธงเธดเธเธฒเนเธฃเธเธเธญเธเธเธธเธ“
+                    <i class="fas fa-plus mr-1"></i> สร้างรายวิชาแรกของคุณ
                 </button>
             </div>
         `;
@@ -2605,22 +2605,22 @@ async function loadTeacherCourses() {
                 </div>
                 <h4 class="font-bold text-slate-900 text-base mb-1">${escapeHtml(c.course_name)}</h4>
                 
-                <!-- Badge เธฃเธฐเธ”เธฑเธเธเธฑเนเธเนเธฅเธฐเนเธเธเธเธเธฃเธฐเธเธณเธงเธดเธเธฒ -->
+                <!-- Badge ระดับชั้นและแผนกประจำวิชา -->
                 <div class="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200/60 rounded-lg text-[11px] font-bold text-amber-900">
-                    <i class="fas fa-bullseye text-amber-600"></i> ${escapeHtml(c.target_year || 'เธ—เธธเธเธเธฑเนเธ')} | ${escapeHtml(c.target_department || 'เธ—เธธเธเนเธเธเธ')}
+                    <i class="fas fa-bullseye text-amber-600"></i> ${escapeHtml(c.target_year || 'ทุกชั้น')} | ${escapeHtml(c.target_department || 'ทุกแผนก')}
                 </div>
 
-                <p class="text-xs text-slate-500 line-clamp-2 mb-3">${escapeHtml(c.description || 'เนเธกเนเธกเธตเธเธณเธญเธเธดเธเธฒเธขเธฃเธฒเธขเธงเธดเธเธฒ')}</p>
+                <p class="text-xs text-slate-500 line-clamp-2 mb-3">${escapeHtml(c.description || 'ไม่มีคำอธิบายรายวิชา')}</p>
                 <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
-                    <i class="fas fa-user-tie text-emerald-500"></i> ${escapeHtml(c.teacher_name || 'เธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธ')}
+                    <i class="fas fa-user-tie text-emerald-500"></i> ${escapeHtml(c.teacher_name || 'อาจารย์ผู้สอน')}
                 </div>
             </div>
 
             <div class="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                 <button onclick="openCreateExamForCourse('${c.id}')" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl transition flex items-center gap-1">
-                    <i class="fas fa-plus"></i> เน€เธเธดเนเธกเธเนเธญเธชเธญเธเนเธเธงเธดเธเธฒเธเธตเน
+                    <i class="fas fa-plus"></i> เพิ่มข้อสอบในวิชานี้
                 </button>
-                <button onclick="deleteCourse('${c.id}', '${escapeHtml(c.course_name)}')" class="text-slate-300 hover:text-red-500 text-xs p-1.5 rounded-lg transition" title="เธฅเธเธฃเธฒเธขเธงเธดเธเธฒ">
+                <button onclick="deleteCourse('${c.id}', '${escapeHtml(c.course_name)}')" class="text-slate-300 hover:text-red-500 text-xs p-1.5 rounded-lg transition" title="ลบรายวิชา">
                     <i class="fas fa-trash-can"></i>
                 </button>
             </div>
@@ -2630,11 +2630,11 @@ async function loadTeacherCourses() {
 
 window.deleteCourse = async function(courseId, courseName) {
     showCustomConfirm({
-        title: 'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธฅเธเธฃเธฒเธขเธงเธดเธเธฒ',
-        message: `เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธฅเธเธฃเธฒเธขเธงเธดเธเธฒ "${courseName}" เนเธเนเธซเธฃเธทเธญเนเธกเน?\n(เธเธธเธ”เธเนเธญเธชเธญเธเธ—เธตเนเธเธนเธเธเธฑเธเธงเธดเธเธฒเธเธตเนเธเธฐเธขเธฑเธเธเธเธญเธขเธนเนเนเธเธฃเธฐเธเธ)`,
+        title: 'ยืนยันการลบรายวิชา',
+        message: `คุณต้องการลบรายวิชา "${courseName}" ใช่หรือไม่?\n(ชุดข้อสอบที่ผูกกับวิชานี้จะยังคงอยู่ในระบบ)`,
         icon: 'fas fa-trash-can',
-        confirmText: 'เธฅเธเธฃเธฒเธขเธงเธดเธเธฒ',
-        cancelText: 'เธขเธเน€เธฅเธดเธ',
+        confirmText: 'ลบรายวิชา',
+        cancelText: 'ยกเลิก',
         confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
         onConfirm: async () => {
             deleteLocalCourse(courseId);
@@ -2643,14 +2643,14 @@ window.deleteCourse = async function(courseId, courseName) {
                     await state.supabaseClient.from('courses').delete().eq('id', courseId);
                 } catch (e) {}
             }
-            showToast(`เธฅเธเธฃเธฒเธขเธงเธดเธเธฒ "${courseName}" เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง`, 'info');
+            showToast(`ลบรายวิชา "${courseName}" เรียบร้อยแล้ว`, 'info');
             loadTeacherCourses();
             populateCourseSelects();
         }
     });
 };
 
-// 7.2 เธเธฑเธเธเนเธเธฑเธเน€เธ•เธดเธกเธฃเธฒเธขเธเธฒเธฃเธเธธเธ”เธเนเธญเธชเธญเธเนเธเธ•เธฑเธงเธเธฃเธญเธเธเธฅเธชเธญเธ
+// 7.2 ฟังก์ชันเติมรายการชุดข้อสอบในตัวกรองผลสอบ
 function populateTeacherSubmissionExamFilter() {
     const select = document.getElementById('teacher-sub-filter-exam');
     if (!select) return;
@@ -2666,8 +2666,8 @@ function populateTeacherSubmissionExamFilter() {
     }
 
     const currentVal = select.value;
-    select.innerHTML = `<option value="เธ—เธฑเนเธเธซเธกเธ”">เธเธธเธ”เธเนเธญเธชเธญเธ: เธ—เธฑเนเธเธซเธกเธ”</option>` + exams.map(e => `
-        <option value="${e.id}">[${escapeHtml(e.title)}] (${escapeHtml(e.target_year || 'เธ—เธธเธเธเธฑเนเธ')} ${escapeHtml(e.target_room || 'เธ—เธธเธเธซเนเธญเธ')})</option>
+    select.innerHTML = `<option value="ทั้งหมด">ชุดข้อสอบ: ทั้งหมด</option>` + exams.map(e => `
+        <option value="${e.id}">[${escapeHtml(e.title)}] (${escapeHtml(e.target_year || 'ทุกชั้น')} ${escapeHtml(e.target_room || 'ทุกห้อง')})</option>
     `).join('');
 
     if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
@@ -2675,7 +2675,7 @@ function populateTeacherSubmissionExamFilter() {
     }
 }
 
-// 7.2.1 เนเธซเธฅเธ”เธ•เธฒเธฃเธฒเธเธเธฅเธชเธญเธเธญเธฒเธเธฒเธฃเธขเน (เธเธฃเนเธญเธกเธ•เธฑเธงเธเธฃเธญเธเนเธขเธเธเธธเธ”เธเนเธญเธชเธญเธ/เธฃเธฐเธ”เธฑเธเธเธฑเนเธ/เนเธเธเธ/เธซเนเธญเธเน€เธฃเธตเธขเธ)
+// 7.2.1 โหลดตารางผลสอบอาจารย์ (พร้อมตัวกรองแยกชุดข้อสอบ/ระดับชั้น/แผนก/ห้องเรียน)
 async function loadTeacherSubmissions() {
     const tableBody = document.getElementById('teacher-submissions-table-body');
     const statTotal = document.getElementById('teacher-stat-total-submissions');
@@ -2706,7 +2706,7 @@ async function loadTeacherSubmissions() {
         }
     }
 
-    // ๐”’ Teacher Isolation: เนเธชเธ”เธเน€เธเธเธฒเธฐเธเธฅเธเธฐเนเธเธเนเธเธงเธดเธเธฒเนเธฅเธฐเธเธธเธ”เธเนเธญเธชเธญเธเธเธญเธเธญเธฒเธเธฒเธฃเธขเนเธ—เนเธฒเธเธเธตเนเน€เธ—เนเธฒเธเธฑเนเธ (เน€เธงเนเธเนเธ•เน Admin)
+    // 🔒 Teacher Isolation: แสดงเฉพาะผลคะแนนในวิชาและชุดข้อสอบของอาจารย์ท่านนี้เท่านั้น (เว้นแต่ Admin)
     if (state.currentUser?.role === 'teacher') {
         const myExamIds = (state.localExams || getLocalExams()).map(e => e.id);
         const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
@@ -2716,12 +2716,12 @@ async function loadTeacherSubmissions() {
         );
     }
 
-    // ๐” Apply Filters: Search, Exam, Year, Department, Room
+    // 🔍 Apply Filters: Search, Exam, Year, Department, Room
     const searchVal = (document.getElementById('teacher-sub-filter-search')?.value || '').trim().toLowerCase();
-    const examFilter = document.getElementById('teacher-sub-filter-exam')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
-    const yearFilter = document.getElementById('teacher-sub-filter-year')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
-    const deptFilter = document.getElementById('teacher-sub-filter-dept')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
-    const roomFilter = document.getElementById('teacher-sub-filter-room')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
+    const examFilter = document.getElementById('teacher-sub-filter-exam')?.value || 'ทั้งหมด';
+    const yearFilter = document.getElementById('teacher-sub-filter-year')?.value || 'ทั้งหมด';
+    const deptFilter = document.getElementById('teacher-sub-filter-dept')?.value || 'ทั้งหมด';
+    const roomFilter = document.getElementById('teacher-sub-filter-room')?.value || 'ทั้งหมด';
 
     // Roster lookup map for resolving student code / citizen id
     const localStudents = getLocalStudents();
@@ -2762,11 +2762,11 @@ async function loadTeacherSubmissions() {
         });
     }
 
-    if (examFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (examFilter !== 'ทั้งหมด') {
         filtered = filtered.filter(s => s.exam_id === examFilter);
     }
 
-    if (yearFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (yearFilter !== 'ทั้งหมด') {
         const cleanTargetYear = yearFilter.replace(/\s+/g, '').toLowerCase();
         filtered = filtered.filter(s => {
             const sYear = (s.student_year || s.year || '').replace(/\s+/g, '').toLowerCase();
@@ -2778,7 +2778,7 @@ async function loadTeacherSubmissions() {
         });
     }
 
-    if (deptFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (deptFilter !== 'ทั้งหมด') {
         const targetDept = deptFilter.trim().toLowerCase();
         filtered = filtered.filter(s => {
             const sDept = (s.student_department || s.dept || '').trim().toLowerCase();
@@ -2790,7 +2790,7 @@ async function loadTeacherSubmissions() {
         });
     }
 
-    if (roomFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (roomFilter !== 'ทั้งหมด') {
         const cleanTargetRoom = roomFilter.replace(/\s+/g, '').toLowerCase();
         filtered = filtered.filter(s => {
             const sRoom = (s.student_room || s.room || '').replace(/\s+/g, '').toLowerCase();
@@ -2807,12 +2807,12 @@ async function loadTeacherSubmissions() {
             <tr>
                 <td colspan="8" class="text-center py-10 text-slate-400">
                     <i class="fas fa-filter-circle-xmark text-3xl text-slate-300 mb-2 block"></i>
-                    เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธฅเธเธฒเธฃเธชเธญเธเธ•เธฒเธกเน€เธเธทเนเธญเธเนเธเธ•เธฑเธงเธเธฃเธญเธเธ—เธตเนเธเนเธเธซเธฒ
+                    ไม่พบข้อมูลผลการสอบตามเงื่อนไขตัวกรองที่ค้นหา
                     <div class="text-xs text-slate-400 mt-1">
-                        (เธเนเธเธซเธฒ: ${escapeHtml(searchVal || '-')} | เธฃเธฐเธ”เธฑเธเธเธฑเนเธ: ${escapeHtml(yearFilter)} | เธซเนเธญเธ: ${escapeHtml(roomFilter)})
+                        (ค้นหา: ${escapeHtml(searchVal || '-')} | ระดับชั้น: ${escapeHtml(yearFilter)} | ห้อง: ${escapeHtml(roomFilter)})
                     </div>
                     <button type="button" onclick="resetTeacherSubmissionFilters()" class="mt-3 px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition inline-flex items-center gap-1.5">
-                        <i class="fas fa-rotate-left"></i> เธฅเนเธฒเธเธ•เธฑเธงเธเธฃเธญเธเธ—เธฑเนเธเธซเธกเธ”
+                        <i class="fas fa-rotate-left"></i> ล้างตัวกรองทั้งหมด
                     </button>
                 </td>
             </tr>
@@ -2833,7 +2833,7 @@ async function loadTeacherSubmissions() {
 
     tableBody.innerHTML = filtered.map(sub => {
         const isFlagged = sub.is_flagged_cheating;
-        const examTitle = sub.exam_title || sub.exam?.title || 'เธเธธเธ”เธเนเธญเธชเธญเธ';
+        const examTitle = sub.exam_title || sub.exam?.title || 'ชุดข้อสอบ';
         const courseName = sub.course_name || sub.exam?.course?.course_name || '-';
         const formattedDate = new Date(sub.graded_at).toLocaleString('th-TH');
 
@@ -2842,7 +2842,7 @@ async function loadTeacherSubmissions() {
         return `
             <tr class="border-b border-gray-100 hover:bg-gray-50/70 transition">
                 <td class="py-4 px-4 font-medium text-gray-800">
-                    <div class="font-bold text-slate-900">${escapeHtml(sub.student_name || 'เธเธฑเธเน€เธฃเธตเธขเธ')}</div>
+                    <div class="font-bold text-slate-900">${escapeHtml(sub.student_name || 'นักเรียน')}</div>
                     <div class="text-xs text-gray-400 font-mono">${(sub.student_id || '').slice(0, 8)}...</div>
                 </td>
                 <td class="py-4 px-4 text-xs font-semibold text-indigo-700">
@@ -2852,7 +2852,7 @@ async function loadTeacherSubmissions() {
                 </td>
                 <td class="py-4 px-4 text-gray-600 text-xs">
                     <div class="font-bold text-slate-800">${escapeHtml(examTitle)}</div>
-                    <div class="text-[11px] text-slate-400">เธงเธดเธเธฒ: ${escapeHtml(courseName)}</div>
+                    <div class="text-[11px] text-slate-400">วิชา: ${escapeHtml(courseName)}</div>
                 </td>
                 <td class="py-4 px-4 font-bold text-gray-800">
                     ${sub.total_score} / ${sub.max_score}
@@ -2864,24 +2864,24 @@ async function loadTeacherSubmissions() {
                             ? 'bg-red-100 text-red-700'
                             : 'bg-gray-100 text-gray-600'
                     }">
-                        ${sub.total_tab_switches} เธเธฃเธฑเนเธ
+                        ${sub.total_tab_switches} ครั้ง
                     </span>
                 </td>
                 <td class="py-4 px-4 text-center">
                     ${isFlagged ? `
                         <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 inline-flex items-center gap-1">
-                            <i class="fas fa-exclamation-triangle"></i> เธกเธตเธเธคเธ•เธดเธเธฃเธฃเธกเธชเธเธชเธฑเธข
+                            <i class="fas fa-exclamation-triangle"></i> มีพฤติกรรมสงสัย
                         </span>
                     ` : `
                         <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 inline-flex items-center gap-1">
-                            <i class="fas fa-check-circle"></i> เธเธเธ•เธด
+                            <i class="fas fa-check-circle"></i> ปกติ
                         </span>
                     `}
                 </td>
                 <td class="py-4 px-4 text-xs text-gray-400">${formattedDate}</td>
                 <td class="py-4 px-4 text-right">
                     <button onclick="inspectStudentSubmission('${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}')" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium rounded-lg transition shadow-xs">
-                        <i class="fas fa-search mr-1"></i> เธ•เธฃเธงเธเธเธณเธ•เธญเธ
+                        <i class="fas fa-search mr-1"></i> ตรวจคำตอบ
                     </button>
                 </td>
             </tr>
@@ -2897,19 +2897,19 @@ window.resetTeacherSubmissionFilters = function() {
     const roomSelect = document.getElementById('teacher-sub-filter-room');
 
     if (searchInput) searchInput.value = '';
-    if (examSelect) examSelect.value = 'เธ—เธฑเนเธเธซเธกเธ”';
-    if (yearSelect) yearSelect.value = 'เธ—เธฑเนเธเธซเธกเธ”';
-    if (deptSelect) deptSelect.value = 'เธ—เธฑเนเธเธซเธกเธ”';
-    if (roomSelect) roomSelect.value = 'เธ—เธฑเนเธเธซเธกเธ”';
+    if (examSelect) examSelect.value = 'ทั้งหมด';
+    if (yearSelect) yearSelect.value = 'ทั้งหมด';
+    if (deptSelect) deptSelect.value = 'ทั้งหมด';
+    if (roomSelect) roomSelect.value = 'ทั้งหมด';
 
-    showToast('เธฅเนเธฒเธเธ•เธฑเธงเธเธฃเธญเธเธเธฅเธชเธญเธเธ—เธฑเนเธเธซเธกเธ”เนเธฅเนเธง', 'info');
+    showToast('ล้างตัวกรองผลสอบทั้งหมดแล้ว', 'info');
     loadTeacherSubmissions();
 };
 
-// 7.3 เธชเนเธเธญเธญเธเธเธฐเนเธเธเธเธฑเธเน€เธฃเธตเธขเธเน€เธเนเธเนเธเธฅเน Excel (.xlsx) เธ•เธฒเธกเธ•เธฑเธงเธเธฃเธญเธเธฃเธฐเธ”เธฑเธเธเธฑเนเธ/เนเธเธเธ/เธซเนเธญเธเน€เธฃเธตเธขเธ
+// 7.3 ส่งออกคะแนนนักเรียนเป็นไฟล์ Excel (.xlsx) ตามตัวกรองระดับชั้น/แผนก/ห้องเรียน
 window.exportTeacherScoresToExcel = async function() {
     if (!window.XLSX) {
-        showToast('เนเธฅเธเธฃเธฒเธฃเธต SheetJS เธขเธฑเธเนเธกเนเธเธฃเนเธญเธกเนเธเนเธเธฒเธ', 'warning');
+        showToast('ไลบรารี SheetJS ยังไม่พร้อมใช้งาน', 'warning');
         return;
     }
 
@@ -2944,10 +2944,10 @@ window.exportTeacherScoresToExcel = async function() {
 
     // Apply active filters to export
     const searchVal = (document.getElementById('teacher-sub-filter-search')?.value || '').trim().toLowerCase();
-    const examFilter = document.getElementById('teacher-sub-filter-exam')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
-    const yearFilter = document.getElementById('teacher-sub-filter-year')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
-    const deptFilter = document.getElementById('teacher-sub-filter-dept')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
-    const roomFilter = document.getElementById('teacher-sub-filter-room')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
+    const examFilter = document.getElementById('teacher-sub-filter-exam')?.value || 'ทั้งหมด';
+    const yearFilter = document.getElementById('teacher-sub-filter-year')?.value || 'ทั้งหมด';
+    const deptFilter = document.getElementById('teacher-sub-filter-dept')?.value || 'ทั้งหมด';
+    const roomFilter = document.getElementById('teacher-sub-filter-room')?.value || 'ทั้งหมด';
 
     const localStudents = getLocalStudents();
     const studentRosterMap = new Map();
@@ -2985,10 +2985,10 @@ window.exportTeacherScoresToExcel = async function() {
         });
     }
 
-    if (examFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (examFilter !== 'ทั้งหมด') {
         filtered = filtered.filter(s => s.exam_id === examFilter);
     }
-    if (yearFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (yearFilter !== 'ทั้งหมด') {
         const cleanTargetYear = yearFilter.replace(/\s+/g, '').toLowerCase();
         filtered = filtered.filter(s => {
             const sYear = (s.student_year || s.year || '').replace(/\s+/g, '').toLowerCase();
@@ -2999,7 +2999,7 @@ window.exportTeacherScoresToExcel = async function() {
             return sYear.includes(cleanTargetYear) || eYear.includes(cleanTargetYear) || lYear.includes(cleanTargetYear);
         });
     }
-    if (deptFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (deptFilter !== 'ทั้งหมด') {
         const targetDept = deptFilter.trim().toLowerCase();
         filtered = filtered.filter(s => {
             const sDept = (s.student_department || s.dept || '').trim().toLowerCase();
@@ -3010,7 +3010,7 @@ window.exportTeacherScoresToExcel = async function() {
             return sDept.includes(targetDept) || eDept.includes(targetDept) || lDept.includes(targetDept);
         });
     }
-    if (roomFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (roomFilter !== 'ทั้งหมด') {
         const cleanTargetRoom = roomFilter.replace(/\s+/g, '').toLowerCase();
         filtered = filtered.filter(s => {
             const sRoom = (s.student_room || s.room || '').replace(/\s+/g, '').toLowerCase();
@@ -3023,47 +3023,47 @@ window.exportTeacherScoresToExcel = async function() {
     }
 
     if (!filtered || filtered.length === 0) {
-        showToast('เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธฅเธเธฒเธฃเธชเธญเธเธ•เธฒเธกเน€เธเธทเนเธญเธเนเธเธ—เธตเนเน€เธฅเธทเธญเธเน€เธเธทเนเธญเธชเนเธเธญเธญเธ Excel', 'warning');
+        showToast('ไม่พบข้อมูลผลการสอบตามเงื่อนไขที่เลือกเพื่อส่งออก Excel', 'warning');
         return;
     }
 
     const excelRows = filtered.map((d, index) => ({
-        'เธฅเธณเธ”เธฑเธ': index + 1,
-        'เธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ': d.student_name || 'เธเธฑเธเน€เธฃเธตเธขเธ',
-        'เธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธ': d.student_id,
-        'เธฃเธฐเธ”เธฑเธเธเธฑเนเธ/เธเธต': d.student_year || '-',
-        'เนเธเธเธเธงเธดเธเธฒ/เธชเธฒเธเธฒ': d.student_department || '-',
-        'เธซเนเธญเธเน€เธฃเธตเธขเธ': d.student_room || '-',
-        'เธฃเธฒเธขเธงเธดเธเธฒ': d.course_name || d.exam?.course?.course_name || '-',
-        'เธเธธเธ”เธเนเธญเธชเธญเธ': d.exam_title || d.exam?.title || '-',
-        'เธเธฐเนเธเธเธ—เธตเนเนเธ”เน': Number(d.total_score || 0),
-        'เธเธฐเนเธเธเน€เธ•เนเธก': Number(d.max_score || 0),
-        'เธฃเนเธญเธขเธฅเธฐ (%)': Number(d.percentage || 0),
-        'เธเธณเธเธงเธเธชเธฅเธฑเธเธซเธเนเธฒเธเธญ (เธเธฃเธฑเนเธ)': Number(d.total_tab_switches || 0),
-        'เธเธณเธเธงเธเธญเธญเธเธเธฒเธเน€เธ•เนเธกเธเธญ (เธเธฃเธฑเนเธ)': Number(d.total_fullscreen_exits || 0),
-        'เธชเธ–เธฒเธเธฐเธเธฒเธฃเธ•เธฃเธงเธ': d.is_flagged_cheating ? 'โ ๏ธ เธเธเธเธคเธ•เธดเธเธฃเธฃเธกเธเนเธฒเธชเธเธชเธฑเธข' : 'โ… เธเนเธฒเธเธเธฒเธฃเธ•เธฃเธงเธเธชเธญเธ',
-        'เธชเธฒเน€เธซเธ•เธธเธ—เธตเนเธ•เธดเธ”เธชเธ–เธฒเธเธฐ': (d.cheating_reasons || []).join('; ') || '-',
-        'เธงเธฑเธเธ—เธตเนเนเธฅเธฐเน€เธงเธฅเธฒเธ—เธตเนเธชเนเธ': new Date(d.graded_at).toLocaleString('th-TH')
+        'ลำดับ': index + 1,
+        'ชื่อ-นามสกุล': d.student_name || 'นักเรียน',
+        'รหัสนักเรียน': d.student_id,
+        'ระดับชั้น/ปี': d.student_year || '-',
+        'แผนกวิชา/สาขา': d.student_department || '-',
+        'ห้องเรียน': d.student_room || '-',
+        'รายวิชา': d.course_name || d.exam?.course?.course_name || '-',
+        'ชุดข้อสอบ': d.exam_title || d.exam?.title || '-',
+        'คะแนนที่ได้': Number(d.total_score || 0),
+        'คะแนนเต็ม': Number(d.max_score || 0),
+        'ร้อยละ (%)': Number(d.percentage || 0),
+        'จำนวนสลับหน้าจอ (ครั้ง)': Number(d.total_tab_switches || 0),
+        'จำนวนออกจากเต็มจอ (ครั้ง)': Number(d.total_fullscreen_exits || 0),
+        'สถานะการตรวจ': d.is_flagged_cheating ? '⚠️ พบพฤติกรรมน่าสงสัย' : '✅ ผ่านการตรวจสอบ',
+        'สาเหตุที่ติดสถานะ': (d.cheating_reasons || []).join('; ') || '-',
+        'วันที่และเวลาที่ส่ง': new Date(d.graded_at).toLocaleString('th-TH')
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'เธฃเธฒเธขเธเธฒเธเธเธฅเธเธฐเนเธเธ');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'รายงานผลคะแนน');
 
     const dateStr = new Date().toISOString().slice(0, 10);
-    let nameParts = ['เธฃเธฒเธขเธเธฒเธเธเธฅเธเธฐเนเธเธเธชเธญเธ'];
-    if (yearFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') nameParts.push(yearFilter);
-    if (roomFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') nameParts.push(roomFilter);
-    if (deptFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') nameParts.push(deptFilter);
+    let nameParts = ['รายงานผลคะแนนสอบ'];
+    if (yearFilter !== 'ทั้งหมด') nameParts.push(yearFilter);
+    if (roomFilter !== 'ทั้งหมด') nameParts.push(roomFilter);
+    if (deptFilter !== 'ทั้งหมด') nameParts.push(deptFilter);
     nameParts.push(dateStr);
 
     const fileName = `${nameParts.join('_')}.xlsx`;
     XLSX.writeFile(workbook, fileName);
-    showToast(`เธ”เธฒเธงเธเนเนเธซเธฅเธ”เนเธเธฅเน Excel (${filtered.length} เธฃเธฒเธขเธเธฒเธฃ) เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง!`, 'success');
+    showToast(`ดาวน์โหลดไฟล์ Excel (${filtered.length} รายการ) เรียบร้อยแล้ว!`, 'success');
 };
 
 // ==============================================================================
-// 7.3.5 TEACHER STUDENT ROSTER MANAGEMENT (เธเธฑเธ”เธเธฒเธฃเธฃเธฒเธขเธเธทเนเธญเธเธฑเธเน€เธฃเธตเธขเธ & เธฃเธซเธฑเธชเธเนเธฒเธเน€เธฅเธเธเธฑเธ•เธฃ เธเธเธ.)
+// 7.3.5 TEACHER STUDENT ROSTER MANAGEMENT (จัดการรายชื่อนักเรียน & รหัสผ่านเลขบัตร ปชช.)
 // ==============================================================================
 
 let _studentExcelParsedList = [];
@@ -3077,17 +3077,17 @@ window.loadTeacherStudentsList = function() {
 
     // Filters
     const searchVal = document.getElementById('teacher-student-search-input')?.value.trim().toLowerCase() || '';
-    const filterYear = document.getElementById('teacher-student-filter-year')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
-    const filterDept = document.getElementById('teacher-student-filter-dept')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
-    const filterRoom = document.getElementById('teacher-student-filter-room')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
+    const filterYear = document.getElementById('teacher-student-filter-year')?.value || 'ทั้งหมด';
+    const filterDept = document.getElementById('teacher-student-filter-dept')?.value || 'ทั้งหมด';
+    const filterRoom = document.getElementById('teacher-student-filter-room')?.value || 'ทั้งหมด';
 
-    if (filterYear !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (filterYear !== 'ทั้งหมด') {
         students = students.filter(s => s.year === filterYear);
     }
-    if (filterDept !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (filterDept !== 'ทั้งหมด') {
         students = students.filter(s => s.dept === filterDept);
     }
-    if (filterRoom !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (filterRoom !== 'ทั้งหมด') {
         students = students.filter(s => s.room === filterRoom);
     }
     if (searchVal) {
@@ -3098,15 +3098,15 @@ window.loadTeacherStudentsList = function() {
         );
     }
 
-    if (badgeCount) badgeCount.textContent = `${students.length} เธเธ`;
+    if (badgeCount) badgeCount.textContent = `${students.length} คน`;
 
     if (students.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="7" class="p-8 text-center text-slate-400">
                     <i class="fas fa-user-slash text-3xl mb-2 text-slate-300"></i>
-                    <p class="font-bold text-slate-600">เธขเธฑเธเนเธกเนเธกเธตเธฃเธฒเธขเธเธทเนเธญเธเธฑเธเน€เธฃเธตเธขเธเนเธเธฃเธฐเธเธ</p>
-                    <p class="text-xs text-slate-400 mt-1">เธเธฅเธดเธเธเธธเนเธก "+ เน€เธเธดเนเธกเธเธฑเธเน€เธฃเธตเธขเธเธฃเธฒเธขเธเธ" เธซเธฃเธทเธญ "เธเธณเน€เธเนเธฒเธเธฒเธ Excel" เน€เธเธทเนเธญเน€เธเธดเนเธกเธฃเธฒเธขเธเธทเนเธญ</p>
+                    <p class="font-bold text-slate-600">ยังไม่มีรายชื่อนักเรียนในระบบ</p>
+                    <p class="text-xs text-slate-400 mt-1">คลิกปุ่ม "+ เพิ่มนักเรียนรายคน" หรือ "นำเข้าจาก Excel" เพื่อเพิ่มรายชื่อ</p>
                 </td>
             </tr>
         `;
@@ -3132,11 +3132,11 @@ window.loadTeacherStudentsList = function() {
                 ${s.created_at ? new Date(s.created_at).toLocaleDateString('th-TH') : '-'}
             </td>
             <td class="py-3 px-4 text-right whitespace-nowrap">
-                <button onclick="openAddStudentModal('${s.id}')" class="px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition mr-1" title="เนเธเนเนเธเธเนเธญเธกเธนเธฅ">
-                    <i class="fas fa-edit"></i> เนเธเนเนเธ
+                <button onclick="openAddStudentModal('${s.id}')" class="px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition mr-1" title="แก้ไขข้อมูล">
+                    <i class="fas fa-edit"></i> แก้ไข
                 </button>
-                <button onclick="deleteStudent('${s.id}', '${escapeHtml(s.name)}')" class="px-2.5 py-1 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition" title="เธฅเธเธฃเธฒเธขเธเธทเนเธญ">
-                    <i class="fas fa-trash"></i> เธฅเธ
+                <button onclick="deleteStudent('${s.id}', '${escapeHtml(s.name)}')" class="px-2.5 py-1 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition" title="ลบรายชื่อ">
+                    <i class="fas fa-trash"></i> ลบ
                 </button>
             </td>
         </tr>
@@ -3161,26 +3161,26 @@ window.openAddStudentModal = function(studentId = null) {
         const students = getLocalStudents();
         const student = students.find(s => s.id === studentId);
         if (student) {
-            if (title) title.innerHTML = '<i class="fas fa-user-pen text-indigo-600"></i> เนเธเนเนเธเธเนเธญเธกเธนเธฅเธเธฑเธเน€เธฃเธตเธขเธ';
+            if (title) title.innerHTML = '<i class="fas fa-user-pen text-indigo-600"></i> แก้ไขข้อมูลนักเรียน';
             if (modeInput) modeInput.value = 'edit';
             if (idInput) idInput.value = student.id;
             if (codeInput) codeInput.value = student.code || '';
             if (nameInput) nameInput.value = student.name || '';
             if (citizenInput) citizenInput.value = student.citizen_id || '';
-            if (yearSelect) yearSelect.value = student.year || 'เธเธงเธ.2';
-            if (deptSelect) deptSelect.value = student.dept || 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ';
-            if (roomSelect) roomSelect.value = student.room || 'เธซเนเธญเธ 1';
+            if (yearSelect) yearSelect.value = student.year || 'ปวช.2';
+            if (deptSelect) deptSelect.value = student.dept || 'เทคโนโลยีธุรกิจดิจิทัล';
+            if (roomSelect) roomSelect.value = student.room || 'ห้อง 1';
         }
     } else {
-        if (title) title.innerHTML = '<i class="fas fa-user-plus text-indigo-600"></i> เน€เธเธดเนเธกเธเนเธญเธกเธนเธฅเธเธฑเธเน€เธฃเธตเธขเธเนเธซเธกเน';
+        if (title) title.innerHTML = '<i class="fas fa-user-plus text-indigo-600"></i> เพิ่มข้อมูลนักเรียนใหม่';
         if (modeInput) modeInput.value = 'create';
         if (idInput) idInput.value = '';
         if (codeInput) codeInput.value = '';
         if (nameInput) nameInput.value = '';
         if (citizenInput) citizenInput.value = '';
-        if (yearSelect) yearSelect.value = 'เธเธงเธ.2';
-        if (deptSelect) deptSelect.value = 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ';
-        if (roomSelect) roomSelect.value = 'เธซเนเธญเธ 1';
+        if (yearSelect) yearSelect.value = 'ปวช.2';
+        if (deptSelect) deptSelect.value = 'เทคโนโลยีธุรกิจดิจิทัล';
+        if (roomSelect) roomSelect.value = 'ห้อง 1';
     }
 
     modal.classList.remove('hidden');
@@ -3198,19 +3198,19 @@ window.saveStudentFromForm = function(event) {
     const code = document.getElementById('student-form-code')?.value.trim();
     const name = document.getElementById('student-form-name')?.value.trim();
     const citizenId = document.getElementById('student-form-citizen-id')?.value.trim();
-    const year = document.getElementById('student-form-year')?.value || 'เธเธงเธ.2';
-    const dept = document.getElementById('student-form-dept')?.value || 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ';
-    const room = document.getElementById('student-form-room')?.value || 'เธซเนเธญเธ 1';
+    const year = document.getElementById('student-form-year')?.value || 'ปวช.2';
+    const dept = document.getElementById('student-form-dept')?.value || 'เทคโนโลยีธุรกิจดิจิทัล';
+    const room = document.getElementById('student-form-room')?.value || 'ห้อง 1';
 
     if (!code || !name) {
-        showToast('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธเนเธฅเธฐเธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ', 'warning');
+        showToast('กรุณากรอกรหัสนักเรียนและชื่อ-นามสกุล', 'warning');
         return;
     }
 
     if (!citizenId || citizenId.length !== 13 || isNaN(citizenId)) {
         showCustomAlert({
-            title: 'เน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ',
-            message: 'เธเธฃเธธเธ“เธฒเธเธฃเธญเธเน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธณเธ•เธฑเธงเธเธฃเธฐเธเธฒเธเธเนเธซเนเธเธฃเธ 13 เธซเธฅเธฑเธเธ•เธฑเธงเน€เธฅเธ\n(เนเธเนเน€เธเนเธเธฃเธซเธฑเธชเธเนเธฒเธเน€เธเนเธฒเธชเธญเธเธเธญเธเธเธฑเธเน€เธฃเธตเธขเธ)',
+            title: 'เลขบัตรประชาชนไม่ถูกต้อง',
+            message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลักตัวเลข\n(ใช้เป็นรหัสผ่านเข้าสอบของนักเรียน)',
             icon: 'fas fa-id-card'
         });
         return;
@@ -3222,8 +3222,8 @@ window.saveStudentFromForm = function(event) {
         const existCode = allStudents.find(s => s.code === code);
         if (existCode) {
             showCustomAlert({
-                title: 'เธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธเธเนเธณ',
-                message: `เธกเธตเธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธ "${code}" (${existCode.name}) เธญเธขเธนเนเนเธเธฃเธฐเธเธเนเธฅเนเธง`,
+                title: 'รหัสนักเรียนซ้ำ',
+                message: `มีรหัสนักเรียน "${code}" (${existCode.name}) อยู่ในระบบแล้ว`,
                 icon: 'fas fa-triangle-exclamation'
             });
             return;
@@ -3231,8 +3231,8 @@ window.saveStudentFromForm = function(event) {
         const existCitizen = allStudents.find(s => s.citizen_id === citizenId);
         if (existCitizen) {
             showCustomAlert({
-                title: 'เน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธเธเนเธณ',
-                message: `เธกเธตเน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธ "${citizenId}" (${existCitizen.name}) เธญเธขเธนเนเนเธเธฃเธฐเธเธเนเธฅเนเธง`,
+                title: 'เลขบัตรประชาชนซ้ำ',
+                message: `มีเลขบัตรประชาชน "${citizenId}" (${existCitizen.name}) อยู่ในระบบแล้ว`,
                 icon: 'fas fa-triangle-exclamation'
             });
             return;
@@ -3250,22 +3250,22 @@ window.saveStudentFromForm = function(event) {
     };
 
     saveLocalStudent(studentObj);
-    showToast(`เธเธฑเธเธ—เธถเธเธเนเธญเธกเธนเธฅเธเธฑเธเน€เธฃเธตเธขเธ "${name}" เธชเธณเน€เธฃเนเธ`, 'success');
+    showToast(`บันทึกข้อมูลนักเรียน "${name}" สำเร็จ`, 'success');
     closeStudentModal();
     loadTeacherStudentsList();
 };
 
 window.deleteStudent = function(studentId, studentName) {
     showCustomConfirm({
-        title: 'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธฅเธเธเธฑเธเน€เธฃเธตเธขเธ',
-        message: `เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธฅเธเธฃเธฒเธขเธเธทเนเธญเธเธฑเธเน€เธฃเธตเธขเธ "${studentName}" เธซเธฃเธทเธญเนเธกเน?\n(เธเนเธญเธกเธนเธฅเธเธฐเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธเธนเนเธเธทเธเนเธ”เน)`,
+        title: 'ยืนยันการลบนักเรียน',
+        message: `คุณต้องการลบรายชื่อนักเรียน "${studentName}" หรือไม่?\n(ข้อมูลจะไม่สามารถกู้คืนได้)`,
         icon: 'fas fa-user-xmark',
-        confirmText: 'เธฅเธเธฃเธฒเธขเธเธทเนเธญ',
-        cancelText: 'เธขเธเน€เธฅเธดเธ',
+        confirmText: 'ลบรายชื่อ',
+        cancelText: 'ยกเลิก',
         confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
         onConfirm: () => {
             deleteLocalStudent(studentId);
-            showToast(`เธฅเธเธฃเธฒเธขเธเธทเนเธญเธเธฑเธเน€เธฃเธตเธขเธ "${studentName}" เนเธฅเนเธง`, 'info');
+            showToast(`ลบรายชื่อนักเรียน "${studentName}" แล้ว`, 'info');
             loadTeacherStudentsList();
         }
     });
@@ -3274,43 +3274,43 @@ window.deleteStudent = function(studentId, studentName) {
 // Excel Template & Import for Students
 window.downloadStudentExcelTemplate = function() {
     if (!window.XLSX) {
-        showToast('เนเธฅเธเธฃเธฒเธฃเธต SheetJS เธขเธฑเธเนเธกเนเธเธฃเนเธญเธกเนเธเนเธเธฒเธ', 'warning');
+        showToast('ไลบรารี SheetJS ยังไม่พร้อมใช้งาน', 'warning');
         return;
     }
 
     const templateData = [
         {
-            'เธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธ': '66209010001',
-            'เธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ': 'เธเธฒเธขเธชเธกเธเธฒเธข เธฃเธฑเธเน€เธฃเธตเธขเธ',
-            'เน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธ13เธซเธฅเธฑเธ': '1103701234567',
-            'เธฃเธฐเธ”เธฑเธเธเธฑเนเธ': 'เธเธงเธ.2',
-            'เนเธเธเธเธงเธดเธเธฒ': 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ',
-            'เธซเนเธญเธเน€เธฃเธตเธขเธ': 'เธซเนเธญเธ 1'
+            'รหัสนักเรียน': '66209010001',
+            'ชื่อ-นามสกุล': 'นายสมชาย รักเรียน',
+            'เลขบัตรประชาชน13หลัก': '1103701234567',
+            'ระดับชั้น': 'ปวช.2',
+            'แผนกวิชา': 'เทคโนโลยีธุรกิจดิจิทัล',
+            'ห้องเรียน': 'ห้อง 1'
         },
         {
-            'เธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธ': '66209010002',
-            'เธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ': 'เธเธฒเธเธชเธฒเธงเธชเธกเธซเธเธดเธ เนเธเธ”เธต',
-            'เน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธ13เธซเธฅเธฑเธ': '1103701234568',
-            'เธฃเธฐเธ”เธฑเธเธเธฑเนเธ': 'เธเธงเธ.2',
-            'เนเธเธเธเธงเธดเธเธฒ': 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ',
-            'เธซเนเธญเธเน€เธฃเธตเธขเธ': 'เธซเนเธญเธ 1'
+            'รหัสนักเรียน': '66209010002',
+            'ชื่อ-นามสกุล': 'นางสาวสมหญิง ใจดี',
+            'เลขบัตรประชาชน13หลัก': '1103701234568',
+            'ระดับชั้น': 'ปวช.2',
+            'แผนกวิชา': 'เทคโนโลยีธุรกิจดิจิทัล',
+            'ห้องเรียน': 'ห้อง 1'
         },
         {
-            'เธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธ': '66209010003',
-            'เธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ': 'เธเธฒเธขเธเธเธเธคเธ• เธกเธธเนเธเธกเธฑเนเธ',
-            'เน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธ13เธซเธฅเธฑเธ': '1103701234569',
-            'เธฃเธฐเธ”เธฑเธเธเธฑเนเธ': 'เธเธงเธ.2',
-            'เนเธเธเธเธงเธดเธเธฒ': 'เธเธฒเธฃเธเธฑเธเธเธต',
-            'เธซเนเธญเธเน€เธฃเธตเธขเธ': 'เธซเนเธญเธ 2'
+            'รหัสนักเรียน': '66209010003',
+            'ชื่อ-นามสกุล': 'นายธนกฤต มุ่งมั่น',
+            'เลขบัตรประชาชน13หลัก': '1103701234569',
+            'ระดับชั้น': 'ปวช.2',
+            'แผนกวิชา': 'การบัญชี',
+            'ห้องเรียน': 'ห้อง 2'
         }
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'เธฃเธฒเธขเธเธทเนเธญเธเธฑเธเน€เธฃเธตเธขเธ');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'รายชื่อนักเรียน');
 
-    XLSX.writeFile(workbook, 'เนเธเธเธเธญเธฃเนเธกเธเธณเน€เธเนเธฒเธฃเธฒเธขเธเธทเนเธญเธเธฑเธเน€เธฃเธตเธขเธ_เธงเธฑเธเนเธเธฅเธเธฑเธเธงเธฅ.xlsx');
-    showToast('เธ”เธฒเธงเธเนเนเธซเธฅเธ”เน€เธ—เธกเน€เธเธฅเธ• Excel เธฃเธฒเธขเธเธทเนเธญเธเธฑเธเน€เธฃเธตเธขเธเนเธฅเนเธง', 'success');
+    XLSX.writeFile(workbook, 'แบบฟอร์มนำเข้ารายชื่อนักเรียน_วังไกลกังวล.xlsx');
+    showToast('ดาวน์โหลดเทมเพลต Excel รายชื่อนักเรียนแล้ว', 'success');
 };
 
 window.openStudentExcelImportModal = function() {
@@ -3334,20 +3334,20 @@ window.handleStudentExcelUpload = function(event) {
 
             if (!rows || rows.length === 0) {
                 showCustomAlert({
-                    title: 'เนเธกเนเธเธเธเนเธญเธกเธนเธฅเนเธเนเธเธฅเน',
-                    message: 'เนเธกเนเธเธเธเนเธญเธกเธนเธฅเนเธเนเธเธฅเน Excel เธซเธฃเธทเธญเธฃเธนเธเนเธเธเธ•เธฒเธฃเธฒเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ',
+                    title: 'ไม่พบข้อมูลในไฟล์',
+                    message: 'ไม่พบข้อมูลในไฟล์ Excel หรือรูปแบบตารางไม่ถูกต้อง',
                     icon: 'fas fa-triangle-exclamation'
                 });
                 return;
             }
 
             _studentExcelParsedList = rows.map((r, idx) => {
-                const code = String(r['เธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธ'] || r['student_id'] || r['code'] || r['ID'] || '').trim();
-                const name = String(r['เธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ'] || r['เธเธทเนเธญ'] || r['name'] || r['student_name'] || '').trim();
-                const citizenId = String(r['เน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธ13เธซเธฅเธฑเธ'] || r['เน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธ'] || r['citizen_id'] || r['id_card'] || '').replace(/[^0-9]/g, '').trim();
-                const year = String(r['เธฃเธฐเธ”เธฑเธเธเธฑเนเธ'] || r['year'] || r['class'] || 'เธเธงเธ.2').trim();
-                const dept = String(r['เนเธเธเธเธงเธดเธเธฒ'] || r['เนเธเธเธ'] || r['dept'] || 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ').trim();
-                const room = String(r['เธซเนเธญเธเน€เธฃเธตเธขเธ'] || r['เธซเนเธญเธ'] || r['room'] || 'เธซเนเธญเธ 1').trim();
+                const code = String(r['รหัสนักเรียน'] || r['student_id'] || r['code'] || r['ID'] || '').trim();
+                const name = String(r['ชื่อ-นามสกุล'] || r['ชื่อ'] || r['name'] || r['student_name'] || '').trim();
+                const citizenId = String(r['เลขบัตรประชาชน13หลัก'] || r['เลขบัตรประชาชน'] || r['citizen_id'] || r['id_card'] || '').replace(/[^0-9]/g, '').trim();
+                const year = String(r['ระดับชั้น'] || r['year'] || r['class'] || 'ปวช.2').trim();
+                const dept = String(r['แผนกวิชา'] || r['แผนก'] || r['dept'] || 'เทคโนโลยีธุรกิจดิจิทัล').trim();
+                const room = String(r['ห้องเรียน'] || r['ห้อง'] || r['room'] || 'ห้อง 1').trim();
 
                 return {
                     id: generatePseudoUUID(),
@@ -3363,8 +3363,8 @@ window.handleStudentExcelUpload = function(event) {
 
             if (_studentExcelParsedList.length === 0) {
                 showCustomAlert({
-                    title: 'เธเนเธญเธกเธนเธฅเนเธกเนเธ–เธนเธเธ•เนเธญเธ',
-                    message: 'เนเธกเนเธเธเธฃเธฒเธขเธเธทเนเธญเธ—เธตเนเธชเธกเธเธนเธฃเธ“เน เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเธกเธตเธเธญเธฅเธฑเธกเธเน "เธฃเธซเธฑเธชเธเธฑเธเน€เธฃเธตเธขเธ", "เธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ", เนเธฅเธฐ "เน€เธฅเธเธเธฑเธ•เธฃเธเธฃเธฐเธเธฒเธเธ13เธซเธฅเธฑเธ" (13 เธซเธฅเธฑเธ) เธเธฃเธเธ–เนเธงเธเธ•เธฒเธกเธ•เธฑเธงเธญเธขเนเธฒเธเน€เธ—เธกเน€เธเธฅเธ•',
+                    title: 'ข้อมูลไม่ถูกต้อง',
+                    message: 'ไม่พบรายชื่อที่สมบูรณ์ กรุณาตรวจสอบว่ามีคอลัมน์ "รหัสนักเรียน", "ชื่อ-นามสกุล", และ "เลขบัตรประชาชน13หลัก" (13 หลัก) ครบถ้วนตามตัวอย่างเทมเพลต',
                     icon: 'fas fa-triangle-exclamation'
                 });
                 return;
@@ -3388,10 +3388,10 @@ window.handleStudentExcelUpload = function(event) {
             }
 
             if (previewContainer) previewContainer.classList.remove('hidden');
-            showToast(`เธญเนเธฒเธเนเธเธฅเนเธชเธณเน€เธฃเนเธ เธเธเธฃเธฒเธขเธเธทเนเธญเธเธฑเธเน€เธฃเธตเธขเธ ${_studentExcelParsedList.length} เธเธ`, 'info');
+            showToast(`อ่านไฟล์สำเร็จ พบรายชื่อนักเรียน ${_studentExcelParsedList.length} คน`, 'info');
 
         } catch (err) {
-            showToast('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธญเนเธฒเธเนเธเธฅเน: ' + err.message, 'error');
+            showToast('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message, 'error');
         }
     };
     reader.readAsArrayBuffer(file);
@@ -3407,7 +3407,7 @@ window.clearStudentExcelPreview = function() {
 
 window.executeStudentExcelImport = function() {
     if (!_studentExcelParsedList || _studentExcelParsedList.length === 0) {
-        showToast('เนเธกเนเธกเธตเธเนเธญเธกเธนเธฅเธเธฑเธเน€เธฃเธตเธขเธเธ—เธตเนเธเธฐเธเธณเน€เธเนเธฒ', 'warning');
+        showToast('ไม่มีข้อมูลนักเรียนที่จะนำเข้า', 'warning');
         return;
     }
 
@@ -3415,52 +3415,52 @@ window.executeStudentExcelImport = function() {
         saveLocalStudent(s);
     });
 
-    showToast(`เธเธณเน€เธเนเธฒเธฃเธฒเธขเธเธทเนเธญเธเธฑเธเน€เธฃเธตเธขเธเธชเธณเน€เธฃเนเธ ${_studentExcelParsedList.length} เธเธ!`, 'success');
+    showToast(`นำเข้ารายชื่อนักเรียนสำเร็จ ${_studentExcelParsedList.length} คน!`, 'success');
     const modal = document.getElementById('modal-student-excel-import');
     if (modal) modal.classList.add('hidden');
     clearStudentExcelPreview();
     loadTeacherStudentsList();
 };
 
-// 7.4 เธ”เธฒเธงเธเนเนเธซเธฅเธ”เนเธเธฅเนเน€เธ—เธกเน€เธเธฅเธ• Excel เธชเธณเธซเธฃเธฑเธเน€เธเธดเนเธกเนเธเธ—เธขเน
+// 7.4 ดาวน์โหลดไฟล์เทมเพลต Excel สำหรับเพิ่มโจทย์
 window.downloadExcelQuestionTemplate = function() {
     if (!window.XLSX) {
-        showToast('เนเธฅเธเธฃเธฒเธฃเธต SheetJS เธขเธฑเธเนเธกเนเธเธฃเนเธญเธกเนเธเนเธเธฒเธ', 'warning');
+        showToast('ไลบรารี SheetJS ยังไม่พร้อมใช้งาน', 'warning');
         return;
     }
 
     const templateData = [
         {
-            'เนเธเธ—เธขเนเธเธณเธ–เธฒเธก': 'เธเนเธญเนเธ”เธเธทเธญเนเธเธฃเนเธ•เธเธญเธฅเธเธงเธฒเธกเธเธฅเธญเธ”เธ เธฑเธขเธชเธณเธซเธฃเธฑเธเธเธฒเธฃเธชเนเธเธเนเธญเธกเธนเธฅเธเนเธฒเธเน€เธงเนเธ?',
-            'เธ•เธฑเธงเน€เธฅเธทเธญเธ A': 'HTTP',
-            'เธ•เธฑเธงเน€เธฅเธทเธญเธ B': 'FTP',
-            'เธ•เธฑเธงเน€เธฅเธทเธญเธ C': 'HTTPS',
-            'เธ•เธฑเธงเน€เธฅเธทเธญเธ D': 'SMTP',
-            'เน€เธเธฅเธขเธ—เธตเนเธ–เธนเธเธ•เนเธญเธ (A/B/C/D)': 'C',
-            'เธเธฐเนเธเธ': 2.0,
-            'เธเธณเธญเธเธดเธเธฒเธขเน€เธเธฅเธข': 'HTTPS เธกเธตเธเธฒเธฃเน€เธเนเธฒเธฃเธซเธฑเธชเธเนเธญเธกเธนเธฅเธเนเธฒเธ TLS/SSL เธเธฅเธญเธ”เธ เธฑเธขเธ—เธตเนเธชเธธเธ”'
+            'โจทย์คำถาม': 'ข้อใดคือโปรโตคอลความปลอดภัยสำหรับการส่งข้อมูลผ่านเว็บ?',
+            'ตัวเลือก A': 'HTTP',
+            'ตัวเลือก B': 'FTP',
+            'ตัวเลือก C': 'HTTPS',
+            'ตัวเลือก D': 'SMTP',
+            'เฉลยที่ถูกต้อง (A/B/C/D)': 'C',
+            'คะแนน': 2.0,
+            'คำอธิบายเฉลย': 'HTTPS มีการเข้ารหัสข้อมูลผ่าน TLS/SSL ปลอดภัยที่สุด'
         },
         {
-            'เนเธเธ—เธขเนเธเธณเธ–เธฒเธก': 'เธเธฑเธเธเนเธเธฑเธเธซเธฅเธฑเธเธเธญเธ CPU เนเธเน€เธเธฃเธทเนเธญเธเธเธญเธกเธเธดเธงเน€เธ•เธญเธฃเนเธเธทเธญเธญเธฐเนเธฃ?',
-            'เธ•เธฑเธงเน€เธฅเธทเธญเธ A': 'เธเธฃเธฐเธกเธงเธฅเธเธฅเธเธณเธชเธฑเนเธเนเธฅเธฐเธเนเธญเธกเธนเธฅ',
-            'เธ•เธฑเธงเน€เธฅเธทเธญเธ B': 'เธเนเธฒเธขเธเธฃเธฐเนเธชเนเธเธเนเธฒ',
-            'เธ•เธฑเธงเน€เธฅเธทเธญเธ C': 'เธฃเธฐเธเธฒเธขเธเธงเธฒเธกเธฃเนเธญเธ',
-            'เธ•เธฑเธงเน€เธฅเธทเธญเธ D': 'เนเธชเธ”เธเธเธฅเธ—เธฒเธเธเธญเธ เธฒเธ',
-            'เน€เธเธฅเธขเธ—เธตเนเธ–เธนเธเธ•เนเธญเธ (A/B/C/D)': 'A',
-            'เธเธฐเนเธเธ': 1.0,
-            'เธเธณเธญเธเธดเธเธฒเธขเน€เธเธฅเธข': 'CPU (Central Processing Unit) เธ—เธณเธซเธเนเธฒเธ—เธตเนเน€เธเนเธเธชเธกเธญเธเนเธเธเธฒเธฃเธเธฃเธฐเธกเธงเธฅเธเธฅเธเธณเธชเธฑเนเธ'
+            'โจทย์คำถาม': 'ฟังก์ชันหลักของ CPU ในเครื่องคอมพิวเตอร์คืออะไร?',
+            'ตัวเลือก A': 'ประมวลผลคำสั่งและข้อมูล',
+            'ตัวเลือก B': 'จ่ายกระแสไฟฟ้า',
+            'ตัวเลือก C': 'ระบายความร้อน',
+            'ตัวเลือก D': 'แสดงผลทางจอภาพ',
+            'เฉลยที่ถูกต้อง (A/B/C/D)': 'A',
+            'คะแนน': 1.0,
+            'คำอธิบายเฉลย': 'CPU (Central Processing Unit) ทำหน้าที่เป็นสมองในการประมวลผลคำสั่ง'
         }
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'เน€เธ—เธกเน€เธเธฅเธ•เธเนเธญเธชเธญเธ');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'เทมเพลตข้อสอบ');
 
-    XLSX.writeFile(workbook, 'เนเธเธเธเธญเธฃเนเธกเธเธณเน€เธเนเธฒเธเนเธญเธชเธญเธ_เธงเธฑเธเนเธเธฅเธเธฑเธเธงเธฅ.xlsx');
-    showToast('เธ”เธฒเธงเธเนเนเธซเธฅเธ”เนเธเธฅเนเน€เธ—เธกเน€เธเธฅเธ• Excel เนเธฅเนเธง เธเธฃเธธเธ“เธฒเธเธฃเธญเธเนเธเธ—เธขเนเธ•เธฒเธกเธ•เธฑเธงเธญเธขเนเธฒเธ', 'success');
+    XLSX.writeFile(workbook, 'แบบฟอร์มนำเข้าข้อสอบ_วังไกลกังวล.xlsx');
+    showToast('ดาวน์โหลดไฟล์เทมเพลต Excel แล้ว กรุณากรอกโจทย์ตามตัวอย่าง', 'success');
 };
 
-// 7.5 เธเธฑเธ”เธเธฒเธฃเนเธเธฅเน Excel เธ—เธตเนเธญเธฑเธเนเธซเธฅเธ” (Import)
+// 7.5 จัดการไฟล์ Excel ที่อัปโหลด (Import)
 window.handleExcelFileUpload = function(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -3477,40 +3477,74 @@ window.handleExcelFileUpload = function(event) {
 
             if (!rows || rows.length === 0) {
                 showCustomAlert({
-                    title: 'เนเธกเนเธเธเธเนเธญเธกเธนเธฅเนเธเนเธเธฅเน',
-                    message: 'เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเนเธญเธชเธญเธเนเธเนเธเธฅเน Excel เธซเธฃเธทเธญเธฃเธนเธเนเธเธเธ•เธฒเธฃเธฒเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ',
+                    title: 'ไม่พบข้อมูลในไฟล์',
+                    message: 'ไม่พบข้อมูลข้อสอบในไฟล์ Excel หรือรูปแบบตารางไม่ถูกต้อง',
                     icon: 'fas fa-triangle-exclamation'
                 });
                 return;
             }
 
-            state.excelParsedQuestions = rows.map((r, idx) => {
-                const qText = r['เนเธเธ—เธขเนเธเธณเธ–เธฒเธก'] || r['question'] || r['Question'] || '';
-                const optA = r['เธ•เธฑเธงเน€เธฅเธทเธญเธ A'] || r['option_a'] || r['A'] || '';
-                const optB = r['เธ•เธฑเธงเน€เธฅเธทเธญเธ B'] || r['option_b'] || r['B'] || '';
-                const optC = r['เธ•เธฑเธงเน€เธฅเธทเธญเธ C'] || r['option_c'] || r['C'] || '';
-                const optD = r['เธ•เธฑเธงเน€เธฅเธทเธญเธ D'] || r['option_d'] || r['D'] || '';
-                const correct = (r['เน€เธเธฅเธขเธ—เธตเนเธ–เธนเธเธ•เนเธญเธ (A/B/C/D)'] || r['correct'] || r['Answer'] || 'A').toString().trim().toUpperCase();
-                const points = Number(r['เธเธฐเนเธเธ'] || r['points'] || 1.0);
-                const explanation = r['เธเธณเธญเธเธดเธเธฒเธขเน€เธเธฅเธข'] || r['explanation'] || '';
+            // Helper function to extract cell value from row with flexible key matching
+            const getVal = (r, keys) => {
+                for (const k of keys) {
+                    if (r[k] !== undefined && r[k] !== null) {
+                        const s = String(r[k]).trim();
+                        if (s.length > 0) return s;
+                    }
+                }
+                const rowKeys = Object.keys(r);
+                for (const targetKey of keys) {
+                    const normTarget = targetKey.toLowerCase().replace(/[\s_\-()]/g, '');
+                    for (const rk of rowKeys) {
+                        const normRk = rk.toLowerCase().replace(/[\s_\-()]/g, '');
+                        if (normRk === normTarget || (normRk.length > 2 && normTarget.length > 2 && (normRk.includes(normTarget) || normTarget.includes(normRk)))) {
+                            const val = r[rk];
+                            if (val !== undefined && val !== null) {
+                                const s = String(val).trim();
+                                if (s.length > 0) return s;
+                            }
+                        }
+                    }
+                }
+                return '';
+            };
+
+            const parsed = rows.map((r, idx) => {
+                const qText = getVal(r, ['โจทย์คำถาม', 'โจทย์', 'คำถาม', 'question', 'Question', 'text']);
+                const optA = getVal(r, ['ตัวเลือก A', 'ตัวเลือกA', 'ข้อ A', 'A', 'option_a', 'ตัวเลือก 1', 'ข้อ 1']);
+                const optB = getVal(r, ['ตัวเลือก B', 'ตัวเลือกB', 'ข้อ B', 'B', 'option_b', 'ตัวเลือก 2', 'ข้อ 2']);
+                const optC = getVal(r, ['ตัวเลือก C', 'ตัวเลือกC', 'ข้อ C', 'C', 'option_c', 'ตัวเลือก 3', 'ข้อ 3']);
+                const optD = getVal(r, ['ตัวเลือก D', 'ตัวเลือกD', 'ข้อ D', 'D', 'option_d', 'ตัวเลือก 4', 'ข้อ 4']);
+                let correct = getVal(r, ['เฉลยที่ถูกต้อง (A/B/C/D)', 'เฉลยที่ถูกต้อง', 'เฉลย', 'คำตอบ', 'correct', 'Answer', 'answer']).toUpperCase();
+                if (!['A', 'B', 'C', 'D'].includes(correct)) {
+                    if (correct === '1' || correct === 'ก') correct = 'A';
+                    else if (correct === '2' || correct === 'ข') correct = 'B';
+                    else if (correct === '3' || correct === 'ค') correct = 'C';
+                    else if (correct === '4' || correct === 'ง') correct = 'D';
+                    else correct = 'A';
+                }
+                const points = Number(getVal(r, ['คะแนน', 'points', 'point', 'score'])) || 1.0;
+                const explanation = getVal(r, ['คำอธิบายเฉลย', 'คำอธิบาย', 'explanation']);
 
                 return {
                     order: idx + 1,
                     questionText: qText,
-                    optA,
-                    optB,
+                    optA: optA || 'ตัวเลือก A',
+                    optB: optB || 'ตัวเลือก B',
                     optC,
                     optD,
                     correct,
                     points,
                     explanation
                 };
-            }).filter(q => q.questionText && q.optA && q.optB);
+            });
+
+            state.excelParsedQuestions = parsed.filter(q => q.questionText.length > 0);
 
             if (state.excelParsedQuestions.length === 0) {
                 showCustomAlert({
-                    title: 'เธเนเธญเธกเธนเธฅเนเธกเนเธเธฃเธเธ–เนเธงเธ',
-                    message: 'เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเธงเนเธฒเธกเธตเธเธญเธฅเธฑเธกเธเน "เนเธเธ—เธขเนเธเธณเธ–เธฒเธก", "เธ•เธฑเธงเน€เธฅเธทเธญเธ A", เนเธฅเธฐ "เธ•เธฑเธงเน€เธฅเธทเธญเธ B" เธเธฃเธเธ–เนเธงเธเธ•เธฒเธกเธ•เธฑเธงเธญเธขเนเธฒเธเน€เธ—เธกเน€เธเธฅเธ•',
+                    title: 'ข้อมูลไม่ครบถ้วน',
+                    message: 'กรุณาตรวจสอบว่ามีคอลัมน์ "โจทย์คำถาม", "ตัวเลือก A", และ "ตัวเลือก B" ครบถ้วนตามตัวอย่างเทมเพลต',
                     icon: 'fas fa-triangle-exclamation'
                 });
                 return;
@@ -3538,10 +3572,10 @@ window.handleExcelFileUpload = function(event) {
             }
 
             if (previewContainer) previewContainer.classList.remove('hidden');
-            showToast(`เธญเนเธฒเธเนเธเธฅเนเธชเธณเน€เธฃเนเธ เธเธเธเนเธญเธชเธญเธ ${state.excelParsedQuestions.length} เธเนเธญ`, 'info');
+            showToast(`อ่านไฟล์สำเร็จ พบข้อสอบ ${state.excelParsedQuestions.length} ข้อ`, 'info');
 
         } catch (err) {
-            showToast('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธญเนเธฒเธเนเธเธฅเน Excel: ' + err.message, 'error');
+            showToast('เกิดข้อผิดพลาดในการอ่านไฟล์ Excel: ' + err.message, 'error');
         }
     };
     reader.readAsArrayBuffer(file);
@@ -3554,7 +3588,7 @@ window.clearExcelPreview = function() {
     if (previewContainer) previewContainer.classList.add('hidden');
 };
 
-// 7.6 เธเธณเน€เธเนเธฒเนเธเธ—เธขเนเน€เธเนเธฒเธชเธนเนเธเธฒเธเธเนเธญเธกเธนเธฅ Supabase
+// 7.6 นำเข้าโจทย์เข้าสู่ฐานข้อมูล Supabase
 window.executeExcelImport = async function() {
     let examId = document.getElementById('excel-target-exam-select').value;
     
@@ -3585,72 +3619,91 @@ window.executeExcelImport = async function() {
     const loadingModal = document.getElementById('modal-loading');
     if (loadingModal) {
         document.getElementById('loading-modal-title').textContent = 'กำลังนำเข้าข้อสอบ...';
-        document.getElementById('loading-modal-desc').textContent = `กำลังบันทึก ${totalQ} ข้อลงฐานข้อมูลอย่างปลอดภัย`;
+        document.getElementById('loading-modal-desc').textContent = `กำลังบันทึก ${totalQ} ข้อลงฐานข้อมูล...`;
         loadingModal.classList.remove('hidden');
     }
 
     let successCount = 0;
     let failedRows = [];
+    const newLocalQuestions = [];
+
+    const existingQ = getLocalQuestions(examId);
+    const maxExistingOrder = existingQ.reduce((max, q) => Math.max(max, Number(q.order_seq) || 0), 0);
 
     try {
         for (let idx = 0; idx < state.excelParsedQuestions.length; idx++) {
             const q = state.excelParsedQuestions[idx];
-            const options = [{ id: 'A', text: q.optA }, { id: 'B', text: q.optB }];
+            const currentOrder = maxExistingOrder + idx + 1;
+
+            const options = [
+                { id: 'A', text: q.optA || 'ตัวเลือก A' },
+                { id: 'B', text: q.optB || 'ตัวเลือก B' }
+            ];
             if (q.optC) options.push({ id: 'C', text: q.optC });
             if (q.optD) options.push({ id: 'D', text: q.optD });
 
-            // อัปเดต progress
-            if (loadingModal) {
-                document.getElementById('loading-modal-desc').textContent =
-                    `กำลังบันทึกข้อ ${idx + 1}/${totalQ}...`;
-            }
-
-            // Local storage (ไม่มีเฉลยเก็บ — local ใช้แค่ preview)
-            const localQ = {
+            const newQ = {
                 id: generatePseudoUUID(),
                 exam_id: examId,
                 question_text: q.questionText,
                 options: options,
-                correct: q.correct,
                 points: Number(q.points) || 1.0,
+                correct: q.correct || 'A',
                 explanation: q.explanation || '',
-                order_seq: idx + 1
+                order_seq: currentOrder
             };
-            saveLocalQuestion(localQ);
+            newLocalQuestions.push(newQ);
 
-            // Supabase: ใช้ RPC ที่ insert ทั้ง questions + exam_answers พร้อมกัน
+            if (loadingModal && (idx % 5 === 0 || idx === totalQ - 1)) {
+                document.getElementById('loading-modal-desc').textContent = `กำลังบันทึกข้อที่ ${idx + 1}/${totalQ}...`;
+            }
+
             if (isSupabaseConfigured() && state.supabaseClient) {
-                const { data, error } = await state.supabaseClient.rpc('create_question_with_answer', {
-                    p_exam_id: examId,
-                    p_question_text: q.questionText,
-                    p_options: options,
-                    p_points: Number(q.points) || 1.0,
-                    p_correct_option_id: q.correct,
-                    p_explanation: q.explanation || '',
-                    p_order_seq: idx + 1
-                });
-                if (error) {
-                    failedRows.push({ order: idx + 1, error: error.message });
-                    console.warn(`[Excel Import] ข้อ ${idx + 1} fail:`, error.message);
-                } else {
-                    successCount++;
+                try {
+                    const { data, error } = await state.supabaseClient.rpc('create_question_with_answer', {
+                        p_exam_id: examId,
+                        p_question_text: q.questionText,
+                        p_options: options,
+                        p_points: Number(q.points) || 1.0,
+                        p_correct_option_id: q.correct || 'A',
+                        p_explanation: q.explanation || '',
+                        p_order_seq: currentOrder
+                    });
+                    if (error) {
+                        console.error(`[Excel Import] ข้อ ${idx + 1} Supabase error:`, error);
+                        failedRows.push({ order: idx + 1, error: error.message });
+                    } else {
+                        successCount++;
+                    }
+                } catch (rpcErr) {
+                    console.error(`[Excel Import] ข้อ ${idx + 1} RPC exception:`, rpcErr);
+                    failedRows.push({ order: idx + 1, error: rpcErr.message || 'Network error' });
                 }
             } else {
                 successCount++;
             }
         }
 
+        const allLocal = getLocalQuestions();
+        newLocalQuestions.forEach(q => allLocal.unshift(q));
+        localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify(allLocal));
+        broadcastAppEvent('exam_updated', { examId });
+
         if (loadingModal) loadingModal.classList.add('hidden');
 
-        const failMsg = failedRows.length > 0
-            ? `\n\n⚠️ บันทึกไม่สำเร็จ ${failedRows.length} ข้อ:\nข้อ ${failedRows.map(f => f.order).join(', ')}\n\nError: ${failedRows[0].error}`
-            : '';
-
-        showCustomAlert({
-            title: failedRows.length === 0 ? 'นำเข้าสำเร็จ!' : 'นำเข้าบางส่วน',
-            message: `${failedRows.length === 0 ? '🎉' : '⚠️'} บันทึกข้อสอบสำเร็จ ${successCount}/${totalQ} ข้อ${failMsg}`,
-            icon: failedRows.length === 0 ? 'fas fa-check-circle' : 'fas fa-triangle-exclamation'
-        });
+        if (failedRows.length === 0) {
+            showCustomAlert({
+                title: 'นำเข้าสำเร็จ!',
+                message: `🎉 บันทึกข้อสอบเข้าสู่ชุดข้อสอบเรียบร้อยแล้ว ครบถ้วน ${totalQ} ข้อ!`,
+                icon: 'fas fa-check-circle'
+            });
+        } else {
+            showCustomAlert({
+                title: 'นำเข้าสำเร็จบางส่วน',
+                message: `บันทึกสำเร็จ ${successCount}/${totalQ} ข้อ\n(ไม่สำเร็จ ${failedRows.length} ข้อ: ${failedRows.map(f => `ข้อ ${f.order}`).join(', ')})\n\nคำแนะนำ: กรุณารัน SQL อัปเดตตาราง questions/exams ใน Supabase`,
+                icon: 'fas fa-triangle-exclamation'
+            });
+        }
 
         clearExcelPreview();
         document.getElementById('teacher-tab-btn-exams').click();
@@ -3686,10 +3739,10 @@ function setupExcelDragDrop() {
     }, false);
 }
 
-// 7.7 เธ•เธฃเธงเธเธเธณเธ•เธญเธเธเธฑเธเน€เธฃเธตเธขเธเธ—เธตเธฅเธฐเธเนเธญ (Inspection Modal)
-// 7.2.2 เธญเธฒเธเธฒเธฃเธขเนเธเธฅเธ”เธฅเนเธญเธเนเธซเนเธเธฑเธเน€เธฃเธตเธขเธเธ—เธณเธเนเธญเธชเธญเธเนเธซเธกเนเธญเธตเธเธเธฃเธฑเนเธ (เธฅเนเธฒเธเธเธฅเธชเธญเธเน€เธ”เธดเธกเนเธฅเธฐเน€เธเธดเธ”เธชเธดเธ—เธเธดเน)
+// 7.7 ตรวจคำตอบนักเรียนทีละข้อ (Inspection Modal)
+// 7.2.2 อาจารย์ปลดล็อกให้นักเรียนทำข้อสอบใหม่อีกครั้ง (ล้างผลสอบเดิมและเปิดสิทธิ์)
 window.allowStudentRetake = function(subId, studentId, examId, studentName, examTitle) {
-    // เธฃเธญเธเธฃเธฑเธเธเธฒเธฃเน€เธฃเธตเธขเธเนเธเธ 4 เธเธฒเธฃเธฒเธกเธดเน€เธ•เธญเธฃเนเน€เธ”เธดเธก (studentId, examId, studentName, examTitle)
+    // รองรับการเรียกแบบ 4 พารามิเตอร์เดิม (studentId, examId, studentName, examTitle)
     if (!examTitle && studentName && examId) {
         examTitle = studentName;
         studentName = examId;
@@ -3699,23 +3752,23 @@ window.allowStudentRetake = function(subId, studentId, examId, studentName, exam
     }
 
     showCustomConfirm({
-        title: 'เธเธฅเธ”เธฅเนเธญเธเนเธซเนเน€เธเนเธฒเธ—เธณเธเนเธญเธชเธญเธเนเธซเธกเน',
-        message: `เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธฅเนเธฒเธเธเธฅเธชเธญเธเน€เธ”เธดเธกเนเธฅเธฐเธญเธเธธเธเธฒเธ•เนเธซเนเธเธฑเธเน€เธฃเธตเธขเธ "${studentName}" เน€เธเนเธฒเธ—เธณเธเนเธญเธชเธญเธเธเธธเธ” "${examTitle}" เนเธซเธกเนเธญเธตเธเธเธฃเธฑเนเธเนเธเนเธซเธฃเธทเธญเนเธกเน?`,
+        title: 'ปลดล็อกให้เข้าทำข้อสอบใหม่',
+        message: `คุณต้องการล้างผลสอบเดิมและอนุญาตให้นักเรียน "${studentName}" เข้าทำข้อสอบชุด "${examTitle}" ใหม่อีกครั้งใช่หรือไม่?`,
         icon: 'fas fa-rotate-left text-amber-500',
-        confirmText: 'เธเธฅเธ”เธฅเนเธญเธเนเธซเนเธชเธญเธเนเธซเธกเน',
-        cancelText: 'เธขเธเน€เธฅเธดเธ',
+        confirmText: 'ปลดล็อกให้สอบใหม่',
+        cancelText: 'ยกเลิก',
         confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-100',
         onConfirm: async () => {
-            // 1. เธฅเธเธเธฒเธ Local Storage เธเธญเธเธเธฃเธน
+            // 1. ลบจาก Local Storage ของครู
             const subs = getLocalSubmissions();
             const cleanName = (studentName || '').trim().toLowerCase();
             const updatedSubs = subs.filter(s => !(s.exam_id === examId && (s.student_id === studentId || (s.student_name && s.student_name.trim().toLowerCase() === cleanName))));
             localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(updatedSubs));
 
-            // 2. เธฅเธเธเธฒเธ Supabase Cloud เนเธเธเนเธขเธเธเธณเธชเธฑเนเธ เธเนเธญเธเธเธฑเธ syntax error เธเธฒเธเธเนเธญเธเธงเนเธฒเธเนเธเธเธทเนเธญเธซเธฃเธทเธญ UUID error
+            // 2. ลบจาก Supabase Cloud แบบแยกคำสั่ง ป้องกัน syntax error จากช่องว่างในชื่อหรือ UUID error
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
-                    // เธฅเธเธเธฒเธ exam_results เธ”เนเธงเธข Primary Key ID เนเธ”เธขเธ•เธฃเธ (100% เนเธเนเธเธญเธ)
+                    // ลบจาก exam_results ด้วย Primary Key ID โดยตรง (100% แน่นอน)
                     if (subId && isValidUUID(subId)) {
                         await state.supabaseClient
                             .from('exam_results')
@@ -3723,7 +3776,7 @@ window.allowStudentRetake = function(subId, studentId, examId, studentName, exam
                             .eq('id', subId);
                     }
 
-                    // เธฅเธเธเธฒเธ exam_results เธ”เนเธงเธข student_id (เธ–เนเธฒเน€เธเนเธ UUID)
+                    // ลบจาก exam_results ด้วย student_id (ถ้าเป็น UUID)
                     if (isValidUUID(studentId)) {
                         await state.supabaseClient
                             .from('exam_results')
@@ -3732,7 +3785,7 @@ window.allowStudentRetake = function(subId, studentId, examId, studentName, exam
                             .eq('student_id', studentId);
                     }
 
-                    // เธฅเธเธเธฒเธ exam_results เธ”เนเธงเธข student_name
+                    // ลบจาก exam_results ด้วย student_name
                     if (studentName) {
                         await state.supabaseClient
                             .from('exam_results')
@@ -3741,7 +3794,7 @@ window.allowStudentRetake = function(subId, studentId, examId, studentName, exam
                             .eq('student_name', studentName);
                     }
 
-                    // เธฅเธเธเธฒเธ student_submissions เธ”เนเธงเธข student_id (เธ–เนเธฒเน€เธเนเธ UUID)
+                    // ลบจาก student_submissions ด้วย student_id (ถ้าเป็น UUID)
                     if (isValidUUID(studentId)) {
                         await state.supabaseClient
                             .from('student_submissions')
@@ -3750,7 +3803,7 @@ window.allowStudentRetake = function(subId, studentId, examId, studentName, exam
                             .eq('student_id', studentId);
                     }
 
-                    // เธฅเธเธเธฒเธ student_submissions เธ”เนเธงเธข student_name
+                    // ลบจาก student_submissions ด้วย student_name
                     if (studentName) {
                         await state.supabaseClient
                             .from('student_submissions')
@@ -3759,7 +3812,7 @@ window.allowStudentRetake = function(subId, studentId, examId, studentName, exam
                             .eq('student_name', studentName);
                     }
 
-                    // เธฅเธเธเธฒเธ anti_cheat_logs
+                    // ลบจาก anti_cheat_logs
                     if (isValidUUID(studentId)) {
                         await state.supabaseClient
                             .from('anti_cheat_logs')
@@ -3772,14 +3825,14 @@ window.allowStudentRetake = function(subId, studentId, examId, studentName, exam
                 }
             }
 
-            // 3. เธชเนเธเธชเธฑเธเธเธฒเธ“ Realtime เน€เธเธทเนเธญเธเธฅเธ”เธฅเนเธญเธเนเธเน€เธเธฃเธทเนเธญเธเธเธฑเธเน€เธฃเธตเธขเธเธ—เธฑเธเธ—เธต
+            // 3. ส่งสัญญาณ Realtime เพื่อปลดล็อกในเครื่องนักเรียนทันที
             broadcastAppEvent('student_retake_unlocked', {
                 studentId: studentId,
                 examId: examId,
                 studentName: studentName
             });
 
-            showToast(`เธเธฅเธ”เธฅเนเธญเธเนเธซเนเธเธฑเธเน€เธฃเธตเธขเธ "${studentName}" เน€เธเนเธฒเธ—เธณเธเนเธญเธชเธญเธเนเธซเธกเนเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง!`, 'success');
+            showToast(`ปลดล็อกให้นักเรียน "${studentName}" เข้าทำข้อสอบใหม่เรียบร้อยแล้ว!`, 'success');
             await loadTeacherSubmissions();
 
             const unlockModal = document.getElementById('modal-exam-submissions-unlock');
@@ -3787,7 +3840,7 @@ window.allowStudentRetake = function(subId, studentId, examId, studentName, exam
                 await openExamSubmissionsUnlockModal(examId);
             }
 
-            // เธเธดเธ” modal เธ•เธฃเธงเธเธเธณเธ•เธญเธเธ–เนเธฒเน€เธเธดเธ”เธญเธขเธนเน
+            // ปิด modal ตรวจคำตอบถ้าเปิดอยู่
             closeInspectModal();
         }
     });
@@ -3798,12 +3851,12 @@ window.inspectStudentSubmission = async function(studentId, examId, studentName)
     const container = document.getElementById('inspect-content');
     const nameEl = document.getElementById('inspect-student-name');
 
-    if (nameEl) nameEl.textContent = `เธฃเธฒเธขเธเธฒเธเธเธฒเธฃเธ•เธฃเธงเธ: ${studentName}`;
+    if (nameEl) nameEl.textContent = `รายงานการตรวจ: ${studentName}`;
     if (modal) modal.classList.remove('hidden');
 
     if (container) {
         container.innerHTML = `
-            <div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-emerald-500 mb-2"></i><p class="text-gray-500 text-sm">เธเธณเธฅเธฑเธเธ”เธถเธเธเนเธญเธกเธนเธฅเธเธณเธ•เธญเธเนเธฅเธฐเน€เธเธฅเธขเธฅเธฑเธ...</p></div>
+            <div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-emerald-500 mb-2"></i><p class="text-gray-500 text-sm">กำลังดึงข้อมูลคำตอบและเฉลยลับ...</p></div>
         `;
     }
 
@@ -3848,14 +3901,14 @@ window.inspectStudentSubmission = async function(studentId, examId, studentName)
 
         container.innerHTML = `
             <div class="bg-gray-50 rounded-xl p-4 mb-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div><span class="text-gray-400 block text-xs">เธเธฐเนเธเธเธฃเธงเธก:</span><span class="text-lg font-bold text-gray-800">${summary.total_score || 0} / ${summary.max_score || 0}</span></div>
-                <div><span class="text-gray-400 block text-xs">เธเธดเธ”เน€เธเนเธ:</span><span class="text-lg font-bold text-emerald-600">${summary.percentage || 0}%</span></div>
-                <div><span class="text-gray-400 block text-xs">เธชเธฅเธฑเธเธซเธเนเธฒเธเธญเธฃเธงเธก:</span><span class="text-lg font-bold text-amber-600">${summary.total_tab_switches || 0} เธเธฃเธฑเนเธ</span></div>
-                <div><span class="text-gray-400 block text-xs">เธชเธ–เธฒเธเธฐ Anti-Cheat:</span><span class="text-xs font-bold px-2 py-1 rounded-full ${summary.is_flagged_cheating ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">${summary.is_flagged_cheating ? 'โ ๏ธ เธชเธเธชเธฑเธขเธ—เธธเธเธฃเธดเธ•' : 'โ… เธเธเธ•เธด'}</span></div>
+                <div><span class="text-gray-400 block text-xs">คะแนนรวม:</span><span class="text-lg font-bold text-gray-800">${summary.total_score || 0} / ${summary.max_score || 0}</span></div>
+                <div><span class="text-gray-400 block text-xs">คิดเป็น:</span><span class="text-lg font-bold text-emerald-600">${summary.percentage || 0}%</span></div>
+                <div><span class="text-gray-400 block text-xs">สลับหน้าจอรวม:</span><span class="text-lg font-bold text-amber-600">${summary.total_tab_switches || 0} ครั้ง</span></div>
+                <div><span class="text-gray-400 block text-xs">สถานะ Anti-Cheat:</span><span class="text-xs font-bold px-2 py-1 rounded-full ${summary.is_flagged_cheating ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">${summary.is_flagged_cheating ? '⚠️ สงสัยทุจริต' : '✅ ปกติ'}</span></div>
             </div>
 
             <h4 class="font-bold text-gray-800 mb-4 text-sm flex items-center gap-2">
-                <i class="fas fa-list-check text-emerald-500"></i> เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเธณเธ•เธญเธ (${questions.length} เธเนเธญ):
+                <i class="fas fa-list-check text-emerald-500"></i> รายละเอียดคำตอบ (${questions.length} ข้อ):
             </h4>
 
             <div class="space-y-4">
@@ -3865,22 +3918,22 @@ window.inspectStudentSubmission = async function(studentId, examId, studentName)
     return `
         <div class="p-4 rounded-xl border ${isCorrect ? 'border-green-200 bg-green-50/30' : 'border-red-200 bg-red-50/30'}">
             <div class="flex items-center justify-between mb-2">
-                <span class="font-bold text-sm text-gray-800">เธเนเธญเธ—เธตเน ${idx + 1}: ${escapeHtml(parsed.text || (parsed.image ? '(เธเนเธญเธชเธญเธเนเธเธเธฃเธนเธเธ เธฒเธ)' : ''))}</span>
+                <span class="font-bold text-sm text-gray-800">ข้อที่ ${idx + 1}: ${escapeHtml(parsed.text || (parsed.image ? '(ข้อสอบแบบรูปภาพ)' : ''))}</span>
                 <span class="text-xs font-bold px-2 py-0.5 rounded ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
-                    ${isCorrect ? `+${q.points} เธเธฐเนเธเธ (เธ–เธนเธ)` : '0 เธเธฐเนเธเธ (เธเธดเธ”)'}
+                    ${isCorrect ? `+${q.points} คะแนน (ถูก)` : '0 คะแนน (ผิด)'}
                 </span>
             </div>
             ${parsed.image ? `
                 <div class="mb-3 p-2 bg-white rounded-xl border border-gray-200 inline-block">
-                    <img src="${parsed.image}" alt="เธฃเธนเธเธ เธฒเธเนเธเธ—เธขเน" class="max-h-48 max-w-full object-contain rounded-lg cursor-pointer hover:opacity-90 transition" onclick="openImageZoomModal('${parsed.image}')">
-                    <div class="text-[10px] text-gray-400 mt-1"><i class="fas fa-magnifying-glass-plus"></i> เธเธฅเธดเธเน€เธเธทเนเธญเธ”เธนเธฃเธนเธเธเธเธฒเธ”เนเธซเธเน</div>
+                    <img src="${parsed.image}" alt="รูปภาพโจทย์" class="max-h-48 max-w-full object-contain rounded-lg cursor-pointer hover:opacity-90 transition" onclick="openImageZoomModal('${parsed.image}')">
+                    <div class="text-[10px] text-gray-400 mt-1"><i class="fas fa-magnifying-glass-plus"></i> คลิกเพื่อดูรูปขนาดใหญ่</div>
                 </div>
             ` : ''}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs mb-2">
-                <div class="p-2 rounded bg-white border border-gray-100"><span class="text-gray-400">เธเธณเธ•เธญเธเธ—เธตเนเธเธฑเธเน€เธฃเธตเธขเธเน€เธฅเธทเธญเธ:</span> <strong class="${isCorrect ? 'text-green-600' : 'text-red-600'}">${q.student_selected || 'เนเธกเนเนเธ”เนเธ•เธญเธ'}</strong></div>
-                <div class="p-2 rounded bg-white border border-gray-100"><span class="text-gray-400">เน€เธเธฅเธขเธ—เธตเนเธ–เธนเธเธ•เนเธญเธ:</span> <strong class="text-green-600">${q.correct_answer}</strong></div>
+                <div class="p-2 rounded bg-white border border-gray-100"><span class="text-gray-400">คำตอบที่นักเรียนเลือก:</span> <strong class="${isCorrect ? 'text-green-600' : 'text-red-600'}">${q.student_selected || 'ไม่ได้ตอบ'}</strong></div>
+                <div class="p-2 rounded bg-white border border-gray-100"><span class="text-gray-400">เฉลยที่ถูกต้อง:</span> <strong class="text-green-600">${q.correct_answer}</strong></div>
             </div>
-            ${q.explanation ? `<p class="text-xs text-gray-500 bg-white/80 p-2 rounded border border-gray-100 mt-1">๐’ก <strong>เธเธณเธญเธเธดเธเธฒเธข:</strong> ${escapeHtml(q.explanation)}</p>` : ''}
+            ${q.explanation ? `<p class="text-xs text-gray-500 bg-white/80 p-2 rounded border border-gray-100 mt-1">💡 <strong>คำอธิบาย:</strong> ${escapeHtml(q.explanation)}</p>` : ''}
         </div>
     `;
 }).join('')}
@@ -3889,7 +3942,7 @@ window.inspectStudentSubmission = async function(studentId, examId, studentName)
         `;
 
     } catch (err) {
-        container.innerHTML = `<div class="text-red-500 p-4">เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”: ${escapeHtml(err.message)}</div>`;
+        container.innerHTML = `<div class="text-red-500 p-4">เกิดข้อผิดพลาด: ${escapeHtml(err.message)}</div>`;
     }
 };
 
@@ -3898,12 +3951,12 @@ window.closeInspectModal = function() {
     if (modal) modal.classList.add('hidden');
 };
 
-// 7.8 เธเธฑเธ”เธเธฒเธฃเธเธธเธ”เธเนเธญเธชเธญเธเนเธเธซเนเธญเธเธญเธฒเธเธฒเธฃเธขเน (เธเธฃเนเธญเธกเธชเธงเธดเธ•เธเนเน€เธเธดเธ”/เธเธดเธ”เธชเธญเธเธ—เธฑเธเธ—เธต & เนเธขเธเธชเธดเธ—เธเธดเนเธเธฃเธนเนเธ•เนเธฅเธฐเธ—เนเธฒเธ)
-// 8.1 เธ•เธฑเธงเธเธฃเธญเธเธฃเธฐเธ”เธฑเธเธเธฑเนเธเธเธตเนเธเธซเธเนเธฒเธฃเธงเธกเธเธธเธ”เธเนเธญเธชเธญเธ
-window.selectedTeacherExamYearFilter = 'เธ—เธฑเนเธเธซเธกเธ”';
+// 7.8 จัดการชุดข้อสอบในห้องอาจารย์ (พร้อมสวิตช์เปิด/ปิดสอบทันที & แยกสิทธิ์ครูแต่ละท่าน)
+// 8.1 ตัวกรองระดับชั้นปีในหน้ารวมชุดข้อสอบ
+window.selectedTeacherExamYearFilter = 'ทั้งหมด';
 
 window.setTeacherExamYearFilter = function(year) {
-    window.selectedTeacherExamYearFilter = year || 'เธ—เธฑเนเธเธซเธกเธ”';
+    window.selectedTeacherExamYearFilter = year || 'ทั้งหมด';
     
     // Update pills styling
     const pillBtns = document.querySelectorAll('.year-pill-btn');
@@ -3919,63 +3972,7 @@ window.setTeacherExamYearFilter = function(year) {
     loadTeacherExamsList();
 };
 
-window.saveExamDuration = async function(event) {
-    event.preventDefault();
-    const examId = document.getElementById('edit-duration-exam-id')?.value;
-    const minutes = parseInt(document.getElementById('edit-duration-minutes-input')?.value, 10);
-    const maxSwitches = parseInt(document.getElementById('edit-max-switches-input')?.value, 10);
-
-    if (!examId || isNaN(minutes) || minutes <= 0) {
-        showToast('เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเน€เธงเธฅเธฒเธ—เธณเธเนเธญเธชเธญเธเนเธซเนเธ–เธนเธเธ•เนเธญเธ (เธญเธขเนเธฒเธเธเนเธญเธข 1 เธเธฒเธ—เธต)', 'warning');
-        return;
-    }
-    if (isNaN(maxSwitches) || maxSwitches < 0) {
-        showToast('เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธเธณเธเธงเธเธเธฃเธฑเนเธเธ—เธตเนเธญเธเธธเธเธฒเธ•เนเธซเนเธชเธฅเธฑเธเธเธญ (0 = เธซเนเธฒเธกเธชเธฅเธฑเธ)', 'warning');
-        return;
-    }
-
-    const exams = getLocalExams();
-    const exam = exams.find(e => e.id === examId);
-    if (!exam) {
-        showToast('เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธธเธ”เธเนเธญเธชเธญเธ', 'error');
-        return;
-    }
-
-    exam.duration_minutes = minutes;
-    exam.max_tab_switches_allowed = maxSwitches;
-    saveLocalExam(exam);
-
-    if (isSupabaseConfigured() && state.supabaseClient) {
-        try {
-            await state.supabaseClient
-                .from('exams')
-                .update({ duration_minutes: minutes, max_tab_switches_allowed: maxSwitches })
-                .eq('id', examId);
-        } catch (e) {
-            console.warn('[saveExamDuration] Remote update warning:', e);
-        }
-    }
-
-    // Update in-memory state
-    if (state.localExams) {
-        const idx = state.localExams.findIndex(e => e.id === examId);
-        if (idx >= 0) {
-            state.localExams[idx].duration_minutes = minutes;
-            state.localExams[idx].max_tab_switches_allowed = maxSwitches;
-        }
-    }
-
-    // Update view modal display if open
-    const displayEl = document.getElementById('teacher-view-duration-display');
-    if (displayEl) displayEl.textContent = `${minutes} เธเธฒเธ—เธต`;
-
-    closeEditExamDurationModal();
-    showToast(`เธญเธฑเธเน€เธ”เธ• \"${exam.title}\" โ’ ${minutes} เธเธฒเธ—เธต, เธชเธฅเธฑเธเธเธญเธชเธนเธเธชเธธเธ” ${maxSwitches} เธเธฃเธฑเนเธ`, 'success');
-    broadcastAppEvent('exam_updated', exam);
-    await loadTeacherExamsList();
-};
-
-// 8.1 เนเธซเธฅเธ”เธเธธเธ”เธเนเธญเธชเธญเธเธ—เธฑเนเธเธซเธกเธ” เนเธ”เธขเธเธฑเธ”เธเธฅเธธเนเธกเนเธขเธเธ•เธฒเธกเธซเธกเธงเธ”เธซเธกเธนเนเธงเธดเธเธฒเนเธฅเธฐเธฃเธฐเธ”เธฑเธเธเธฑเนเธเธเธตเธญเธขเนเธฒเธเธเธฑเธ”เน€เธเธ
+// 8.1 โหลดชุดข้อสอบทั้งหมด โดยจัดกลุ่มแยกตามหมวดหมู่วิชาและระดับชั้นปีอย่างชัดเจน
 async function loadTeacherExamsList() {
     const container = document.getElementById('teacher-exams-list-container');
     if (!container) return;
@@ -3998,7 +3995,7 @@ async function loadTeacherExamsList() {
         }
     }
 
-    // ๐”’ Teacher Isolation: เนเธชเธ”เธเน€เธเธเธฒเธฐเธเธธเธ”เธเนเธญเธชเธญเธเธเธญเธเธญเธฒเธเธฒเธฃเธขเนเธ—เนเธฒเธเธเธตเนเน€เธ—เนเธฒเธเธฑเนเธ (เน€เธงเนเธเนเธ•เน Admin)
+    // 🔒 Teacher Isolation: แสดงเฉพาะชุดข้อสอบของอาจารย์ท่านนี้เท่านั้น (เว้นแต่ Admin)
     if (state.currentUser?.role === 'teacher') {
         const myCourseIds = (state.courses || []).map(c => c.id);
         const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
@@ -4012,7 +4009,7 @@ async function loadTeacherExamsList() {
 
     // Filters from UI
     const searchVal = (document.getElementById('teacher-exam-list-filter-search')?.value || '').trim().toLowerCase();
-    const yearFilter = window.selectedTeacherExamYearFilter || 'เธ—เธฑเนเธเธซเธกเธ”';
+    const yearFilter = window.selectedTeacherExamYearFilter || 'ทั้งหมด';
 
     let filteredExams = exams;
 
@@ -4022,7 +4019,7 @@ async function loadTeacherExamsList() {
             (e.description && e.description.toLowerCase().includes(searchVal))
         );
     }
-    if (yearFilter !== 'เธ—เธฑเนเธเธซเธกเธ”') {
+    if (yearFilter !== 'ทั้งหมด') {
         filteredExams = filteredExams.filter(e => (e.target_year || '').includes(yearFilter));
     }
 
@@ -4032,14 +4029,14 @@ async function loadTeacherExamsList() {
                 <div class="w-16 h-16 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center mx-auto text-2xl">
                     <i class="fas fa-folder-open"></i>
                 </div>
-                <h4 class="font-bold text-slate-800 text-base">เนเธกเนเธเธเธเธธเธ”เธเนเธญเธชเธญเธเธ•เธฒเธกเน€เธเธทเนเธญเธเนเธ</h4>
-                <p class="text-xs text-slate-400 max-w-sm mx-auto">เธเธธเธ“เธชเธฒเธกเธฒเธฃเธ–เธชเธฃเนเธฒเธเธเธธเธ”เธเนเธญเธชเธญเธเนเธซเธกเน เธซเธฃเธทเธญเธเธฅเธดเธเธเธธเนเธกเน€เธฅเธทเธญเธ "เธ—เธฑเนเธเธซเธกเธ”" เธ”เนเธฒเธเธเธเน€เธเธทเนเธญเธ”เธนเธเธธเธ”เธเนเธญเธชเธญเธเธ—เธฑเนเธเธซเธกเธ”</p>
+                <h4 class="font-bold text-slate-800 text-base">ไม่พบชุดข้อสอบตามเงื่อนไข</h4>
+                <p class="text-xs text-slate-400 max-w-sm mx-auto">คุณสามารถสร้างชุดข้อสอบใหม่ หรือคลิกปุ่มเลือก "ทั้งหมด" ด้านบนเพื่อดูชุดข้อสอบทั้งหมด</p>
                 <div class="flex items-center justify-center gap-2 pt-2">
-                    <button onclick="setTeacherExamYearFilter('เธ—เธฑเนเธเธซเธกเธ”')" class="px-3.5 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition">
-                        <i class="fas fa-rotate-left mr-1"></i> เนเธชเธ”เธเธ—เธฑเนเธเธซเธกเธ”
+                    <button onclick="setTeacherExamYearFilter('ทั้งหมด')" class="px-3.5 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition">
+                        <i class="fas fa-rotate-left mr-1"></i> แสดงทั้งหมด
                     </button>
                     <button onclick="openCreateExamModal()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-sm hover:bg-emerald-700 transition">
-                        <i class="fas fa-plus mr-1"></i> เธชเธฃเนเธฒเธเธเธธเธ”เธเนเธญเธชเธญเธเนเธซเธกเน
+                        <i class="fas fa-plus mr-1"></i> สร้างชุดข้อสอบใหม่
                     </button>
                 </div>
             </div>
@@ -4048,14 +4045,14 @@ async function loadTeacherExamsList() {
         return;
     }
 
-    // เธเธฑเธ”เธเธฅเธธเนเธกเธเธธเธ”เธเนเธญเธชเธญเธเธ•เธฒเธก เธฃเธฒเธขเธงเธดเธเธฒ + เธฃเธฐเธ”เธฑเธเธเธฑเนเธเธเธต (Group by Course and Target Year)
+    // จัดกลุ่มชุดข้อสอบตาม รายวิชา + ระดับชั้นปี (Group by Course and Target Year)
     const groupsMap = new Map();
 
     filteredExams.forEach(exam => {
         const matchedCourse = state.courses?.find(c => c.id === exam.course_id);
-        const courseCode = matchedCourse?.course_code || 'เธ—เธฑเนเธงเนเธ';
-        const courseName = matchedCourse?.course_name || 'เธงเธดเธเธฒเธ—เธฑเนเธงเนเธ';
-        const targetYear = exam.target_year || 'เธ—เธธเธเธฃเธฐเธ”เธฑเธเธเธฑเนเธ';
+        const courseCode = matchedCourse?.course_code || 'ทั่วไป';
+        const courseName = matchedCourse?.course_name || 'วิชาทั่วไป';
+        const targetYear = exam.target_year || 'ทุกระดับชั้น';
 
         const groupKey = `${courseCode}___${courseName}___${targetYear}`;
         if (!groupsMap.has(groupKey)) {
@@ -4074,65 +4071,65 @@ async function loadTeacherExamsList() {
         const cardsHtml = group.exams.map(exam => {
             const isActive = exam.is_active !== false;
             const isShowScore = exam.show_score_immediately !== false;
-            const targetTag = `${exam.target_year || 'เธ—เธธเธเธเธฑเนเธ'} | ${exam.target_department || 'เธ—เธธเธเนเธเธเธ'} | ${exam.target_room || 'เธ—เธธเธเธซเนเธญเธ'}`;
+            const targetTag = `${exam.target_year || 'ทุกชั้น'} | ${exam.target_department || 'ทุกแผนก'} | ${exam.target_room || 'ทุกห้อง'}`;
 
             return `
                 <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-sm transition flex flex-wrap items-center justify-between gap-4">
                     <div class="flex-1 min-w-[280px]">
                         <div class="flex flex-wrap items-center gap-2 mb-1.5">
                             <span class="px-2.5 py-0.5 text-xs font-bold rounded-full ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
-                                ${isActive ? '๐ข เน€เธเธดเธ”เธชเธญเธเธญเธขเธนเน' : 'โช เธเธดเธ”เธชเธญเธเธญเธขเธนเน'}
+                                ${isActive ? '🟢 เปิดสอบอยู่' : '⚪ ปิดสอบอยู่'}
                             </span>
                             <span class="px-2.5 py-0.5 text-xs font-bold rounded-full ${isShowScore ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}">
-                                ${isShowScore ? '๐‘๏ธ เนเธชเธ”เธเธเธฐเนเธเธเธ—เธฑเธเธ—เธต' : '๐”’ เธเนเธญเธเธเธฐเนเธเธ'}
+                                ${isShowScore ? '👁️ แสดงคะแนนทันที' : '🔒 ซ่อนคะแนน'}
                             </span>
                             <h4 class="font-bold text-slate-800 text-base">${escapeHtml(exam.title)}</h4>
                         </div>
                         
                         <div class="text-xs text-amber-800 font-semibold mb-2 flex items-center gap-1.5">
-                            <i class="fas fa-bullseye text-amber-600"></i> เน€เธเนเธฒเธซเธกเธฒเธข: <strong>${escapeHtml(targetTag)}</strong>
+                            <i class="fas fa-bullseye text-amber-600"></i> เป้าหมาย: <strong>${escapeHtml(targetTag)}</strong>
                         </div>
                         
-                        <p class="text-xs text-slate-500 line-clamp-1">${escapeHtml(exam.description || 'เนเธกเนเธกเธตเธเธณเธญเธเธดเธเธฒเธขเน€เธเธดเนเธกเน€เธ•เธดเธก')}</p>
+                        <p class="text-xs text-slate-500 line-clamp-1">${escapeHtml(exam.description || 'ไม่มีคำอธิบายเพิ่มเติม')}</p>
                         
                         <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-2.5">
-                            <button type="button" onclick="openEditExamDurationModal('${exam.id}', ${exam.duration_minutes || 60}, '${escapeHtml(exam.title)}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50/70 hover:bg-indigo-100 hover:text-indigo-800 font-bold text-indigo-700 transition border border-indigo-100" title="เธเธฅเธดเธเน€เธเธทเนเธญเน€เธเธฅเธตเนเธขเธเน€เธงเธฅเธฒเธ—เธณเธเนเธญเธชเธญเธ">
+                            <button type="button" onclick="openEditExamDurationModal('${exam.id}', ${exam.duration_minutes || 60}, '${escapeHtml(exam.title)}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50/70 hover:bg-indigo-100 hover:text-indigo-800 font-bold text-indigo-700 transition border border-indigo-100" title="คลิกเพื่อเปลี่ยนเวลาทำข้อสอบ">
                                 <i class="far fa-clock text-indigo-500"></i>
-                                <span>${exam.duration_minutes || 60} เธเธฒเธ—เธต</span>
+                                <span>${exam.duration_minutes || 60} นาที</span>
                                 <i class="fas fa-pen-to-square text-[10px] text-indigo-400 ml-0.5"></i>
                             </button>
-                            <span><i class="far fa-user-tie text-emerald-600"></i> ${escapeHtml(exam.teacher_name || 'เธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธ')}</span>
-                            <span><i class="fas fa-shield-halved text-purple-500"></i> เธชเธฅเธฑเธเธเธญ: ${exam.max_tab_switches_allowed || 3} เธเธฃเธฑเนเธ</span>
+                            <span><i class="far fa-user-tie text-emerald-600"></i> ${escapeHtml(exam.teacher_name || 'อาจารย์ผู้สอน')}</span>
+                            <span><i class="fas fa-shield-halved text-purple-500"></i> สลับจอ: ${exam.max_tab_switches_allowed || 3} ครั้ง</span>
                         </div>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2">
-                        <!-- 1. เนเธเนเนเธเธเนเธญเธชเธญเธ (เธ•เธฃเธงเธเธ”เธนเนเธเธ—เธขเน, เน€เธเธฅเธข เนเธฅเธฐเน€เธเธดเธ”/เธเธดเธ”เนเธชเธ”เธเธเธฐเนเธเธ) -->
-                        <button onclick="viewTeacherExam('${exam.id}')" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs" title="เธเธฅเธดเธเน€เธเธทเนเธญเนเธเนเนเธเธเนเธญเธชเธญเธ เธ•เธฃเธงเธเธ”เธนเนเธเธ—เธขเน เน€เธเธฅเธข เนเธฅเธฐเธ•เธฑเนเธเธเนเธฒเน€เธเธดเธ”/เธเธดเธ”เนเธชเธ”เธเธเธฐเนเธเธ">
+                        <!-- 1. แก้ไขข้อสอบ (ตรวจดูโจทย์, เฉลย และเปิด/ปิดแสดงคะแนน) -->
+                        <button onclick="viewTeacherExam('${exam.id}')" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs" title="คลิกเพื่อแก้ไขข้อสอบ ตรวจดูโจทย์ เฉลย และตั้งค่าเปิด/ปิดแสดงคะแนน">
                             <i class="fas fa-pen-to-square text-white"></i>
-                            <span>เนเธเนเนเธเธเนเธญเธชเธญเธ</span>
+                            <span>แก้ไขข้อสอบ</span>
                         </button>
 
-                        <!-- 2. เธเธฅเธชเธญเธ & เนเธซเนเธชเธญเธเนเธซเธกเน (Allow Retake) -->
-                        <button onclick="openExamSubmissionsUnlockModal('${exam.id}')" class="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs border border-amber-300" title="เธ”เธนเธเธฅเธชเธญเธเธเธญเธเธเธธเธ”เธเธตเน เนเธฅเธฐเธเธ”เธเธฅเธ”เธฅเนเธญเธเนเธซเนเธเธฑเธเน€เธฃเธตเธขเธเธ—เธณเนเธซเธกเน">
+                        <!-- 2. ผลสอบ & ให้สอบใหม่ (Allow Retake) -->
+                        <button onclick="openExamSubmissionsUnlockModal('${exam.id}')" class="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-xs border border-amber-300" title="ดูผลสอบของชุดนี้ และกดปลดล็อกให้นักเรียนทำใหม่">
                             <i class="fas fa-rotate-left text-amber-600"></i>
-                            <span>๐” เนเธซเนเธชเธญเธเนเธซเธกเน</span>
+                            <span>🔄 ให้สอบใหม่</span>
                         </button>
 
-                        <!-- 3. เธชเธฅเธฑเธ เน€เธเธดเธ”/เธเธดเธ”เธชเธญเธ เธ—เธฑเธเธ—เธต -->
-                        <button onclick="toggleExamActive('${exam.id}')" class="px-3.5 py-2 ${isActive ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="เธเธฅเธดเธเธชเธฅเธฑเธเน€เธเธดเธ”เธซเธฃเธทเธญเธเธดเธ”เธชเธญเธ">
+                        <!-- 3. สลับ เปิด/ปิดสอบ ทันที -->
+                        <button onclick="toggleExamActive('${exam.id}')" class="px-3.5 py-2 ${isActive ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="คลิกสลับเปิดหรือปิดสอบ">
                             <i class="fas ${isActive ? 'fa-toggle-on text-emerald-600 text-sm' : 'fa-toggle-off text-slate-400 text-sm'}"></i>
-                            <span>${isActive ? 'เธเธญเธเธดเธ”เธชเธญเธ' : 'เน€เธเธดเธ”เธชเธญเธ'}</span>
+                            <span>${isActive ? 'ขอปิดสอบ' : 'เปิดสอบ'}</span>
                         </button>
 
                         <button onclick="openAddQuestionForExam('${exam.id}')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium transition flex items-center gap-1.5 shadow-xs">
-                            <i class="fas fa-plus"></i> เน€เธเธดเนเธกเนเธเธ—เธขเน
+                            <i class="fas fa-plus"></i> เพิ่มโจทย์
                         </button>
                         <button onclick="openExcelImportForExam('${exam.id}')" class="px-3 py-2 btn-excel rounded-xl text-xs font-medium transition flex items-center gap-1.5 shadow-xs">
-                            <i class="fas fa-file-excel"></i> เธเธณเน€เธเนเธฒ Excel
+                            <i class="fas fa-file-excel"></i> นำเข้า Excel
                         </button>
-                        <button onclick="deleteExam('${exam.id}', '${escapeHtml(exam.title)}')" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-medium transition flex items-center gap-1.5" title="เธฅเธเธเธธเธ”เธเนเธญเธชเธญเธ">
-                            <i class="fas fa-trash-can"></i> เธฅเธ
+                        <button onclick="deleteExam('${exam.id}', '${escapeHtml(exam.title)}')" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-medium transition flex items-center gap-1.5" title="ลบชุดข้อสอบ">
+                            <i class="fas fa-trash-can"></i> ลบ
                         </button>
                     </div>
                 </div>
@@ -4141,7 +4138,7 @@ async function loadTeacherExamsList() {
 
         return `
             <div class="bg-slate-100/70 rounded-3xl p-4 sm:p-5 border border-slate-200 space-y-3 shadow-2xs">
-                <!-- Group Category Header (เธซเธฑเธงเธเนเธญเธซเธกเธงเธ”เธซเธกเธนเนเธงเธดเธเธฒเนเธฅเธฐเธฃเธฐเธ”เธฑเธเธเธฑเนเธเธเธต) -->
+                <!-- Group Category Header (หัวข้อหมวดหมู่วิชาและระดับชั้นปี) -->
                 <div class="flex flex-wrap items-center justify-between gap-2 px-1">
                     <div class="flex flex-wrap items-center gap-2.5">
                         <div class="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-sm shadow-xs font-bold">
@@ -4152,12 +4149,12 @@ async function loadTeacherExamsList() {
                                 [${escapeHtml(group.courseCode)}] ${escapeHtml(group.courseName)}
                             </span>
                             <span class="ml-2.5 px-2.5 py-0.5 text-xs font-bold rounded-lg bg-indigo-100 text-indigo-800 border border-indigo-200">
-                                ๐“ เธฃเธฐเธ”เธฑเธเธเธฑเนเธ: ${escapeHtml(group.targetYear)}
+                                🎓 ระดับชั้น: ${escapeHtml(group.targetYear)}
                             </span>
                         </div>
                     </div>
                     <span class="text-xs text-slate-600 font-bold px-3 py-1 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                        ${group.exams.length} เธเธธเธ”เธเนเธญเธชเธญเธ
+                        ${group.exams.length} ชุดข้อสอบ
                     </span>
                 </div>
 
@@ -4172,7 +4169,7 @@ async function loadTeacherExamsList() {
     populateTeacherExamSelects();
 }
 
-// 8.1.2 เน€เธเธดเธ”เธซเธเนเธฒเธ•เนเธฒเธเธ”เธนเธเธฅเธชเธญเธเนเธฅเธฐเธเธฅเธ”เธฅเนเธญเธเธชเธญเธเนเธซเธกเนเธฃเธฒเธขเธเธธเธ”เธเนเธญเธชเธญเธ
+// 8.1.2 เปิดหน้าต่างดูผลสอบและปลดล็อกสอบใหม่รายชุดข้อสอบ
 window.openExamSubmissionsUnlockModal = async function(examId) {
     const modal = document.getElementById('modal-exam-submissions-unlock');
     const tableBody = document.getElementById('exam-unlock-table-body');
@@ -4185,13 +4182,13 @@ window.openExamSubmissionsUnlockModal = async function(examId) {
     const exams = state.localExams || getLocalExams();
     const exam = exams.find(e => e.id === examId);
     if (!exam) {
-        showToast('เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธธเธ”เธเนเธญเธชเธญเธ', 'error');
+        showToast('ไม่พบข้อมูลชุดข้อสอบ', 'error');
         return;
     }
 
     const matchedCourse = state.courses?.find(c => c.id === exam.course_id);
-    const courseCode = matchedCourse?.course_code || 'เธ—เธฑเนเธงเนเธ';
-    const courseName = matchedCourse?.course_name || 'เธงเธดเธเธฒเธ—เธฑเนเธงเนเธ';
+    const courseCode = matchedCourse?.course_code || 'ทั่วไป';
+    const courseName = matchedCourse?.course_name || 'วิชาทั่วไป';
 
     if (titleEl) titleEl.textContent = exam.title;
     if (badgeEl) badgeEl.textContent = `[${courseCode}] ${courseName}`;
@@ -4203,7 +4200,7 @@ window.openExamSubmissionsUnlockModal = async function(examId) {
             <tr>
                 <td colspan="7" class="text-center py-8 text-slate-400">
                     <i class="fas fa-spinner fa-spin text-2xl text-indigo-500 mb-2 block"></i>
-                    เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธฃเธฒเธขเธเธทเนเธญเธเธฑเธเน€เธฃเธตเธขเธเธ—เธตเนเธชเนเธเธเนเธญเธชเธญเธเธเธธเธ”เธเธตเน...
+                    กำลังโหลดรายชื่อนักเรียนที่ส่งข้อสอบชุดนี้...
                 </td>
             </tr>
         `;
@@ -4234,8 +4231,8 @@ window.openExamSubmissionsUnlockModal = async function(examId) {
 
     if (metaEl) {
         metaEl.innerHTML = `
-            <span><i class="fas fa-users text-indigo-500"></i> เธชเนเธเธเนเธญเธชเธญเธเนเธฅเนเธง: <strong>${examSubs.length} เธเธ</strong></span>
-            <span><i class="fas fa-bullseye text-amber-500"></i> เน€เธเนเธฒเธซเธกเธฒเธข: <strong>${escapeHtml(exam.target_year || 'เธ—เธธเธเธเธฑเนเธ')} ${escapeHtml(exam.target_room || 'เธ—เธธเธเธซเนเธญเธ')}</strong></span>
+            <span><i class="fas fa-users text-indigo-500"></i> ส่งข้อสอบแล้ว: <strong>${examSubs.length} คน</strong></span>
+            <span><i class="fas fa-bullseye text-amber-500"></i> เป้าหมาย: <strong>${escapeHtml(exam.target_year || 'ทุกชั้น')} ${escapeHtml(exam.target_room || 'ทุกห้อง')}</strong></span>
         `;
     }
 
@@ -4244,7 +4241,7 @@ window.openExamSubmissionsUnlockModal = async function(examId) {
             <tr>
                 <td colspan="7" class="text-center py-10 text-slate-400">
                     <i class="fas fa-user-clock text-3xl text-slate-300 mb-2 block"></i>
-                    เธขเธฑเธเนเธกเนเธกเธตเธเธฑเธเน€เธฃเธตเธขเธเธชเนเธเธเนเธญเธชเธญเธเนเธเธเธธเธ”เธเธตเน
+                    ยังไม่มีนักเรียนส่งข้อสอบในชุดนี้
                 </td>
             </tr>
         `;
@@ -4259,7 +4256,7 @@ window.openExamSubmissionsUnlockModal = async function(examId) {
         return `
             <tr class="hover:bg-slate-50 transition">
                 <td class="py-3.5 px-4 font-medium text-slate-800">
-                    <div class="font-bold text-slate-900">${escapeHtml(sub.student_name || 'เธเธฑเธเน€เธฃเธตเธขเธ')}</div>
+                    <div class="font-bold text-slate-900">${escapeHtml(sub.student_name || 'นักเรียน')}</div>
                     <div class="text-[11px] text-slate-400 font-mono">${sub.student_code || sub.student_id}</div>
                 </td>
                 <td class="py-3.5 px-4 text-xs font-semibold text-indigo-700">
@@ -4275,24 +4272,24 @@ window.openExamSubmissionsUnlockModal = async function(examId) {
                     <span class="px-2 py-0.5 rounded-md text-xs font-semibold ${
                         sub.total_tab_switches > (exam.max_tab_switches_allowed || 3) ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
                     }">
-                        ${sub.total_tab_switches} เธเธฃเธฑเนเธ
+                        ${sub.total_tab_switches} ครั้ง
                     </span>
                 </td>
                 <td class="py-3.5 px-4 text-center">
                     ${isFlagged ? `
-                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700">โ ๏ธ เธชเธเธชเธฑเธขเธ—เธธเธเธฃเธดเธ•</span>
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700">⚠️ สงสัยทุจริต</span>
                     ` : `
-                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-700">โ… เธเธเธ•เธด</span>
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-700">✅ ปกติ</span>
                     `}
                 </td>
                 <td class="py-3.5 px-4 text-slate-400 text-[11px]">${formattedDate}</td>
                 <td class="py-3.5 px-4 text-right">
                     <div class="flex items-center justify-end gap-1.5 whitespace-nowrap">
                         <button onclick="inspectStudentSubmission('${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}')" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1">
-                            <i class="fas fa-search"></i> เธ•เธฃเธงเธเธเธณเธ•เธญเธ
+                            <i class="fas fa-search"></i> ตรวจคำตอบ
                         </button>
-                        <button onclick="allowStudentRetake('${sub.id || ''}', '${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}', '${escapeHtml(exam.title)}')" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1 border border-amber-300" title="เธฅเนเธฒเธเธเธฅเธชเธญเธเน€เธ”เธดเธกเนเธฅเธฐเน€เธเธดเธ”เธชเธดเธ—เธเธดเนเนเธซเนเธเธฑเธเน€เธฃเธตเธขเธเธ—เธณเนเธซเธกเนเธ—เธฑเธเธ—เธต">
-                            <i class="fas fa-rotate-left"></i> เนเธซเนเธชเธญเธเนเธซเธกเน
+                        <button onclick="allowStudentRetake('${sub.id || ''}', '${sub.student_id}', '${sub.exam_id}', '${escapeHtml(sub.student_name)}', '${escapeHtml(exam.title)}')" class="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-lg transition shadow-2xs inline-flex items-center gap-1 border border-amber-300" title="ล้างผลสอบเดิมและเปิดสิทธิ์ให้นักเรียนทำใหม่ทันที">
+                            <i class="fas fa-rotate-left"></i> ให้สอบใหม่
                         </button>
                     </div>
                 </td>
@@ -4327,7 +4324,7 @@ window.toggleExamActive = async function(examId) {
     }
 
     broadcastAppEvent('exam_updated', exam);
-    showToast(`เธเธธเธ”เธเนเธญเธชเธญเธ "${exam.title}" เน€เธเธฅเธตเนเธขเธเธชเธ–เธฒเธเธฐเน€เธเนเธ ${newStatus ? '๐ข เน€เธเธดเธ”เธชเธญเธเธญเธขเธนเน' : 'โช เธเธดเธ”เธชเธญเธเธญเธขเธนเน'}`, 'success');
+    showToast(`ชุดข้อสอบ "${exam.title}" เปลี่ยนสถานะเป็น ${newStatus ? '🟢 เปิดสอบอยู่' : '⚪ ปิดสอบอยู่'}`, 'success');
     await loadTeacherExamsList();
 };
 
@@ -4353,11 +4350,10 @@ window.toggleExamShowScore = async function(examId) {
     }
 
     broadcastAppEvent('exam_updated', exam);
-    showToast(`เธเธธเธ”เธเนเธญเธชเธญเธ "${exam.title}" ${newSetting ? '๐‘๏ธ เน€เธเธดเธ”เนเธซเนเธเธฑเธเน€เธฃเธตเธขเธเน€เธซเนเธเธเธฐเนเธเธเนเธฅเนเธง' : '๐”’ เธเนเธญเธเธเธฐเนเธเธเธเธฒเธเธเธฑเธเน€เธฃเธตเธขเธเนเธฅเนเธง'}`, 'success');
+    showToast(`ชุดข้อสอบ "${exam.title}" ${newSetting ? '👁️ เปิดให้นักเรียนเห็นคะแนนแล้ว' : '🔒 ซ่อนคะแนนจากนักเรียนแล้ว'}`, 'success');
     await loadTeacherExamsList();
 };
 
-// 8.1.1 เธเธฑเธ”เธเธฒเธฃเนเธเนเนเธเน€เธงเธฅเธฒเธ—เธณเธเนเธญเธชเธญเธ (Duration Modal)
 window.openEditExamDurationModal = function(examId, currentMinutes, examTitle = '') {
     const modal = document.getElementById('modal-edit-exam-duration');
     const idInput = document.getElementById('edit-duration-exam-id');
@@ -4369,9 +4365,8 @@ window.openEditExamDurationModal = function(examId, currentMinutes, examTitle = 
 
     if (idInput) idInput.value = examId;
     if (minInput) minInput.value = currentMinutes || 60;
-    if (titleEl) titleEl.textContent = examTitle || 'เธเธธเธ”เธเนเธญเธชเธญเธ';
+    if (titleEl) titleEl.textContent = examTitle || 'ชุดข้อสอบ';
 
-    // เนเธซเธฅเธ”เธเนเธฒ max_tab_switches_allowed เธเธฑเธเธเธธเธเธฑเธ
     if (switchesInput) {
         const exam = (state.localExams || getLocalExams()).find(e => e.id === examId);
         switchesInput.value = (exam && exam.max_tab_switches_allowed != null) ? exam.max_tab_switches_allowed : 3;
@@ -4394,12 +4389,67 @@ window.setDurationPreset = function(minutes) {
     if (minInput) minInput.value = minutes;
 };
 
+window.saveExamDuration = async function(event) {
+    event.preventDefault();
+    const examId = document.getElementById('edit-duration-exam-id')?.value;
+    const minutes = parseInt(document.getElementById('edit-duration-minutes-input')?.value, 10);
+    const maxSwitches = parseInt(document.getElementById('edit-max-switches-input')?.value, 10);
+
+    if (!examId || isNaN(minutes) || minutes <= 0) {
+        showToast('กรุณาระบุเวลาทำข้อสอบให้ถูกต้อง (อย่างน้อย 1 นาที)', 'warning');
+        return;
+    }
+    const safeSwitches = isNaN(maxSwitches) || maxSwitches < 0 ? 3 : maxSwitches;
+
+    const exams = getLocalExams();
+    const exam = exams.find(e => e.id === examId);
+    if (!exam) {
+        showToast('ไม่พบข้อมูลชุดข้อสอบ', 'error');
+        return;
+    }
+
+    exam.duration_minutes = minutes;
+    exam.max_tab_switches_allowed = safeSwitches;
+    saveLocalExam(exam);
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            await state.supabaseClient
+                .from('exams')
+                .update({ 
+                    duration_minutes: minutes,
+                    max_tab_switches_allowed: safeSwitches
+                })
+                .eq('id', examId);
+        } catch (e) {
+            console.warn('[saveExamDuration] Remote update warning:', e);
+        }
+    }
+
+    // Update in-memory state
+    if (state.localExams) {
+        const idx = state.localExams.findIndex(e => e.id === examId);
+        if (idx >= 0) {
+            state.localExams[idx].duration_minutes = minutes;
+            state.localExams[idx].max_tab_switches_allowed = safeSwitches;
+        }
+    }
+
+    // Update view modal display if open
+    const displayEl = document.getElementById('teacher-view-duration-display');
+    if (displayEl) displayEl.textContent = `${minutes} นาที`;
+
+    closeEditExamDurationModal();
+    showToast(`อัปเดต "${exam.title}" เป็น ${minutes} นาที, อนุญาตสลับจอ ${safeSwitches} ครั้ง เรียบร้อยแล้ว!`, 'success');
+    broadcastAppEvent('exam_updated', exam);
+    await loadTeacherExamsList();
+};
 
 window.viewTeacherExam = async function(examId) {
     const exam = (state.localExams || getLocalExams()).find(e => e.id === examId) || 
                  getLocalExams().find(e => e.id === examId);
     if (!exam) {
-        showToast('เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธธเธ”เธเนเธญเธชเธญเธ', 'error');
+        showToast('ไม่พบข้อมูลชุดข้อสอบ', 'error');
         return;
     }
 
@@ -4443,8 +4493,8 @@ function renderTeacherExamViewModal(exam, questions) {
     modal.classList.remove('hidden');
 
     const matchedCourse = state.courses?.find(c => c.id === exam.course_id);
-    const courseCode = matchedCourse?.course_code || 'เธ—เธฑเนเธงเนเธ';
-    const courseName = matchedCourse?.course_name || 'เธงเธดเธเธฒเธ—เธฑเนเธงเนเธ';
+    const courseCode = matchedCourse?.course_code || 'ทั่วไป';
+    const courseName = matchedCourse?.course_name || 'วิชาทั่วไป';
     const isActive = exam.is_active !== false;
 
     // Header Badges & Info
@@ -4462,10 +4512,10 @@ function renderTeacherExamViewModal(exam, questions) {
     if (statusBadge) {
         statusBadge.innerHTML = `
             <span class="px-2.5 py-0.5 text-xs font-bold rounded-full ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
-                ${isActive ? '๐ข เน€เธเธดเธ”เธชเธญเธเธญเธขเธนเน' : 'โช เธเธดเธ”เธชเธญเธเธญเธขเธนเน'}
+                ${isActive ? '🟢 เปิดสอบอยู่' : '⚪ ปิดสอบอยู่'}
             </span>
             <span class="ml-1 px-2.5 py-0.5 text-xs font-bold rounded-full ${isShowScore ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}">
-                ${isShowScore ? '๐‘๏ธ เนเธชเธ”เธเธเธฐเนเธเธ' : '๐”’ เธเนเธญเธเธเธฐเนเธเธ'}
+                ${isShowScore ? '👁️ แสดงคะแนน' : '🔒 ซ่อนคะแนน'}
             </span>
         `;
     }
@@ -4474,20 +4524,20 @@ function renderTeacherExamViewModal(exam, questions) {
         metaEl.innerHTML = `
             <div class="flex flex-wrap items-center gap-2 pt-1">
                 <span class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100/80 px-2.5 py-1 rounded-xl text-indigo-900 shadow-2xs">
-                    <i class="far fa-clock text-indigo-600"></i> เน€เธงเธฅเธฒเธชเธญเธ: <strong id="teacher-view-duration-display" class="font-bold text-indigo-700">${exam.duration_minutes || 60} เธเธฒเธ—เธต</strong>
-                    <button type="button" onclick="openEditExamDurationModal('${exam.id}', ${exam.duration_minutes || 60}, '${escapeHtml(exam.title)}')" class="ml-1 px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition inline-flex items-center gap-1 shadow-xs" title="เธเธฅเธดเธเน€เธเธทเนเธญเน€เธเธฅเธตเนเธขเธเน€เธงเธฅเธฒเธ—เธณเธเนเธญเธชเธญเธ">
-                        <i class="fas fa-pen-to-square"></i> เนเธเนเนเธเน€เธงเธฅเธฒ
+                    <i class="far fa-clock text-indigo-600"></i> เวลาสอบ: <strong id="teacher-view-duration-display" class="font-bold text-indigo-700">${exam.duration_minutes || 60} นาที</strong>
+                    <button type="button" onclick="openEditExamDurationModal('${exam.id}', ${exam.duration_minutes || 60}, '${escapeHtml(exam.title)}')" class="ml-1 px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition inline-flex items-center gap-1 shadow-xs" title="คลิกเพื่อเปลี่ยนเวลาทำข้อสอบ">
+                        <i class="fas fa-pen-to-square"></i> แก้ไขเวลา
                     </button>
                 </span>
-                <button type="button" onclick="toggleExamShowScore('${exam.id}'); setTimeout(() => viewTeacherExam('${exam.id}'), 200);" class="px-3 py-1.5 ${isShowScore ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'} rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-xs" title="เธเธฅเธดเธเน€เธเธทเนเธญเน€เธเธดเธ”เธซเธฃเธทเธญเธเธดเธ”เธเธฒเธฃเนเธชเธ”เธเธเธฐเนเธเธเนเธซเนเธเธฑเธเน€เธฃเธตเธขเธเน€เธซเนเธเธ—เธฑเธเธ—เธตเธซเธฅเธฑเธเธชเนเธ">
+                <button type="button" onclick="toggleExamShowScore('${exam.id}'); setTimeout(() => viewTeacherExam('${exam.id}'), 200);" class="px-3 py-1.5 ${isShowScore ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'} rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-xs" title="คลิกเพื่อเปิดหรือปิดการแสดงคะแนนให้นักเรียนเห็นทันทีหลังส่ง">
                     <i class="fas ${isShowScore ? 'fa-eye text-amber-600' : 'fa-eye-slash text-slate-500'}"></i>
-                    <span>${isShowScore ? '๐‘๏ธ เนเธชเธ”เธเธเธฐเนเธเธเนเธซเนเธเธฑเธเน€เธฃเธตเธขเธ: เน€เธเธดเธ”' : '๐”’ เธเนเธญเธเธเธฐเนเธเธ: เธเธดเธ”เธญเธขเธนเน'}</span>
+                    <span>${isShowScore ? '👁️ แสดงคะแนนให้นักเรียน: เปิด' : '🔒 ซ่อนคะแนน: ปิดอยู่'}</span>
                 </button>
-                <span><i class="fas fa-list-check text-emerald-500"></i> เธเนเธญเธชเธญเธ: <strong>${questions.length} เธเนเธญ</strong> (${totalPoints} เธเธฐเนเธเธ)</span>
-                <span><i class="fas fa-bullseye text-amber-500"></i> <strong>${escapeHtml(exam.target_year || 'เธ—เธธเธเธเธฑเนเธ')} ${escapeHtml(exam.target_department || 'เธ—เธธเธเนเธเธเธ')} ${escapeHtml(exam.target_room || 'เธ—เธธเธเธซเนเธญเธ')}</strong></span>
-                <span><i class="fas fa-shield-halved text-purple-500"></i> เธชเธฅเธฑเธเธเธญ: <strong>${exam.max_tab_switches_allowed || 3} เธเธฃเธฑเนเธ</strong></span>
+                <span><i class="fas fa-list-check text-emerald-500"></i> ข้อสอบ: <strong>${questions.length} ข้อ</strong> (${totalPoints} คะแนน)</span>
+                <span><i class="fas fa-bullseye text-amber-500"></i> <strong>${escapeHtml(exam.target_year || 'ทุกชั้น')} ${escapeHtml(exam.target_department || 'ทุกแผนก')} ${escapeHtml(exam.target_room || 'ทุกห้อง')}</strong></span>
+                <span><i class="fas fa-shield-halved text-purple-500"></i> สลับจอ: <strong>${exam.max_tab_switches_allowed || 3} ครั้ง</strong></span>
                 <button type="button" onclick="closeTeacherExamViewModal(); openExamSubmissionsUnlockModal('${exam.id}')" class="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1 shadow-xs">
-                    <i class="fas fa-rotate-left"></i> เธเธฅเธชเธญเธ & เนเธซเนเธชเธญเธเนเธซเธกเน
+                    <i class="fas fa-rotate-left"></i> ผลสอบ & ให้สอบใหม่
                 </button>
             </div>
         `;
@@ -4516,14 +4566,14 @@ function renderTeacherExamViewModal(exam, questions) {
                 <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto text-2xl">
                     <i class="fas fa-clipboard-question"></i>
                 </div>
-                <h4 class="font-bold text-slate-800 text-base">เธขเธฑเธเนเธกเนเธกเธตเธเธณเธ–เธฒเธกเนเธเธเธธเธ”เธเนเธญเธชเธญเธเธเธตเน</h4>
-                <p class="text-xs text-slate-500 max-w-sm mx-auto">เธเธธเธ“เธชเธฒเธกเธฒเธฃเธ–เน€เธเธดเนเธกเธเธณเธ–เธฒเธกเนเธเธเธเนเธญเธ•เนเธญเธเนเธญ เธซเธฃเธทเธญเธเธณเน€เธเนเธฒเธเนเธญเธชเธญเธเธเธฃเนเธญเธกเธเธฑเธเธเธฒเธเนเธเธฅเน Excel (.xlsx) เนเธ”เนเธ—เธฑเธเธ—เธต</p>
+                <h4 class="font-bold text-slate-800 text-base">ยังไม่มีคำถามในชุดข้อสอบนี้</h4>
+                <p class="text-xs text-slate-500 max-w-sm mx-auto">คุณสามารถเพิ่มคำถามแบบข้อต่อข้อ หรือนำเข้าข้อสอบพร้อมกันจากไฟล์ Excel (.xlsx) ได้ทันที</p>
                 <div class="flex items-center justify-center gap-2 pt-2">
                     <button onclick="closeTeacherExamViewModal(); openAddQuestionForExam('${exam.id}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
-                        <i class="fas fa-plus"></i> เน€เธเธดเนเธกเนเธเธ—เธขเนเนเธฃเธ
+                        <i class="fas fa-plus"></i> เพิ่มโจทย์แรก
                     </button>
                     <button onclick="closeTeacherExamViewModal(); openExcelImportForExam('${exam.id}')" class="px-4 py-2 btn-excel text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5">
-                        <i class="fas fa-file-excel"></i> เธเธณเน€เธเนเธฒ Excel
+                        <i class="fas fa-file-excel"></i> นำเข้า Excel
                     </button>
                 </div>
             </div>
@@ -4548,7 +4598,7 @@ function renderTeacherExamViewModal(exam, questions) {
                         </div>
                         ${isCorrect ? `
                             <span class="px-2 py-0.5 bg-emerald-600 text-white text-[10px] font-bold rounded-md flex items-center gap-1 shrink-0">
-                                <i class="fas fa-check"></i> เน€เธเธฅเธข
+                                <i class="fas fa-check"></i> เฉลย
                             </span>
                         ` : ''}
                     </div>
@@ -4560,29 +4610,29 @@ function renderTeacherExamViewModal(exam, questions) {
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">
-                                เธเนเธญเธ—เธตเน ${qNum}
+                                ข้อที่ ${qNum}
                             </span>
-                            <span class="text-xs text-slate-400">(${points} เธเธฐเนเธเธ)</span>
+                            <span class="text-xs text-slate-400">(${points} คะแนน)</span>
                         </div>
                         <button onclick="deleteTeacherQuestion('${q.id}', '${exam.id}', ${qNum})" class="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg transition font-medium flex items-center gap-1">
-                            <i class="fas fa-trash-can"></i> เธฅเธเธเนเธญเธเธตเน
+                            <i class="fas fa-trash-can"></i> ลบข้อนี้
                         </button>
                     </div>
 
                     ${parsed.image ? `
                         <div class="p-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
-                            <img src="${parsed.image}" alt="เธ เธฒเธเนเธเธ—เธขเน" class="w-24 h-24 object-contain bg-white rounded-lg border border-slate-200 shadow-2xs cursor-pointer" onclick="openImageZoomModal('${parsed.image}')">
+                            <img src="${parsed.image}" alt="ภาพโจทย์" class="w-24 h-24 object-contain bg-white rounded-lg border border-slate-200 shadow-2xs cursor-pointer" onclick="openImageZoomModal('${parsed.image}')">
                             <div class="text-xs text-slate-500">
-                                <div class="font-bold text-slate-700 mb-1"><i class="far fa-image text-indigo-600 mr-1"></i> เธกเธตเธฃเธนเธเธ เธฒเธเธเธฃเธฐเธเธญเธเนเธเธ—เธขเน</div>
+                                <div class="font-bold text-slate-700 mb-1"><i class="far fa-image text-indigo-600 mr-1"></i> มีรูปภาพประกอบโจทย์</div>
                                 <button type="button" onclick="openImageZoomModal('${parsed.image}')" class="text-[11px] text-indigo-600 hover:underline font-semibold">
-                                    <i class="fas fa-magnifying-glass-plus"></i> เธเธฅเธดเธเน€เธเธทเนเธญเธ”เธนเธฃเธนเธเธเธเธฒเธ”เนเธซเธเน
+                                    <i class="fas fa-magnifying-glass-plus"></i> คลิกเพื่อดูรูปขนาดใหญ่
                                 </button>
                             </div>
                         </div>
                     ` : ''}
 
                     <div class="text-sm font-bold text-slate-900 leading-snug">
-                        ${escapeHtml(parsed.text || (parsed.image ? '(เธ”เธนเนเธเธ—เธขเนเธเธฒเธเธ เธฒเธเธ”เนเธฒเธเธเธ)' : ''))}
+                        ${escapeHtml(parsed.text || (parsed.image ? '(ดูโจทย์จากภาพด้านบน)' : ''))}
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -4591,7 +4641,7 @@ function renderTeacherExamViewModal(exam, questions) {
 
                     ${q.explanation ? `
                         <div class="p-3 bg-amber-50/70 border border-amber-200/60 rounded-xl text-xs text-amber-900 mt-2">
-                            <strong class="text-amber-800"><i class="fas fa-lightbulb text-amber-600 mr-1"></i> เธเธณเธญเธเธดเธเธฒเธข:</strong> ${escapeHtml(q.explanation)}
+                            <strong class="text-amber-800"><i class="fas fa-lightbulb text-amber-600 mr-1"></i> คำอธิบาย:</strong> ${escapeHtml(q.explanation)}
                         </div>
                     ` : ''}
                 </div>
@@ -4604,11 +4654,11 @@ function renderTeacherExamViewModal(exam, questions) {
 
 window.deleteTeacherQuestion = async function(questionId, examId, qIndex) {
     showCustomConfirm({
-        title: 'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธฅเธเธเธณเธ–เธฒเธก',
-        message: `เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธฅเธเธเธณเธ–เธฒเธกเธเนเธญเธ—เธตเน ${qIndex} เนเธเนเธซเธฃเธทเธญเนเธกเน?\n(เธเนเธญเธกเธนเธฅเธเธฐเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธเธนเนเธเธทเธเนเธ”เน)`,
+        title: 'ยืนยันการลบคำถาม',
+        message: `คุณต้องการลบคำถามข้อที่ ${qIndex} ใช่หรือไม่?\n(ข้อมูลจะไม่สามารถกู้คืนได้)`,
         icon: 'fas fa-trash-can',
-        confirmText: 'เธฅเธเธเธณเธ–เธฒเธก',
-        cancelText: 'เธขเธเน€เธฅเธดเธ',
+        confirmText: 'ลบคำถาม',
+        cancelText: 'ยกเลิก',
         confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
         onConfirm: async () => {
             const allQ = getLocalQuestions().filter(q => q.id !== questionId);
@@ -4616,12 +4666,18 @@ window.deleteTeacherQuestion = async function(questionId, examId, qIndex) {
 
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
-                    await state.supabaseClient.from('questions').delete().eq('id', questionId);
+                    const { error } = await state.supabaseClient.from('questions').delete().eq('id', questionId);
+                    if (error) {
+                        console.error('[deleteTeacherQuestion] Supabase error:', error);
+                        showToast('ลบจากเซิร์ฟเวอร์ไม่สำเร็จ (ติดสิทธิ์ RLS): ' + error.message, 'warning');
+                    }
                     await state.supabaseClient.from('exam_answers').delete().eq('question_id', questionId);
-                } catch (e) {}
+                } catch (e) {
+                    console.error('[deleteTeacherQuestion] Error:', e);
+                }
             }
 
-            showToast(`เธฅเธเธเธณเธ–เธฒเธกเธเนเธญเธ—เธตเน ${qIndex} เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง`, 'info');
+            showToast(`ลบคำถามข้อที่ ${qIndex} เรียบร้อยแล้ว`, 'info');
             await viewTeacherExam(examId);
             await loadTeacherExamsList();
         }
@@ -4630,21 +4686,28 @@ window.deleteTeacherQuestion = async function(questionId, examId, qIndex) {
 
 window.deleteExam = function(examId, examTitle) {
     showCustomConfirm({
-        title: 'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธฅเธเธเธธเธ”เธเนเธญเธชเธญเธ',
-        message: `เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธฅเธเธเธธเธ”เธเนเธญเธชเธญเธ "${examTitle}" เนเธเนเธซเธฃเธทเธญเนเธกเน?\n(เธเธณเธ–เธฒเธกเนเธฅเธฐเธเนเธญเธกเธนเธฅเธ—เธฑเนเธเธซเธกเธ”เธเธญเธเธเธธเธ”เธเธตเนเธเธฐเธ–เธนเธเธฅเธเธญเธญเธเธเธฒเธเธฃเธฐเธเธ)`,
+        title: 'ยืนยันการลบชุดข้อสอบ',
+        message: `คุณต้องการลบชุดข้อสอบ "${examTitle}" ใช่หรือไม่?\n(คำถามและข้อมูลทั้งหมดของชุดนี้จะถูกลบออกจากระบบ)`,
         icon: 'fas fa-trash-can',
-        confirmText: 'เธฅเธเธเธธเธ”เธเนเธญเธชเธญเธ',
-        cancelText: 'เธขเธเน€เธฅเธดเธ',
+        confirmText: 'ลบชุดข้อสอบ',
+        cancelText: 'ยกเลิก',
         confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
         onConfirm: async () => {
+            closeTeacherExamViewModal();
             deleteLocalExam(examId);
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
-                    await state.supabaseClient.from('exams').delete().eq('id', examId);
-                } catch (e) {}
+                    const { error } = await state.supabaseClient.from('exams').delete().eq('id', examId);
+                    if (error) {
+                        console.error('[deleteExam] Supabase error:', error);
+                        showToast('ลบจากเซิร์ฟเวอร์ไม่สำเร็จ (ติดสิทธิ์ RLS): ' + error.message, 'warning');
+                    }
+                } catch (e) {
+                    console.error('[deleteExam] Error:', e);
+                }
             }
-            showToast(`เธฅเธเธเธธเธ”เธเนเธญเธชเธญเธ "${examTitle}" เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง`, 'info');
-            loadTeacherExamsList();
+            showToast(`ลบชุดข้อสอบ "${examTitle}" เรียบร้อยแล้ว`, 'info');
+            await loadTeacherExamsList();
             populateTeacherExamSelects();
         }
     });
@@ -4655,12 +4718,12 @@ function populateCourseSelects() {
     if (!courseSelect) return;
 
     if (state.courses.length === 0) {
-        courseSelect.innerHTML = `<option value="">(เนเธกเนเธกเธตเธฃเธฒเธขเธงเธดเธเธฒ - เธเธฃเธธเธ“เธฒเธชเธฃเนเธฒเธเธฃเธฒเธขเธงเธดเธเธฒเธเนเธญเธ)</option>`;
+        courseSelect.innerHTML = `<option value="">(ไม่มีรายวิชา - กรุณาสร้างรายวิชาก่อน)</option>`;
         return;
     }
 
     courseSelect.innerHTML = state.courses.map(c => `
-        <option value="${c.id}" data-year="${escapeHtml(c.target_year || 'เธ—เธฑเนเธเธซเธกเธ”')}" data-dept="${escapeHtml(c.target_department || 'เธ—เธฑเนเธเธซเธกเธ”')}">[${escapeHtml(c.course_code)}] ${escapeHtml(c.course_name)} (${escapeHtml(c.target_year || 'เธ—เธธเธเธเธฑเนเธ')})</option>
+        <option value="${c.id}" data-year="${escapeHtml(c.target_year || 'ทั้งหมด')}" data-dept="${escapeHtml(c.target_department || 'ทั้งหมด')}">[${escapeHtml(c.course_code)}] ${escapeHtml(c.course_name)} (${escapeHtml(c.target_year || 'ทุกชั้น')})</option>
     `).join('');
 
     courseSelect.onchange = function() {
@@ -4695,7 +4758,7 @@ window.populateTeacherExamSelects = async function(showToastFeedback = false) {
 
     try {
         if (state.supabaseClient) {
-            // เธ”เธถเธเธเธธเธ”เธเนเธญเธชเธญเธเธ—เธฑเนเธเธซเธกเธ”
+            // ดึงชุดข้อสอบทั้งหมด
             const { data, error } = await state.supabaseClient
                 .from('exams')
                 .select('*')
@@ -4716,12 +4779,12 @@ window.populateTeacherExamSelects = async function(showToastFeedback = false) {
         console.warn('[populateTeacherExamSelects] Fetching from DB failed, using memory/fallback:', e);
     }
 
-    // เนเธเน localExams เธ—เธตเนเธชเธฃเนเธฒเธเนเธงเนเธเธฃเธดเธ
+    // ใช้ localExams ที่สร้างไว้จริง
     if (exams.length === 0 && Array.isArray(state.localExams) && state.localExams.length > 0) {
         exams = state.localExams;
     }
 
-    // ๐”’ Teacher Isolation: เนเธชเธ”เธเน€เธเธเธฒเธฐเธเธธเธ”เธเนเธญเธชเธญเธเธเธญเธเธ•เธเน€เธญเธ
+    // 🔒 Teacher Isolation: แสดงเฉพาะชุดข้อสอบของตนเอง
     if (state.currentUser?.role === 'teacher') {
         const myCourseIds = (state.courses || []).map(c => c.id);
         const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
@@ -4736,19 +4799,19 @@ window.populateTeacherExamSelects = async function(showToastFeedback = false) {
         const currentVal = select.value;
 
         if (exams.length === 0) {
-            select.innerHTML = `<option value="">-- เธขเธฑเธเนเธกเนเธกเธตเธเธธเธ”เธเนเธญเธชเธญเธ (เธเธฃเธธเธ“เธฒเธชเธฃเนเธฒเธเธเธธเธ”เธเนเธญเธชเธญเธเธเนเธญเธ) --</option>`;
+            select.innerHTML = `<option value="">-- ยังไม่มีชุดข้อสอบ (กรุณาสร้างชุดข้อสอบก่อน) --</option>`;
             return;
         }
 
         let html = exams.map(exam => {
             const coursePrefix = exam.course?.course_code ? `[${exam.course.course_code}] ` : (exam.course?.course_name ? `[${exam.course.course_name}] ` : '');
-            const targetTag = ` (${exam.target_year || 'เธ—เธธเธเธเธฑเนเธ'} ${exam.target_room || 'เธ—เธธเธเธซเนเธญเธ'})`;
+            const targetTag = ` (${exam.target_year || 'ทุกชั้น'} ${exam.target_room || 'ทุกห้อง'})`;
             return `<option value="${exam.id}">${escapeHtml(coursePrefix + exam.title + targetTag)}</option>`;
         }).join('');
 
         select.innerHTML = html;
 
-        // Auto-select: เธ–เนเธฒเธกเธตเธเนเธฒเน€เธ”เธดเธกเธ—เธตเนเธ•เธฃเธเนเธซเนเธเธเนเธงเน เธกเธดเธเธฐเธเธฑเนเธเน€เธฅเธทเธญเธเธเธธเธ”เนเธฃเธเนเธซเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธดเธ—เธฑเธเธ—เธต
+        // Auto-select: ถ้ามีค่าเดิมที่ตรงให้คงไว้ มิฉะนั้นเลือกชุดแรกให้อัตโนมัติทันที
         if (currentVal && exams.some(e => e.id === currentVal)) {
             select.value = currentVal;
         } else if (exams.length > 0) {
@@ -4757,7 +4820,7 @@ window.populateTeacherExamSelects = async function(showToastFeedback = false) {
     });
 
     if (showToastFeedback) {
-        showToast(`เนเธซเธฅเธ”เธฃเธฒเธขเธเธฒเธฃเธเธธเธ”เธเนเธญเธชเธญเธเนเธฅเนเธง (${exams.length} เธเธธเธ”)`, 'info');
+        showToast(`โหลดรายการชุดข้อสอบแล้ว (${exams.length} ชุด)`, 'info');
     }
 };
 
@@ -4810,7 +4873,7 @@ function loadAdminDashboard() {
     loadAdminTeachersList();
 }
 
-// 8.1 เธเธฑเธ”เธเธฒเธฃเธฃเธฒเธขเธเธทเนเธญเธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธเนเธเธซเธเนเธฒเนเธญเธ”เธกเธดเธ (Admin Teacher Management)
+// 8.1 จัดการรายชื่ออาจารย์ผู้สอนในหน้าแอดมิน (Admin Teacher Management)
 async function loadAdminTeachersList() {
     const tableBody = document.getElementById('admin-teachers-table-body');
     const badgeCount = document.getElementById('admin-teachers-count-badge');
@@ -4834,14 +4897,14 @@ async function loadAdminTeachersList() {
         }
     }
 
-    if (badgeCount) badgeCount.textContent = `${teachers.length} เธญเธฒเธเธฒเธฃเธขเน`;
+    if (badgeCount) badgeCount.textContent = `${teachers.length} อาจารย์`;
 
     if (teachers.length === 0) {
         tableBody.innerHTML = `
             <tr>
                 <td colspan="6" class="text-center py-8 text-slate-400">
                     <i class="fas fa-user-xmark text-2xl text-slate-300 mb-2 block"></i>
-                    เธขเธฑเธเนเธกเนเธกเธตเธฃเธฒเธขเธเธทเนเธญเธญเธฒเธเธฒเธฃเธขเนเนเธเธฃเธฐเธเธ เธเธฅเธดเธเธเธธเนเธก "+ เน€เธเธดเนเธกเธญเธฒเธเธฒเธฃเธขเนเนเธซเธกเน" เธ”เนเธฒเธเธเธเน€เธเธทเนเธญเน€เธฃเธดเนเธกเธ•เนเธ
+                    ยังไม่มีรายชื่ออาจารย์ในระบบ คลิกปุ่ม "+ เพิ่มอาจารย์ใหม่" ด้านบนเพื่อเริ่มต้น
                 </td>
             </tr>
         `;
@@ -4853,7 +4916,7 @@ async function loadAdminTeachersList() {
             <td class="py-3 px-3 text-slate-400 font-mono">${idx + 1}</td>
             <td class="py-3 px-3 font-bold text-slate-800 flex items-center gap-2">
                 <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">
-                    ${escapeHtml((t.name || 'เธญ').charAt(0))}
+                    ${escapeHtml((t.name || 'อ').charAt(0))}
                 </div>
                 <span>${escapeHtml(t.name)}</span>
             </td>
@@ -4863,22 +4926,22 @@ async function loadAdminTeachersList() {
                 </span>
             </td>
             <td class="py-3 px-3 text-slate-600">
-                ${escapeHtml(t.department || t.dept || 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ')}
+                ${escapeHtml(t.department || t.dept || 'เทคโนโลยีธุรกิจดิจิทัล')}
             </td>
             <td class="py-3 px-3 font-mono text-slate-600">
                 <div class="flex items-center gap-1.5">
-                    <span id="teacher-pass-display-${t.id}">โ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ข</span>
-                    <button type="button" onclick="toggleTeacherPasswordRow('${t.id}', '${escapeHtml(t.password || 'teacher1234')}')" class="text-slate-400 hover:text-indigo-600 text-xs p-1" title="เนเธชเธ”เธ/เธเนเธญเธเธฃเธซเธฑเธชเธเนเธฒเธ">
+                    <span id="teacher-pass-display-${t.id}">••••••••</span>
+                    <button type="button" onclick="toggleTeacherPasswordRow('${t.id}', '${escapeHtml(t.password || 'teacher1234')}')" class="text-slate-400 hover:text-indigo-600 text-xs p-1" title="แสดง/ซ่อนรหัสผ่าน">
                         <i id="teacher-pass-icon-${t.id}" class="fas fa-eye text-[11px]"></i>
                     </button>
                 </div>
             </td>
             <td class="py-3 px-3 text-right">
                 <div class="flex items-center justify-end gap-1.5">
-                    <button onclick="openTeacherModal('${t.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="เนเธเนเนเธเธเนเธญเธกเธนเธฅ">
+                    <button onclick="openTeacherModal('${t.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="แก้ไขข้อมูล">
                         <i class="fas fa-pen-to-square"></i>
                     </button>
-                    <button onclick="deleteTeacher('${t.id}', '${escapeHtml(t.name)}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="เธฅเธเธญเธฒเธเธฒเธฃเธขเน">
+                    <button onclick="deleteTeacher('${t.id}', '${escapeHtml(t.name)}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="ลบอาจารย์">
                         <i class="fas fa-trash-can"></i>
                     </button>
                 </div>
@@ -4892,11 +4955,11 @@ window.toggleTeacherPasswordRow = function(teacherId, realPassword) {
     const iconEl = document.getElementById(`teacher-pass-icon-${teacherId}`);
     if (!textEl) return;
 
-    if (textEl.textContent === 'โ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ข') {
+    if (textEl.textContent === '••••••••') {
         textEl.textContent = realPassword;
         if (iconEl) iconEl.className = 'fas fa-eye-slash text-[11px] text-indigo-600';
     } else {
-        textEl.textContent = 'โ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ข';
+        textEl.textContent = '••••••••';
         if (iconEl) iconEl.className = 'fas fa-eye text-[11px] text-slate-400';
     }
 };
@@ -4917,21 +4980,21 @@ window.openTeacherModal = function(teacherId) {
         const teachers = getLocalTeachers();
         const teacher = teachers.find(t => t.id === teacherId);
         if (teacher) {
-            if (title) title.innerHTML = '<i class="fas fa-user-pen text-indigo-600"></i> เนเธเนเนเธเธเนเธญเธกเธนเธฅเธญเธฒเธเธฒเธฃเธขเน';
+            if (title) title.innerHTML = '<i class="fas fa-user-pen text-indigo-600"></i> แก้ไขข้อมูลอาจารย์';
             if (modeInput) modeInput.value = 'edit';
             if (idInput) idInput.value = teacher.id;
             if (nameInput) nameInput.value = teacher.name || '';
             if (codeInput) codeInput.value = teacher.teacher_code || teacher.code || '';
-            if (deptSelect) deptSelect.value = teacher.department || teacher.dept || 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ';
+            if (deptSelect) deptSelect.value = teacher.department || teacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล';
             if (passInput) passInput.value = teacher.password || '';
         }
     } else {
-        if (title) title.innerHTML = '<i class="fas fa-user-plus text-indigo-600"></i> เน€เธเธดเนเธกเธเนเธญเธกเธนเธฅเธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธ';
+        if (title) title.innerHTML = '<i class="fas fa-user-plus text-indigo-600"></i> เพิ่มข้อมูลอาจารย์ผู้สอน';
         if (modeInput) modeInput.value = 'create';
         if (idInput) idInput.value = '';
         if (nameInput) nameInput.value = '';
         if (codeInput) codeInput.value = '';
-        if (deptSelect) deptSelect.value = 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ';
+        if (deptSelect) deptSelect.value = 'เทคโนโลยีธุรกิจดิจิทัล';
         if (passInput) passInput.value = 'teacher1234';
     }
 
@@ -4963,11 +5026,11 @@ window.saveTeacherFromForm = async function(event) {
     const id = document.getElementById('teacher-form-id')?.value || generatePseudoUUID();
     const name = document.getElementById('teacher-form-name')?.value.trim();
     const code = document.getElementById('teacher-form-code')?.value.trim();
-    const dept = document.getElementById('teacher-form-dept')?.value || 'เน€เธ—เธเนเธเนเธฅเธขเธตเธเธธเธฃเธเธดเธเธ”เธดเธเธดเธ—เธฑเธฅ';
+    const dept = document.getElementById('teacher-form-dept')?.value || 'เทคโนโลยีธุรกิจดิจิทัล';
     const password = document.getElementById('teacher-form-password')?.value.trim();
 
     if (!name || !code || !password) {
-        showToast('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธเนเธญเธกเธนเธฅเธญเธฒเธเธฒเธฃเธขเนเนเธซเนเธเธฃเธเธ–เนเธงเธ', 'warning');
+        showToast('กรุณากรอกข้อมูลอาจารย์ให้ครบถ้วน', 'warning');
         return;
     }
 
@@ -4976,8 +5039,8 @@ window.saveTeacherFromForm = async function(event) {
         const existCode = allTeachers.find(t => (t.teacher_code || t.code) === code);
         if (existCode) {
             showCustomAlert({
-                title: 'เธฃเธซเธฑเธชเธญเธฒเธเธฒเธฃเธขเนเธเนเธณ',
-                message: `เธกเธตเธฃเธซเธฑเธชเธญเธฒเธเธฒเธฃเธขเน / Username "${code}" (${existCode.name}) เธญเธขเธนเนเนเธเธฃเธฐเธเธเนเธฅเนเธง`,
+                title: 'รหัสอาจารย์ซ้ำ',
+                message: `มีรหัสอาจารย์ / Username "${code}" (${existCode.name}) อยู่ในระบบแล้ว`,
                 icon: 'fas fa-triangle-exclamation'
             });
             return;
@@ -5009,18 +5072,18 @@ window.saveTeacherFromForm = async function(event) {
         }
     }
 
-    showToast(`เธเธฑเธเธ—เธถเธเธเนเธญเธกเธนเธฅ "${name}" เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง`, 'success');
+    showToast(`บันทึกข้อมูล "${name}" เรียบร้อยแล้ว`, 'success');
     closeTeacherModal();
     loadAdminTeachersList();
 };
 
 window.deleteTeacher = function(teacherId, teacherName) {
     showCustomConfirm({
-        title: 'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธฅเธเธญเธฒเธเธฒเธฃเธขเน',
-        message: `เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธฅเธเธฃเธฒเธขเธเธทเนเธญเธญเธฒเธเธฒเธฃเธขเน "${teacherName}" เนเธเนเธซเธฃเธทเธญเนเธกเน?\n(เธญเธฒเธเธฒเธฃเธขเนเธ—เนเธฒเธเธเธตเนเธเธฐเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธเนเธ”เนเธญเธตเธ)`,
+        title: 'ยืนยันการลบอาจารย์',
+        message: `คุณต้องการลบรายชื่ออาจารย์ "${teacherName}" ใช่หรือไม่?\n(อาจารย์ท่านนี้จะไม่สามารถเข้าสู่ระบบได้อีก)`,
         icon: 'fas fa-user-xmark',
-        confirmText: 'เธฅเธเธเนเธญเธกเธนเธฅเธญเธฒเธเธฒเธฃเธขเน',
-        cancelText: 'เธขเธเน€เธฅเธดเธ',
+        confirmText: 'ลบข้อมูลอาจารย์',
+        cancelText: 'ยกเลิก',
         confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
         onConfirm: async () => {
             deleteLocalTeacher(teacherId);
@@ -5029,7 +5092,7 @@ window.deleteTeacher = function(teacherId, teacherName) {
                     await state.supabaseClient.from('teachers').delete().eq('id', teacherId);
                 } catch (e) {}
             }
-            showToast(`เธฅเธเธเนเธญเธกเธนเธฅเธญเธฒเธเธฒเธฃเธขเน "${teacherName}" เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง`, 'info');
+            showToast(`ลบข้อมูลอาจารย์ "${teacherName}" เรียบร้อยแล้ว`, 'info');
             loadAdminTeachersList();
         }
     });
@@ -5045,7 +5108,7 @@ function setupAdminConfigForm() {
         const key = document.getElementById('admin-config-key').value.trim();
 
         if (!rawUrl || !key) {
-            showToast('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธ—เธฑเนเธ Supabase URL เนเธฅเธฐ Key', 'warning');
+            showToast('กรุณากรอกทั้ง Supabase URL และ Key', 'warning');
             return;
         }
 
@@ -5056,7 +5119,7 @@ function setupAdminConfigForm() {
         localStorage.setItem('EXAM_SUPABASE_ANON_KEY', key);
 
         initSupabase();
-        showToast('เธเธฑเธเธ—เธถเธเธเธฒเธฃเธ•เธฑเนเธเธเนเธฒ Supabase เธชเธณเน€เธฃเนเธเนเธฅเนเธง!', 'success');
+        showToast('บันทึกการตั้งค่า Supabase สำเร็จแล้ว!', 'success');
     };
 }
 
@@ -5066,8 +5129,8 @@ window.testSupabaseConnection = async function() {
 
     if (!rawUrl || !key) {
         showCustomAlert({
-            title: 'เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธเนเธญเธกเธนเธฅ',
-            message: 'เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธ—เธฑเนเธ Supabase Project URL เนเธฅเธฐ Anon Key เธเนเธญเธเธเธ”เธ—เธ”เธชเธญเธ',
+            title: 'กรุณากรอกข้อมูล',
+            message: 'กรุณากรอกทั้ง Supabase Project URL และ Anon Key ก่อนกดทดสอบ',
             icon: 'fas fa-triangle-exclamation'
         });
         return;
@@ -5083,8 +5146,8 @@ window.testSupabaseConnection = async function() {
         if (error) {
             if (error.message && (error.message.includes('relation') || error.message.includes('does not exist'))) {
                 showCustomAlert({
-                    title: 'เน€เธเธทเนเธญเธกเธ•เนเธญ Supabase เธชเธณเน€เธฃเนเธ!',
-                    message: 'โ… เน€เธเธทเนเธญเธกเธ•เนเธญเธเธฒเธเธเนเธญเธกเธนเธฅเธชเธณเน€เธฃเนเธเนเธฅเนเธง\nโ ๏ธ เนเธ•เนเธขเธฑเธเนเธกเนเธเธเธ•เธฒเธฃเธฒเธเธเนเธญเธกเธนเธฅ เธเธฃเธธเธ“เธฒเธเธณเนเธเนเธ”เนเธเนเธเธฅเน supabase/schema.sql เนเธเธเธ” Run เนเธ SQL Editor เธเธเน€เธงเนเธ Supabase เน€เธเธทเนเธญเธชเธฃเนเธฒเธเธ•เธฒเธฃเธฒเธ',
+                    title: 'เชื่อมต่อ Supabase สำเร็จ!',
+                    message: '✅ เชื่อมต่อฐานข้อมูลสำเร็จแล้ว\n⚠️ แต่ยังไม่พบตารางข้อมูล กรุณานำโค้ดในไฟล์ supabase/schema.sql ไปกด Run ใน SQL Editor บนเว็บ Supabase เพื่อสร้างตาราง',
                     icon: 'fas fa-circle-info'
                 });
                 return;
@@ -5093,14 +5156,14 @@ window.testSupabaseConnection = async function() {
         }
 
         showCustomAlert({
-            title: 'เน€เธเธทเนเธญเธกเธ•เนเธญเธชเธณเน€เธฃเนเธ!',
-            message: '๐ เธเธฒเธฃเน€เธเธทเนเธญเธกเธ•เนเธญเธเธฑเธเธเธฒเธเธเนเธญเธกเธนเธฅ Supabase เธชเธณเน€เธฃเนเธเธชเธกเธเธนเธฃเธ“เน 100%\nเธเนเธญเธกเธนเธฅเธญเธฒเธเธฒเธฃเธขเน เธเนเธญเธชเธญเธ เนเธฅเธฐเธเธฅเธเธฐเนเธเธเธเธฐเธ–เธนเธเธเธดเธเธเนเนเธเธเน€เธฃเธตเธขเธฅเนเธ—เธกเน',
+            title: 'เชื่อมต่อสำเร็จ!',
+            message: '🎉 การเชื่อมต่อกับฐานข้อมูล Supabase สำเร็จสมบูรณ์ 100%\nข้อมูลอาจารย์ ข้อสอบ และผลคะแนนจะถูกซิงก์แบบเรียลไทม์',
             icon: 'fas fa-plug-circle-check'
         });
     } catch (err) {
         showCustomAlert({
-            title: 'เน€เธเธทเนเธญเธกเธ•เนเธญเนเธกเนเธชเธณเน€เธฃเนเธ',
-            message: 'โ เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เน€เธเธทเนเธญเธกเธ•เนเธญ Supabase เนเธ”เน: ' + err.message + '\n\n๐’ก เนเธเธฐเธเธณ: เธ•เธฃเธงเธเธชเธญเธเธงเนเธฒ Project URL เธญเธขเธนเนเนเธเธฃเธนเธเนเธเธ https://xxxx.supabase.co',
+            title: 'เชื่อมต่อไม่สำเร็จ',
+            message: '❌ ไม่สามารถเชื่อมต่อ Supabase ได้: ' + err.message + '\n\n💡 แนะนำ: ตรวจสอบว่า Project URL อยู่ในรูปแบบ https://xxxx.supabase.co',
             icon: 'fas fa-triangle-exclamation'
         });
     }
@@ -5110,7 +5173,7 @@ window.switchAdminToTeacher = function() {
     state.currentUser = {
         role: 'teacher',
         id: '11111111-0000-0000-0000-000000000001',
-        name: 'เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ (เธชเธดเธ—เธเธดเนเธญเธฒเธเธฒเธฃเธขเน)'
+        name: 'ผู้ดูแลระบบ (สิทธิ์อาจารย์)'
     };
     loadTeacherDashboard();
 };
@@ -5120,19 +5183,19 @@ window.switchAdminToTeacher = function() {
 // ==============================================================================
 
 function setupGlobalFormEvents() {
-    // 9.1 เธเธญเธฃเนเธกเธชเธฃเนเธฒเธเธฃเธฒเธขเธงเธดเธเธฒเนเธซเธกเน
+    // 9.1 ฟอร์มสร้างรายวิชาใหม่
     const formNewCourse = document.getElementById('form-create-course');
     if (formNewCourse) {
         formNewCourse.addEventListener('submit', async (e) => {
             e.preventDefault();
             const code = document.getElementById('create-course-code').value.trim();
             const name = document.getElementById('create-course-name').value.trim();
-            const year = document.getElementById('create-course-year')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
-            const dept = document.getElementById('create-course-dept')?.value || 'เธ—เธฑเนเธเธซเธกเธ”';
+            const year = document.getElementById('create-course-year')?.value || 'ทั้งหมด';
+            const dept = document.getElementById('create-course-dept')?.value || 'ทั้งหมด';
             const desc = document.getElementById('create-course-desc').value.trim();
 
             if (!code || !name) {
-                showToast('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธฃเธซเธฑเธชเธงเธดเธเธฒเนเธฅเธฐเธเธทเนเธญเธฃเธฒเธขเธงเธดเธเธฒ', 'warning');
+                showToast('กรุณากรอกรหัสวิชาและชื่อรายวิชา', 'warning');
                 return;
             }
 
@@ -5144,14 +5207,14 @@ function setupGlobalFormEvents() {
                 target_department: dept,
                 description: desc,
                 teacher_id: state.currentUser?.id || '11111111-0000-0000-0000-000000000001',
-                teacher_name: state.currentUser?.name || 'เธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธ',
+                teacher_name: state.currentUser?.name || 'อาจารย์ผู้สอน',
                 created_at: new Date().toISOString()
             };
 
-            // 1. เธเธฑเธเธ—เธถเธเธฅเธ Local Cache / LocalStorage เธ—เธฑเธเธ—เธต
+            // 1. บันทึกลง Local Cache / LocalStorage ทันที
             saveLocalCourse(newCourse);
 
-            // 2. เธ–เนเธฒเธ•เนเธญ Supabase เธญเธขเธนเน เนเธซเน Sync เธเธถเนเธ DB
+            // 2. ถ้าต่อ Supabase อยู่ ให้ Sync ขึ้น DB
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
                     await state.supabaseClient
@@ -5162,7 +5225,7 @@ function setupGlobalFormEvents() {
                 }
             }
 
-            showToast(`เธชเธฃเนเธฒเธเธฃเธฒเธขเธงเธดเธเธฒ "${name}" เธชเธณเน€เธฃเนเธ!`, 'success');
+            showToast(`สร้างรายวิชา "${name}" สำเร็จ!`, 'success');
             formNewCourse.reset();
             document.getElementById('modal-create-course').classList.add('hidden');
             loadTeacherCourses();
@@ -5170,7 +5233,7 @@ function setupGlobalFormEvents() {
         });
     }
 
-    // 9.2 เธเธญเธฃเนเธกเธชเธฃเนเธฒเธเธเนเธญเธชเธญเธเนเธซเธกเน (เธฃเธฐเธเธธเธงเธดเธเธฒเนเธฅเธฐเธเธฅเธธเนเธกเน€เธเนเธฒเธซเธกเธฒเธข)
+    // 9.2 ฟอร์มสร้างข้อสอบใหม่ (ระบุวิชาและกลุ่มเป้าหมาย)
     const formNewExam = document.getElementById('form-create-exam');
     if (formNewExam) {
         formNewExam.addEventListener('submit', async (e) => {
@@ -5186,14 +5249,14 @@ function setupGlobalFormEvents() {
             const showScore = document.getElementById('create-exam-show-score')?.checked !== false;
 
             if (!title) {
-                showToast('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธเธทเนเธญเธเธธเธ”เธเนเธญเธชเธญเธ', 'warning');
+                showToast('กรุณากรอกชื่อชุดข้อสอบ', 'warning');
                 return;
             }
 
             const newExam = {
                 id: generatePseudoUUID(),
                 course_id: courseId || null,
-                teacher_name: state.currentUser?.name || 'เธญเธฒเธเธฒเธฃเธขเนเธเธนเนเธชเธญเธ',
+                teacher_name: state.currentUser?.name || 'อาจารย์ผู้สอน',
                 title,
                 description: desc,
                 target_year: targetYear,
@@ -5206,10 +5269,10 @@ function setupGlobalFormEvents() {
                 created_at: new Date().toISOString()
             };
 
-            // 1. เธเธฑเธเธ—เธถเธเธฅเธ Local Cache / LocalStorage เธ—เธฑเธเธ—เธต
+            // 1. บันทึกลง Local Cache / LocalStorage ทันที
             saveLocalExam(newExam);
 
-            // 2. เธ–เนเธฒเธ•เนเธญ Supabase เธญเธขเธนเน เนเธซเน Sync เธเธถเนเธ DB
+            // 2. ถ้าต่อ Supabase อยู่ ให้ Sync ขึ้น DB
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
                     await state.supabaseClient
@@ -5220,7 +5283,7 @@ function setupGlobalFormEvents() {
                 }
             }
 
-            showToast(`เธชเธฃเนเธฒเธเธเธธเธ”เธเนเธญเธชเธญเธ "${title}" เธชเธณเน€เธฃเนเธ!`, 'success');
+            showToast(`สร้างชุดข้อสอบ "${title}" สำเร็จ!`, 'success');
             formNewExam.reset();
             loadTeacherExamsList();
             await populateTeacherExamSelects();
@@ -5230,7 +5293,7 @@ function setupGlobalFormEvents() {
         });
     }
 
-    // 9.3 เธเธญเธฃเนเธกเน€เธเธดเนเธกเนเธเธ—เธขเนเน€เธ”เธตเนเธขเธงเธเธญเธเธญเธฒเธเธฒเธฃเธขเน
+    // 9.3 ฟอร์มเพิ่มโจทย์เดี่ยวของอาจารย์
         const formAddQ = document.getElementById('form-teacher-add-question');
     if (formAddQ) {
         formAddQ.addEventListener('submit', async (e) => {
@@ -5247,17 +5310,17 @@ function setupGlobalFormEvents() {
             const attachedImg = state.currentAddQuestionImage;
 
             if (!examId) {
-                showToast('เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธเธธเธ”เธเนเธญเธชเธญเธ', 'warning');
+                showToast('กรุณาเลือกชุดข้อสอบ', 'warning');
                 return;
             }
 
             if (!qText && !attachedImg) {
-                showToast('เธเธฃเธธเธ“เธฒเธเธดเธกเธเนเธเนเธญเธเธงเธฒเธกเธเธณเธ–เธฒเธก เธซเธฃเธทเธญเธญเธฑเธเนเธซเธฅเธ”เธฃเธนเธเธ เธฒเธเนเธเธ—เธขเน', 'warning');
+                showToast('กรุณาพิมพ์ข้อความคำถาม หรืออัปโหลดรูปภาพโจทย์', 'warning');
                 return;
             }
 
             if (!optA || !optB) {
-                showToast('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธ•เธฑเธงเน€เธฅเธทเธญเธเธญเธขเนเธฒเธเธเนเธญเธข A เนเธฅเธฐ B', 'warning');
+                showToast('กรุณากรอกตัวเลือกอย่างน้อย A และ B', 'warning');
                 return;
             }
 
@@ -5285,10 +5348,10 @@ function setupGlobalFormEvents() {
                 explanation: explanation
             };
 
-            // 1. เธเธฑเธเธ—เธถเธเธฅเธ Local Storage เธ—เธฑเธเธ—เธต
+            // 1. บันทึกลง Local Storage ทันที
             saveLocalQuestion(newQ);
 
-            // 2. เธ–เนเธฒเธ•เนเธญ Supabase เนเธ”เน เนเธซเน Sync
+            // 2. ถ้าต่อ Supabase ได้ ให้ Sync
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
                     await state.supabaseClient.rpc('create_question_with_answer', {
@@ -5305,7 +5368,7 @@ function setupGlobalFormEvents() {
                 }
             }
 
-            showToast('เน€เธเธดเนเธกเนเธเธ—เธขเนเนเธฅเธฐเน€เธเธฅเธขเธฅเธฑเธเธชเธณเน€เธฃเนเธ!', 'success');
+            showToast('เพิ่มโจทย์และเฉลยลับสำเร็จ!', 'success');
             document.getElementById('teacher-add-question-text').value = '';
             document.getElementById('teacher-add-opt-a').value = '';
             document.getElementById('teacher-add-opt-b').value = '';
@@ -5327,11 +5390,11 @@ function setupGlobalFormEvents() {
  */
 function showCustomConfirm(options) {
     const {
-        title = 'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธ—เธณเธฃเธฒเธขเธเธฒเธฃ',
-        message = 'เธเธธเธ“เธ•เนเธญเธเธเธฒเธฃเธ”เธณเน€เธเธดเธเธเธฒเธฃเธ•เนเธญเนเธเนเธซเธฃเธทเธญเนเธกเน?',
+        title = 'ยืนยันการทำรายการ',
+        message = 'คุณต้องการดำเนินการต่อใช่หรือไม่?',
         icon = 'fas fa-question',
-        confirmText = 'เธ•เธเธฅเธ',
-        cancelText = 'เธขเธเน€เธฅเธดเธ',
+        confirmText = 'ตกลง',
+        cancelText = 'ยกเลิก',
         confirmClass = 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md',
         onConfirm = null,
         onCancel = null
@@ -5379,10 +5442,10 @@ function showCustomConfirm(options) {
  */
 function showCustomAlert(options) {
     const {
-        title = 'เนเธเนเธเน€เธ•เธทเธญเธ',
+        title = 'แจ้งเตือน',
         message = '',
         icon = 'fas fa-circle-exclamation',
-        buttonText = 'เธ•เธเธฅเธ',
+        buttonText = 'ตกลง',
         onOk = null
     } = options;
 
@@ -5467,7 +5530,7 @@ function showToast(msg, type = 'info') {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // เธฅเนเธฒเธเธเนเธญเธกเธนเธฅเธเธธเธ”เธ—เธ”เธชเธญเธเธ•เธฑเธงเธญเธขเนเธฒเธ (Dummy) เน€เธเนเธฒเธญเธญเธเธเธฒเธ LocalStorage
+    // ล้างข้อมูลชุดทดสอบตัวอย่าง (Dummy) เก่าออกจาก LocalStorage
     try {
         const rawExams = localStorage.getItem('EXAM_LOCAL_EXAMS');
         if (rawExams) {
@@ -5491,7 +5554,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAuthEvents();
     setupGlobalFormEvents();
 
-    // เธเธนเนเธเธทเธ Session เธเธญเธเนเธ—เนเธเธเธฑเธเธเธธเธเธฑเธ (เน€เธเธทเนเธญเนเธซเนเธญเธฒเธเธฒเธฃเธขเน/เธเธฑเธเน€เธฃเธตเธขเธเนเธกเนเธ•เนเธญเธเธฅเนเธญเธเธญเธดเธเธเนเธณเน€เธกเธทเนเธญเธเธ” Refresh)
+    // กู้คืน Session ของแท็บปัจจุบัน (เพื่อให้อาจารย์/นักเรียนไม่ต้องล็อกอินซ้ำเมื่อกด Refresh)
     try {
         const savedSession = sessionStorage.getItem('EXAM_SESSION_USER');
         if (savedSession) {
