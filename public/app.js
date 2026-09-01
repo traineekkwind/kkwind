@@ -492,10 +492,46 @@ function saveLocalTeacher(teacher) {
     broadcastAppEvent('teacher_roster_updated', teacher);
 }
 
-function deleteLocalTeacher(teacherId) {
-    const list = getLocalTeachers().filter(t => t.id !== teacherId);
-    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(list));
+function deleteLocalTeacher(teacherId, teacherName = '') {
+    const teachers = getLocalTeachers();
+    const targetTeacher = teachers.find(t => t.id === teacherId || (teacherName && t.name === teacherName));
+    const cleanTeacherName = (targetTeacher?.name || teacherName || '').trim().toLowerCase();
+
+    // 1. ลบรายชื่ออาจารย์
+    const remainingTeachers = teachers.filter(t => t.id !== teacherId && (!cleanTeacherName || t.name.trim().toLowerCase() !== cleanTeacherName));
+    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(remainingTeachers));
+
+    // 2. ค้นหาและลบรายวิชาทั้งหมดของอาจารย์ท่านนี้
+    const allCourses = getLocalCourses();
+    const removedCourses = allCourses.filter(c => 
+        (c.teacher_id && c.teacher_id === teacherId) ||
+        (cleanTeacherName && c.teacher_name && c.teacher_name.trim().toLowerCase() === cleanTeacherName)
+    );
+    const removedCourseIds = removedCourses.map(c => c.id);
+    const remainingCourses = allCourses.filter(c => !removedCourseIds.includes(c.id));
+    localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(remainingCourses));
+    state.courses = remainingCourses;
+
+    // 3. ค้นหาและลบชุดข้อสอบทั้งหมดที่อาจารย์ท่านนี้สร้าง หรือผูกกับวิชาของอาจารย์
+    const allExams = getLocalExams();
+    const removedExams = allExams.filter(e => 
+        (cleanTeacherName && e.teacher_name && e.teacher_name.trim().toLowerCase() === cleanTeacherName) ||
+        (e.course_id && removedCourseIds.includes(e.course_id))
+    );
+    const removedExamIds = removedExams.map(e => e.id);
+    const remainingExams = allExams.filter(e => !removedExamIds.includes(e.id));
+    localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(remainingExams));
+    state.localExams = remainingExams;
+
+    // 4. ลบคำถามทั้งหมดของชุดข้อสอบที่ถูกลบ
+    if (removedExamIds.length > 0) {
+        const remainingQuestions = getLocalQuestions().filter(q => !removedExamIds.includes(q.exam_id));
+        localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify(remainingQuestions));
+    }
+
     broadcastAppEvent('teacher_roster_updated', { teacherId });
+    broadcastAppEvent('course_updated', {});
+    broadcastAppEvent('exam_updated', {});
 }
 
 // ==============================================================================
@@ -1886,10 +1922,13 @@ function handleFullscreenChange() {
 }
 
 function triggerCheatWarning(reason) {
+    const maxSwitches = state.currentExam?.max_tab_switches_allowed != null ? Number(state.currentExam.max_tab_switches_allowed) : 3;
+    const isExceeded = state.antiCheat.tabSwitches > maxSwitches;
+
     const badgeEl = document.getElementById('exam-room-tab-badge');
     if (badgeEl && state.currentExam) {
-        badgeEl.textContent = `สลับจอ: ${state.antiCheat.tabSwitches}/${state.currentExam.max_tab_switches_allowed}`;
-        if (state.antiCheat.tabSwitches > state.currentExam.max_tab_switches_allowed) {
+        badgeEl.textContent = `สลับจอ: ${state.antiCheat.tabSwitches}/${maxSwitches}`;
+        if (isExceeded) {
             badgeEl.className = 'px-3 py-1 text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-300 warning-pulse';
         }
     }
@@ -1926,13 +1965,33 @@ function triggerCheatWarning(reason) {
             .catch(() => {});
     }
 
+    // 🚨 หากสลับจอเกินจำนวนครั้งที่อนุญาต -> ยุติการสอบ ตัดสิทธิ์ และเด้งออกจากห้องสอบทันที
+    if (isExceeded) {
+        stopAntiCheatMonitor();
+        clearInterval(state.examTimer);
+
+        const warningModal = document.getElementById('modal-cheat-warning');
+        if (warningModal) warningModal.classList.add('hidden');
+
+        showCustomAlert({
+            title: '🚨 ถูกตัดสิทธิ์การสอบทันที',
+            message: `ตรวจพบการสลับหน้าจอ ${state.antiCheat.tabSwitches} ครั้ง (อนุญาตไม่เกิน ${maxSwitches} ครั้ง)\n\nคุณทำผิดกฎความปลอดภัยในการสอบ ระบบได้ทำการบันทึกประวัติการทุจริตและยุติการทำข้อสอบทันที`,
+            icon: 'fas fa-ban',
+            buttonText: 'รับทราบและออกจากห้องสอบ',
+            onOk: () => {
+                submitExamFinal();
+            }
+        });
+        return;
+    }
+
     const modal = document.getElementById('modal-cheat-warning');
     const reasonEl = document.getElementById('cheat-warning-reason');
     const countEl = document.getElementById('cheat-warning-count');
 
     if (modal) {
         if (reasonEl) reasonEl.textContent = reason;
-        if (countEl) countEl.textContent = `จำนวนครั้งที่สลับหน้าจอ: ${state.antiCheat.tabSwitches} ครั้ง (กำหนดไว้ไม่เกิน ${state.currentExam.max_tab_switches_allowed} ครั้ง)`;
+        if (countEl) countEl.textContent = `จำนวนครั้งที่สลับหน้าจอ: ${state.antiCheat.tabSwitches}/${maxSwitches} ครั้ง (หากเกินกำหนดจะถูกตัดสิทธิ์และเด้งออกทันที)`;
         modal.classList.remove('hidden');
     }
 }
@@ -1984,23 +2043,41 @@ function updateTimerDisplay() {
 }
 
 window.confirmSubmitExam = function() {
-    const answeredCount = Object.keys(state.answers).length;
-    const totalCount = state.questions.length;
+    const questions = state.questions || [];
+    const totalCount = questions.length;
+    const answeredCount = Object.keys(state.answers).filter(qId => state.answers[qId] !== undefined && state.answers[qId] !== '').length;
     const unansweredCount = totalCount - answeredCount;
 
-    let confirmMsg = `คุณตอบไปแล้ว ${answeredCount} จาก ${totalCount} ข้อ\n`;
+    // 🔒 บังคับทำข้อสอบให้ครบทุกข้อ: ถ้ายังตอบไม่ครบ ห้ามส่ง และเด้งกลับไปข้อแรกที่ยังไม่ได้ตอบ
     if (unansweredCount > 0) {
-        confirmMsg += `⚠️ ยังมีข้อที่ยังไม่ได้ตอบอีก ${unansweredCount} ข้อ!\n`;
-    }
-    confirmMsg += `\nคุณต้องการยืนยันการส่งข้อสอบและตรวจคะแนนใช่หรือไม่?`;
+        const firstUnansweredIdx = questions.findIndex(q => !state.answers[q.id]);
+        const targetQNum = firstUnansweredIdx >= 0 ? firstUnansweredIdx + 1 : 1;
 
+        showCustomAlert({
+            title: 'ยังทำข้อสอบไม่ครบ',
+            message: `⚠️ คุณยังตอบข้อสอบไม่ครบทุกข้อ (ทำแล้ว ${answeredCount}/${totalCount} ข้อ, ยังเหลืออีก ${unansweredCount} ข้อ)\n\nกรุณาตอบคำถามให้ครบทุกข้อก่อนกดส่งข้อสอบ`,
+            icon: 'fas fa-circle-exclamation',
+            buttonText: `ไปยังข้อที่ ${targetQNum} ที่ยังไม่ได้ตอบ`,
+            onOk: () => {
+                if (firstUnansweredIdx >= 0) {
+                    state.currentQuestionIndex = firstUnansweredIdx;
+                    renderExamQuestion();
+                    const qCard = document.getElementById('exam-question-card');
+                    if (qCard) qCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        });
+        return;
+    }
+
+    // ถ้าตอบครบทุกข้อแล้ว -> ให้ยืนยันการส่งข้อสอบ
     showCustomConfirm({
         title: 'ยืนยันการส่งข้อสอบ',
-        message: confirmMsg,
+        message: `คุณตอบคำถามครบทั้งหมด ${totalCount} ข้อแล้ว!\n\nคุณต้องการยืนยันการส่งข้อสอบและตรวจคะแนนใช่หรือไม่?`,
         icon: 'fas fa-paper-plane',
         confirmText: 'ส่งข้อสอบทันที',
         cancelText: 'กลับไปตรวจทาน',
-        confirmClass: 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-100',
+        confirmClass: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-100',
         onConfirm: () => {
             submitExamFinal();
         }
@@ -5148,20 +5225,30 @@ window.saveTeacherFromForm = async function(event) {
 window.deleteTeacher = function(teacherId, teacherName) {
     showCustomConfirm({
         title: 'ยืนยันการลบอาจารย์',
-        message: `คุณต้องการลบรายชื่ออาจารย์ "${teacherName}" ใช่หรือไม่?\n(อาจารย์ท่านนี้จะไม่สามารถเข้าสู่ระบบได้อีก)`,
+        message: `คุณต้องการลบรายชื่ออาจารย์ "${teacherName}" ใช่หรือไม่?\n(รายวิชาและชุดข้อสอบทั้งหมดที่อาจารย์ท่านนี้สร้างจะถูกลบออกจากระบบด้วย)`,
         icon: 'fas fa-user-xmark',
-        confirmText: 'ลบข้อมูลอาจารย์',
+        confirmText: 'ลบอาจารย์และข้อมูลทั้งหมด',
         cancelText: 'ยกเลิก',
         confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
         onConfirm: async () => {
-            deleteLocalTeacher(teacherId);
+            deleteLocalTeacher(teacherId, teacherName);
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
+                    // 1. ลบชุดข้อสอบทั้งหมดของอาจารย์ท่านนี้จาก Supabase
+                    await state.supabaseClient.from('exams').delete().eq('teacher_name', teacherName);
+                    // 2. ลบรายวิชาทั้งหมดของอาจารย์ท่านนี้จาก Supabase
+                    await state.supabaseClient.from('courses').delete().eq('teacher_name', teacherName);
+                    await state.supabaseClient.from('courses').delete().eq('teacher_id', teacherId);
+                    // 3. ลบข้อมูลอาจารย์
                     await state.supabaseClient.from('teachers').delete().eq('id', teacherId);
-                } catch (e) {}
+                } catch (e) {
+                    console.warn('[deleteTeacher] Remote delete notice:', e);
+                }
             }
-            showToast(`ลบข้อมูลอาจารย์ "${teacherName}" เรียบร้อยแล้ว`, 'info');
+            showToast(`ลบข้อมูลอาจารย์ "${teacherName}" พร้อมรายวิชาและชุดข้อสอบเรียบร้อยแล้ว`, 'info');
             loadAdminTeachersList();
+            if (typeof loadTeacherCourses === 'function') loadTeacherCourses();
+            if (typeof loadTeacherExamsList === 'function') loadTeacherExamsList();
         }
     });
 };
