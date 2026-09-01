@@ -452,7 +452,7 @@ function getLocalStudents() {
 
 function saveLocalStudent(student) {
     const list = getLocalStudents();
-    const idx = list.findIndex(s => s.id === student.id || (s.code && s.code === student.code));
+    const idx = list.findIndex(s => s.id === student.id || (s.code && s.code === student.code) || (s.citizen_id && s.citizen_id === student.citizen_id));
     if (idx >= 0) {
         list[idx] = { ...list[idx], ...student, updated_at: new Date().toISOString() };
     } else {
@@ -462,12 +462,38 @@ function saveLocalStudent(student) {
     }
     localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(list));
     broadcastAppEvent('student_roster_updated', student);
+
+    // Sync to Supabase students table
+    if (isSupabaseConfigured() && state.supabaseClient && student.citizen_id) {
+        state.supabaseClient
+            .from('students')
+            .upsert({
+                id: student.id,
+                code: student.code,
+                name: student.name,
+                citizen_id: student.citizen_id,
+                year: student.year || 'ปวช.2',
+                dept: student.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
+                room: student.room || 'ห้อง 1'
+            }, { onConflict: 'citizen_id' })
+            .then(() => {})
+            .catch(err => console.warn('[saveLocalStudent Supabase sync notice]:', err));
+    }
 }
 
 function deleteLocalStudent(studentId) {
     const list = getLocalStudents().filter(s => s.id !== studentId);
     localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(list));
     broadcastAppEvent('student_roster_updated', { studentId });
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        state.supabaseClient
+            .from('students')
+            .delete()
+            .eq('id', studentId)
+            .then(() => {})
+            .catch(err => console.warn('[deleteLocalStudent Supabase delete notice]:', err));
+    }
 }
 
 function getLocalTeachers() {
@@ -888,55 +914,75 @@ function setupAuthEvents() {
                 return;
             }
 
-            let registeredStudents = getLocalStudents();
-
-            if (isSupabaseConfigured() && state.supabaseClient) {
-                try {
-                    const { data, error } = await state.supabaseClient.from('students').select('*');
-                    if (!error && Array.isArray(data) && data.length > 0) {
-                        registeredStudents = data;
-                        localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(data));
-                    }
-                } catch (e) {}
-            }
-
             let matchedStudent = null;
 
-            if (registeredStudents && registeredStudents.length > 0) {
-                matchedStudent = registeredStudents.find(s => 
-                    (s.code === loginId || s.name.trim().toLowerCase() === loginId.toLowerCase() || s.citizen_id === loginId) && 
-                    s.citizen_id === citizenPass
-                );
+            // 1. ตรวจสอบข้อมูลจาก Supabase Cloud ก่อน (เพื่อให้เข้าจากเครื่องไหนก็ได้)
+            if (isSupabaseConfigured() && state.supabaseClient) {
+                try {
+                    const { data: cloudStudents, error } = await state.supabaseClient
+                        .from('students')
+                        .select('*');
 
-                if (!matchedStudent) {
-                    const studentById = registeredStudents.find(s => s.code === loginId || s.name.trim().toLowerCase() === loginId.toLowerCase());
-                    if (studentById) {
-                        showCustomAlert({
-                            title: 'รหัสผ่านไม่ถูกต้อง',
-                            message: `พบรายชื่อ "${studentById.name}" ในระบบ\nแต่เลขบัตรประจำตัวประชาชน 13 หลัก (รหัสผ่าน) ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง`,
-                            icon: 'fas fa-lock'
-                        });
-                        return;
+                    if (!error && Array.isArray(cloudStudents) && cloudStudents.length > 0) {
+                        localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(cloudStudents));
+                        
+                        const foundInCloud = cloudStudents.find(s => 
+                            (s.code && s.code.trim().toLowerCase() === loginId.toLowerCase()) ||
+                            (s.citizen_id && s.citizen_id.trim() === loginId) ||
+                            (s.name && s.name.trim().toLowerCase() === loginId.toLowerCase())
+                        );
+
+                        if (foundInCloud) {
+                            if (foundInCloud.citizen_id === citizenPass) {
+                                matchedStudent = foundInCloud;
+                            } else {
+                                showCustomAlert({
+                                    title: 'รหัสผ่านไม่ถูกต้อง',
+                                    message: `พบรายชื่อ "${foundInCloud.name}" ในระบบ\nแต่เลขบัตรประจำตัวประชาชน 13 หลัก (รหัสผ่าน) ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง`,
+                                    icon: 'fas fa-lock'
+                                });
+                                return;
+                            }
+                        }
                     }
-
-                    showCustomAlert({
-                        title: 'ไม่พบข้อมูลนักเรียนในระบบ',
-                        message: `ไม่พบรหัสนักเรียนหรือชื่อ "${loginId}" ที่อาจารย์ได้ลงทะเบียนไว้\nกรุณาตรวจสอบหรือติดต่ออาจารย์ผู้สอนเพื่อเพิ่มรายชื่อก่อนเข้าสอบ`,
-                        icon: 'fas fa-user-xmark'
-                    });
-                    return;
+                } catch (e) {
+                    console.warn('[Student Login Supabase notice]:', e);
                 }
-            } else {
-                matchedStudent = {
-                    id: generatePseudoUUID(),
-                    code: loginId,
-                    name: loginId,
-                    citizen_id: citizenPass,
-                    year: 'ปวช.2',
-                    dept: 'เทคโนโลยีธุรกิจดิจิทัล',
-                    room: 'ห้อง 1'
-                };
-                saveLocalStudent(matchedStudent);
+            }
+
+            // 2. ถ้ายังไม่พบ ให้ค้นหาจาก LocalStorage สำรอง
+            if (!matchedStudent) {
+                const registeredStudents = getLocalStudents();
+                if (registeredStudents && registeredStudents.length > 0) {
+                    const foundInLocal = registeredStudents.find(s => 
+                        (s.code && s.code.trim().toLowerCase() === loginId.toLowerCase()) ||
+                        (s.citizen_id && s.citizen_id.trim() === loginId) ||
+                        (s.name && s.name.trim().toLowerCase() === loginId.toLowerCase())
+                    );
+
+                    if (foundInLocal) {
+                        if (foundInLocal.citizen_id === citizenPass) {
+                            matchedStudent = foundInLocal;
+                        } else {
+                            showCustomAlert({
+                                title: 'รหัสผ่านไม่ถูกต้อง',
+                                message: `พบรายชื่อ "${foundInLocal.name}" ในระบบ\nแต่เลขบัตรประจำตัวประชาชน 13 หลัก (รหัสผ่าน) ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง`,
+                                icon: 'fas fa-lock'
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // 3. ถ้าไม่พบข้อมูลทั้งบน Cloud และในเครื่อง
+            if (!matchedStudent) {
+                showCustomAlert({
+                    title: 'ไม่พบข้อมูลนักเรียนในระบบ',
+                    message: `ไม่พบรหัสนักเรียนหรือชื่อ "${loginId}" ในระบบ\nกรุณาติดต่ออาจารย์ผู้สอนเพื่อเพิ่มรายชื่อลงในระบบก่อนเข้าสอบ`,
+                    icon: 'fas fa-user-xmark'
+                });
+                return;
             }
 
             state.currentUser = {
@@ -3210,12 +3256,24 @@ window.exportTeacherScoresToExcel = async function() {
 
 let _studentExcelParsedList = [];
 
-window.loadTeacherStudentsList = function() {
+window.loadTeacherStudentsList = async function() {
     const tbody = document.getElementById('teacher-students-table-body');
     const badgeCount = document.getElementById('teacher-students-count-badge');
     if (!tbody) return;
 
     let students = getLocalStudents();
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            const { data, error } = await state.supabaseClient.from('students').select('*').order('created_at', { ascending: false });
+            if (!error && Array.isArray(data) && data.length > 0) {
+                students = data;
+                localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(data));
+            }
+        } catch (e) {
+            console.warn('[loadTeacherStudentsList Supabase notice]:', e);
+        }
+    }
 
     // Filters
     const searchVal = document.getElementById('teacher-student-search-input')?.value.trim().toLowerCase() || '';
@@ -3547,21 +3605,41 @@ window.clearStudentExcelPreview = function() {
     if (previewContainer) previewContainer.classList.add('hidden');
 };
 
-window.executeStudentExcelImport = function() {
+window.executeStudentExcelImport = async function() {
     if (!_studentExcelParsedList || _studentExcelParsedList.length === 0) {
         showToast('ไม่มีข้อมูลนักเรียนที่จะนำเข้า', 'warning');
         return;
     }
 
-    _studentExcelParsedList.forEach(s => {
+    const payload = _studentExcelParsedList.map(s => ({
+        id: s.id || generatePseudoUUID(),
+        code: s.code,
+        name: s.name,
+        citizen_id: s.citizen_id,
+        year: s.year || 'ปวช.2',
+        dept: s.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
+        room: s.room || 'ห้อง 1'
+    }));
+
+    payload.forEach(s => {
         saveLocalStudent(s);
     });
+
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            await state.supabaseClient
+                .from('students')
+                .upsert(payload, { onConflict: 'citizen_id' });
+        } catch (e) {
+            console.warn('[executeStudentExcelImport Supabase sync notice]:', e);
+        }
+    }
 
     showToast(`นำเข้ารายชื่อนักเรียนสำเร็จ ${_studentExcelParsedList.length} คน!`, 'success');
     const modal = document.getElementById('modal-student-excel-import');
     if (modal) modal.classList.add('hidden');
     clearStudentExcelPreview();
-    loadTeacherStudentsList();
+    await loadTeacherStudentsList();
 };
 
 // 7.4 ดาวน์โหลดไฟล์เทมเพลต Excel สำหรับเพิ่มโจทย์
