@@ -1486,8 +1486,9 @@ window.startExam = async function(examId) {
                     console.warn('[Fullscreen Warning]:', e);
                 }
 
+                // สุ่มลำดับโจทย์เฉพาะบุคคล (Fisher-Yates Shuffle) ป้องกันนักเรียนได้ลำดับข้อสอบซ้ำกัน
                 state.currentExam = exam;
-                state.questions = questions;
+                state.questions = shuffleArray(questions);
                 state.currentQuestionIndex = 0;
                 state.answers = {};
                 state.antiCheat.tabSwitches = 0;
@@ -4798,9 +4799,14 @@ function renderTeacherExamViewModal(exam, questions) {
                             </span>
                             <span class="text-xs text-slate-400">(${points} คะแนน)</span>
                         </div>
-                        <button onclick="deleteTeacherQuestion('${q.id}', '${exam.id}', ${qNum})" class="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg transition font-medium flex items-center gap-1">
-                            <i class="fas fa-trash-can"></i> ลบข้อนี้
-                        </button>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="openEditTeacherQuestionModal('${q.id}', '${exam.id}', ${qNum})" class="text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2.5 py-1 rounded-lg transition font-bold flex items-center gap-1">
+                                <i class="fas fa-pen-to-square"></i> แก้ไขข้อนี้
+                            </button>
+                            <button onclick="deleteTeacherQuestion('${q.id}', '${exam.id}', ${qNum})" class="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg transition font-medium flex items-center gap-1">
+                                <i class="fas fa-trash-can"></i> ลบข้อนี้
+                            </button>
+                        </div>
                     </div>
 
                     ${parsed.image ? `
@@ -4834,6 +4840,141 @@ function renderTeacherExamViewModal(exam, questions) {
 
     }
 }
+
+// 7.11.1 แก้ไขคำถามรายข้อ (Individual Question Editor)
+let _currentEditingQuestion = null;
+
+window.openEditTeacherQuestionModal = async function(questionId, examId, qIndex) {
+    const questions = getLocalQuestions(examId);
+    let q = questions.find(item => item.id === questionId);
+
+    // If not found in local, try to fetch from Supabase
+    if (!q && isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            const { data } = await state.supabaseClient.from('questions').select('*').eq('id', questionId).single();
+            if (data) q = data;
+        } catch (e) {}
+    }
+
+    if (!q) {
+        showToast('ไม่พบข้อมูลคำถามที่ต้องการแก้ไข', 'error');
+        return;
+    }
+
+    _currentEditingQuestion = { ...q, examId, qIndex };
+
+    document.getElementById('edit-q-id').value = q.id || '';
+    document.getElementById('edit-q-exam-id').value = examId || '';
+    document.getElementById('edit-question-modal-title').innerHTML = `<i class="fas fa-pen-to-square text-indigo-600"></i> แก้ไขคำถามข้อที่ ${qIndex}`;
+
+    // Parse question text
+    const parsed = parseQuestionTextAndImage(q.question_text, q.image_url || q.image);
+    document.getElementById('edit-q-text').value = parsed.text || q.question_text || '';
+
+    // Options
+    let opts = q.options;
+    if (typeof opts === 'string') {
+        try { opts = JSON.parse(opts); } catch (e) { opts = []; }
+    }
+    if (!Array.isArray(opts)) opts = [];
+
+    const optA = opts.find(o => o.id === 'A')?.text || '';
+    const optB = opts.find(o => o.id === 'B')?.text || '';
+    const optC = opts.find(o => o.id === 'C')?.text || '';
+    const optD = opts.find(o => o.id === 'D')?.text || '';
+
+    document.getElementById('edit-q-opt-a').value = optA;
+    document.getElementById('edit-q-opt-b').value = optB;
+    document.getElementById('edit-q-opt-c').value = optC;
+    document.getElementById('edit-q-opt-d').value = optD;
+
+    // Correct choice
+    const correctVal = (q.correct || q.correct_option_id || 'A').toUpperCase();
+    document.getElementById('edit-q-correct').value = ['A', 'B', 'C', 'D'].includes(correctVal) ? correctVal : 'A';
+
+    // Points & Explanation
+    document.getElementById('edit-q-points').value = q.points || 1.0;
+    document.getElementById('edit-q-explanation').value = q.explanation || '';
+
+    const modal = document.getElementById('modal-edit-question');
+    if (modal) modal.classList.remove('hidden');
+};
+
+window.closeEditTeacherQuestionModal = function() {
+    const modal = document.getElementById('modal-edit-question');
+    if (modal) modal.classList.add('hidden');
+    _currentEditingQuestion = null;
+};
+
+window.saveEditedTeacherQuestion = async function() {
+    const questionId = document.getElementById('edit-q-id').value;
+    const examId = document.getElementById('edit-q-exam-id').value;
+    const text = document.getElementById('edit-q-text').value.trim();
+    const optA = document.getElementById('edit-q-opt-a').value.trim();
+    const optB = document.getElementById('edit-q-opt-b').value.trim();
+    const optC = document.getElementById('edit-q-opt-c').value.trim();
+    const optD = document.getElementById('edit-q-opt-d').value.trim();
+    const correct = document.getElementById('edit-q-correct').value.toUpperCase();
+    const points = Number(document.getElementById('edit-q-points').value) || 1.0;
+    const explanation = document.getElementById('edit-q-explanation').value.trim();
+
+    if (!text || !optA || !optB) {
+        showToast('กรุณากรอกโจทย์คำถาม ตัวเลือก A และตัวเลือก B ให้ครบถ้วน', 'warning');
+        return;
+    }
+
+    const options = [
+        { id: 'A', text: optA },
+        { id: 'B', text: optB }
+    ];
+    if (optC) options.push({ id: 'C', text: optC });
+    if (optD) options.push({ id: 'D', text: optD });
+
+    // 1. Update in LocalStorage
+    const allQuestions = getLocalQuestions();
+    const qIdx = allQuestions.findIndex(q => q.id === questionId || (q.exam_id === examId && q.question_text === _currentEditingQuestion?.question_text));
+    if (qIdx >= 0) {
+        allQuestions[qIdx] = {
+            ...allQuestions[qIdx],
+            question_text: text,
+            options: options,
+            correct: correct,
+            correct_option_id: correct,
+            points: points,
+            explanation: explanation
+        };
+        localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify(allQuestions));
+    }
+
+    // 2. Update in Supabase
+    if (isSupabaseConfigured() && state.supabaseClient && questionId) {
+        try {
+            await state.supabaseClient
+                .from('questions')
+                .update({
+                    question_text: text,
+                    options: options,
+                    points: points
+                })
+                .eq('id', questionId);
+
+            await state.supabaseClient
+                .from('exam_answers')
+                .upsert({
+                    question_id: questionId,
+                    correct_option_id: correct,
+                    explanation: explanation
+                }, { onConflict: 'question_id' });
+        } catch (e) {
+            console.warn('[saveEditedTeacherQuestion] Supabase update notice:', e);
+        }
+    }
+
+    closeEditTeacherQuestionModal();
+    showToast('บันทึกการแก้ไขคำถามเรียบร้อยแล้ว!', 'success');
+    broadcastAppEvent('exam_updated', { examId });
+    await viewTeacherExam(examId);
+};
 
 
 window.deleteTeacherQuestion = async function(questionId, examId, qIndex) {
@@ -5836,6 +5977,16 @@ window.alert = function(message) {
 // ==============================================================================
 // 11. HELPERS & ENTRY POINT
 // ==============================================================================
+
+function shuffleArray(array) {
+    if (!Array.isArray(array) || array.length <= 1) return [...(array || [])];
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
 
 function generatePseudoUUID() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
