@@ -2801,6 +2801,53 @@ function setupTeacherTabs() {
     if (btnExcel) btnExcel.onclick = () => setTab('excel-import');
 }
 
+// 🔒 Helper สำหรับจับคู่อาจารย์อย่างแม่นยำ พร้อมแยกข้อมูลระหว่างอาจารย์แต่ละท่าน (Teacher Data Isolation)
+function isMatchingTeacher(entityTeacherId, entityTeacherName, currentTeacherId, currentTeacherName) {
+    if (!currentTeacherName && !currentTeacherId) return true;
+    
+    // 1. Direct ID match
+    if (currentTeacherId && entityTeacherId && String(entityTeacherId).trim() === String(currentTeacherId).trim()) {
+        return true;
+    }
+    
+    // ล้างคำนำหน้าและช่องว่าง
+    const cleanCur = (currentTeacherName || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
+    const cleanEnt = (entityTeacherName || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
+    
+    if (cleanCur && cleanEnt && (cleanCur === cleanEnt || cleanEnt === cleanCur)) {
+        return true;
+    }
+
+    if (cleanCur && cleanEnt && cleanCur.length >= 4 && (cleanEnt.includes(cleanCur) || cleanCur.includes(cleanEnt))) {
+        return true;
+    }
+
+    // ตรวจสอบว่าข้อมูลนี้เป็นของอาจารย์ท่านอื่นที่ลงทะเบียนไว้หรือไม่ (ป้องกันไม่ให้ขึ้นซ้อนครูคนอื่น)
+    const allTeachers = getLocalTeachers();
+    const belongsToOther = allTeachers.some(t => {
+        const tClean = (t.name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
+        const tId = t.id;
+        if (tId && entityTeacherId && String(tId).trim() === String(entityTeacherId).trim() && tId !== currentTeacherId) {
+            return true;
+        }
+        if (tClean && tClean !== cleanCur && cleanEnt && (cleanEnt === tClean || cleanEnt.includes(tClean))) {
+            return true;
+        }
+        return false;
+    });
+
+    if (belongsToOther) {
+        return false; // เป็นของอาจารย์ท่านอื่นเด็ดขาด → ไม่แสดง
+    }
+
+    // ข้อมูลเริ่มต้นหรือยังไม่ได้ระบุครู
+    if (!cleanEnt || cleanEnt === 'อาจารย์ผู้สอน' || cleanEnt === 'ครูผู้สอน') {
+        return true;
+    }
+
+    return false;
+}
+
 // 7.1 จัดการรายวิชาของอาจารย์ (Courses)
 async function loadTeacherCourses() {
     const container = document.getElementById('teacher-courses-list-container');
@@ -2825,14 +2872,11 @@ async function loadTeacherCourses() {
         }
     }
 
-    // 🔒 Teacher Isolation: แสดงเฉพาะรายวิชาของอาจารย์ท่านนี้เท่านั้น (เว้นแต่ Admin)
+    // 🔒 Teacher Isolation: แสดงเฉพาะรายวิชาของอาจารย์ท่านนี้เท่านั้น (ป้องกันข้อมูลปนกับอาจารย์ท่านอื่น)
     if (state.currentUser?.role === 'teacher') {
         const currentTeacherId = state.currentUser.id;
-        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
-        courses = courses.filter(c => 
-            (c.teacher_id && c.teacher_id === currentTeacherId) || 
-            (c.teacher_name && c.teacher_name.trim().toLowerCase() === currentTeacherName)
-        );
+        const currentTeacherName = (state.currentUser.name || '').trim();
+        courses = courses.filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName));
     }
 
     state.courses = courses;
@@ -4327,13 +4371,14 @@ async function loadTeacherExamsList() {
         }
     }
 
-    // 🔒 Teacher Isolation: แสดงเฉพาะชุดข้อสอบของอาจารย์ท่านนี้เท่านั้น (เว้นแต่ Admin)
+    // 🔒 Teacher Isolation: แสดงเฉพาะชุดข้อสอบของอาจารย์ท่านนี้เท่านั้น (ป้องกันข้อมูลปนกับอาจารย์ท่านอื่น)
     if (state.currentUser?.role === 'teacher') {
         const myCourseIds = (state.courses || []).map(c => c.id);
-        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
+        const currentTeacherId = state.currentUser.id;
+        const currentTeacherName = (state.currentUser.name || '').trim();
         exams = exams.filter(e => 
-            (e.teacher_name && e.teacher_name.trim().toLowerCase() === currentTeacherName) ||
-            (e.course_id && myCourseIds.includes(e.course_id))
+            (e.course_id && myCourseIds.includes(e.course_id)) ||
+            isMatchingTeacher(e.teacher_id, e.teacher_name, currentTeacherId, currentTeacherName)
         );
     }
 
