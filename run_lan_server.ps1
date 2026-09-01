@@ -27,12 +27,14 @@ $server.Start()
 $myIps = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch 'Loopback|vEthernet' -and $_.IPAddress -notmatch '^169\.' } | Select-Object -ExpandProperty IPAddress
 
 Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host "🚀 Exam LAN Server is LIVE!" -ForegroundColor Green
-Write-Host "💻 Teacher (Localhost): http://localhost:$Port/" -ForegroundColor Yellow
-foreach ($ip in $myIps) {
-    Write-Host "📱 Students on same Wi-Fi/LAN: http://$($ip):$Port/" -ForegroundColor Magenta
+Write-Host ">>> KKWIND Offline LAN Exam Server is RUNNING <<<" -ForegroundColor Green
+Write-Host ("Teacher (This PC): http://localhost:" + $Port + "/") -ForegroundColor Yellow
+if ($myIps) {
+    foreach ($ip in $myIps) {
+        Write-Host ("Students (Wi-Fi/LAN): http://" + $ip + ":" + $Port + "/") -ForegroundColor Magenta
+    }
 }
-Write-Host "📂 Serving Directory: $root" -ForegroundColor Gray
+Write-Host ("Serving Folder: " + $root) -ForegroundColor Gray
 Write-Host "================================================================" -ForegroundColor Cyan
 
 function Get-MimeType($filePath) {
@@ -88,9 +90,8 @@ while ($true) {
             $body = New-Object string ($buffer, 0, $read)
         }
 
-        $cleanPath = $rawUrl.Split('?')[0]
+        $cleanPath = $rawUrl.Split("?")[0]
 
-        # Handle API Endpoints for Offline DB Sync
         if ($cleanPath -eq "/api/db") {
             if ($method -eq "OPTIONS") {
                 $corsHeaders = "HTTP/1.1 200 OK`r`nAccess-Control-Allow-Origin: *`r`nAccess-Control-Allow-Methods: GET, POST, OPTIONS`r`nAccess-Control-Allow-Headers: Content-Type`r`nContent-Length: 0`r`n`r`n"
@@ -100,7 +101,7 @@ while ($true) {
             elseif ($method -eq "GET") {
                 $jsonContent = [System.IO.File]::ReadAllText($dbPath, [System.Text.Encoding]::UTF8)
                 $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($jsonContent)
-                $header = "HTTP/1.1 200 OK`r`nContent-Type: application/json; charset=utf-8`r`nAccess-Control-Allow-Origin: *`r`nContent-Length: $($bodyBytes.Length)`r`nConnection: close`r`n`r`n"
+                $header = "HTTP/1.1 200 OK`r`nContent-Type: application/json; charset=utf-8`r`nAccess-Control-Allow-Origin: *`r`nContent-Length: " + $bodyBytes.Length + "`r`nConnection: close`r`n`r`n"
                 $writer.Write([System.Text.Encoding]::UTF8.GetBytes($header))
                 $writer.Write($bodyBytes)
             }
@@ -108,28 +109,29 @@ while ($true) {
                 if ($body.Length -gt 0) {
                     [System.IO.File]::WriteAllText($dbPath, $body, [System.Text.Encoding]::UTF8)
                 }
-                $resBody = [System.Text.Encoding]::UTF8.GetBytes('{"success":true}')
-                $header = "HTTP/1.1 200 OK`r`nContent-Type: application/json; charset=utf-8`r`nAccess-Control-Allow-Origin: *`r`nContent-Length: $($resBody.Length)`r`nConnection: close`r`n`r`n"
+                $okJson = '{"success":true}'
+                $resBody = [System.Text.Encoding]::UTF8.GetBytes($okJson)
+                $header = "HTTP/1.1 200 OK`r`nContent-Type: application/json; charset=utf-8`r`nAccess-Control-Allow-Origin: *`r`nContent-Length: " + $resBody.Length + "`r`nConnection: close`r`n`r`n"
                 $writer.Write([System.Text.Encoding]::UTF8.GetBytes($header))
                 $writer.Write($resBody)
             }
         }
         else {
-            # Static File Serving
             if ($cleanPath -eq "/" -or [string]::IsNullOrEmpty($cleanPath)) {
                 $cleanPath = "/index.html"
             }
-            $localFilePath = Join-Path $root ($cleanPath.TrimStart('/').Replace('/', '\'))
+            $cleanRel = $cleanPath.TrimStart("/").Replace("/", "\")
+            $localFilePath = Join-Path $root $cleanRel
 
             if (Test-Path $localFilePath -PathType Leaf) {
                 $fileBytes = [System.IO.File]::ReadAllBytes($localFilePath)
                 $mime = Get-MimeType $localFilePath
-                $header = "HTTP/1.1 200 OK`r`nContent-Type: $mime`r`nAccess-Control-Allow-Origin: *`r`nContent-Length: $($fileBytes.Length)`r`nConnection: close`r`n`r`n"
+                $header = "HTTP/1.1 200 OK`r`nContent-Type: " + $mime + "`r`nAccess-Control-Allow-Origin: *`r`nContent-Length: " + $fileBytes.Length + "`r`nConnection: close`r`n`r`n"
                 $writer.Write([System.Text.Encoding]::UTF8.GetBytes($header))
                 $writer.Write($fileBytes)
             } else {
                 $errBytes = [System.Text.Encoding]::UTF8.GetBytes("404 Not Found")
-                $header = "HTTP/1.1 404 Not Found`r`nContent-Type: text/plain`r`nContent-Length: $($errBytes.Length)`r`nConnection: close`r`n`r`n"
+                $header = "HTTP/1.1 404 Not Found`r`nContent-Type: text/plain`r`nContent-Length: " + $errBytes.Length + "`r`nConnection: close`r`n`r`n"
                 $writer.Write([System.Text.Encoding]::UTF8.GetBytes($header))
                 $writer.Write($errBytes)
             }
@@ -139,6 +141,6 @@ while ($true) {
         $client.Close()
     }
     catch {
-        # Ignore client disconnect errors
+        # continue loop on client abort
     }
 }

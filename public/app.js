@@ -970,26 +970,32 @@ function setupAuthEvents() {
     if (formStudent) {
         formStudent.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const loginId = document.getElementById('student-login-id-input')?.value.trim();
-            const citizenPass = document.getElementById('student-login-pass-input')?.value.trim();
+            const rawLoginId = document.getElementById('student-login-id-input')?.value || '';
+            const rawPass = document.getElementById('student-login-pass-input')?.value || '';
+
+            const loginId = rawLoginId.trim();
+            const cleanPass = rawPass.replace(/\D/g, '').trim();
 
             if (!loginId) {
                 showToast('กรุณากรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล', 'warning');
                 return;
             }
 
-            if (!citizenPass || citizenPass.length !== 13) {
+            if (!cleanPass || cleanPass.length !== 13) {
                 showCustomAlert({
                     title: 'เลขบัตรประชาชนไม่ถูกต้อง',
-                    message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลัก\n(ใช้เป็นรหัสผ่านเข้าสอบ)',
+                    message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลักตัวเลข\n(ใช้เป็นรหัสผ่านเข้าสอบ)',
                     icon: 'fas fa-id-card'
                 });
                 return;
             }
 
-            let matchedStudent = null;
+            // ซิงก์ข้อมูลจากเซิร์ฟเวอร์ LAN (ถ้ามี) ก่อนตรวจสอบ
+            await syncWithLocalLanServer();
 
-            // 1. ตรวจสอบข้อมูลจาก Supabase Cloud ก่อน (เพื่อให้เข้าจากเครื่องไหนก็ได้)
+            let allStudents = getLocalStudents();
+
+            // 1. ตรวจสอบข้อมูลจาก Supabase Cloud ก่อน (ถ้าเชื่อมต่ออยู่)
             if (isSupabaseConfigured() && state.supabaseClient) {
                 try {
                     const { data: cloudStudents, error } = await state.supabaseClient
@@ -998,61 +1004,62 @@ function setupAuthEvents() {
 
                     if (!error && Array.isArray(cloudStudents) && cloudStudents.length > 0) {
                         localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(cloudStudents));
-                        
-                        const foundInCloud = cloudStudents.find(s => 
-                            (s.code && s.code.trim().toLowerCase() === loginId.toLowerCase()) ||
-                            (s.citizen_id && s.citizen_id.trim() === loginId) ||
-                            (s.name && s.name.trim().toLowerCase() === loginId.toLowerCase())
-                        );
-
-                        if (foundInCloud) {
-                            if (foundInCloud.citizen_id === citizenPass) {
-                                matchedStudent = foundInCloud;
-                            } else {
-                                showCustomAlert({
-                                    title: 'รหัสผ่านไม่ถูกต้อง',
-                                    message: `พบรายชื่อ "${foundInCloud.name}" ในระบบ\nแต่เลขบัตรประจำตัวประชาชน 13 หลัก (รหัสผ่าน) ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง`,
-                                    icon: 'fas fa-lock'
-                                });
-                                return;
-                            }
-                        }
+                        allStudents = cloudStudents;
                     }
                 } catch (e) {
                     console.warn('[Student Login Supabase notice]:', e);
                 }
             }
 
-            // 2. ถ้ายังไม่พบ ให้ค้นหาจาก LocalStorage สำรอง
-            if (!matchedStudent) {
-                const registeredStudents = getLocalStudents();
-                if (registeredStudents && registeredStudents.length > 0) {
-                    const foundInLocal = registeredStudents.find(s => 
-                        (s.code && s.code.trim().toLowerCase() === loginId.toLowerCase()) ||
-                        (s.citizen_id && s.citizen_id.trim() === loginId) ||
-                        (s.name && s.name.trim().toLowerCase() === loginId.toLowerCase())
-                    );
+            // ค้นหานักเรียนแบบยืดหยุ่น (รองรับทั้งรหัสนักเรียน, เลขบัตร, ชื่อมีคำนำหน้า หรือไม่มีคำนำหน้า)
+            function findCandidate(list, input) {
+                if (!Array.isArray(list) || list.length === 0) return null;
+                const cleanInput = (input || '').trim().toLowerCase();
+                const inputDigits = cleanInput.replace(/\D/g, '');
+                const cleanNoPrefix = cleanInput.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '').trim();
 
-                    if (foundInLocal) {
-                        if (foundInLocal.citizen_id === citizenPass) {
-                            matchedStudent = foundInLocal;
-                        } else {
-                            showCustomAlert({
-                                title: 'รหัสผ่านไม่ถูกต้อง',
-                                message: `พบรายชื่อ "${foundInLocal.name}" ในระบบ\nแต่เลขบัตรประจำตัวประชาชน 13 หลัก (รหัสผ่าน) ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง`,
-                                icon: 'fas fa-lock'
-                            });
-                            return;
-                        }
-                    }
+                return list.find(s => {
+                    if (!s) return false;
+                    const sCode = (s.code || '').toString().trim().toLowerCase();
+                    const sCodeDigits = sCode.replace(/\D/g, '');
+                    const sCitizen = (s.citizen_id || '').toString().replace(/\D/g, '').trim();
+                    const sName = (s.name || '').trim().toLowerCase();
+                    const sNameClean = sName.replace(/\s+/g, ' ');
+                    const sNameNoPrefix = sNameClean.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '').trim();
+
+                    const isCodeMatch = sCode === cleanInput || (inputDigits && sCodeDigits === inputDigits);
+                    const isCitizenMatch = sCitizen === cleanInput || (inputDigits && sCitizen === inputDigits);
+                    const isNameMatch = sName === cleanInput || 
+                                        sNameClean === cleanInput.replace(/\s+/g, ' ') ||
+                                        (cleanNoPrefix && sNameNoPrefix === cleanNoPrefix) ||
+                                        (cleanNoPrefix.length >= 4 && (sNameNoPrefix.includes(cleanNoPrefix) || cleanNoPrefix.includes(sNameNoPrefix)));
+
+                    return isCodeMatch || isCitizenMatch || isNameMatch;
+                });
+            }
+
+            let candidate = findCandidate(allStudents, loginId);
+            let matchedStudent = null;
+
+            if (candidate) {
+                const sCitizen = (candidate.citizen_id || '').toString().replace(/\D/g, '').trim();
+                if (sCitizen === cleanPass) {
+                    matchedStudent = candidate;
+                } else {
+                    showCustomAlert({
+                        title: 'รหัสผ่านไม่ถูกต้อง',
+                        message: `พบรายชื่อ "${candidate.name}" ในระบบ\nแต่เลขบัตรประจำตัวประชาชน 13 หลัก (รหัสผ่าน) ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง`,
+                        icon: 'fas fa-lock'
+                    });
+                    return;
                 }
             }
 
-            // 3. ถ้าไม่พบข้อมูลทั้งบน Cloud และในเครื่อง
+            // ถ้าไม่พบข้อมูลนักเรียน
             if (!matchedStudent) {
                 showCustomAlert({
                     title: 'ไม่พบข้อมูลนักเรียนในระบบ',
-                    message: `ไม่พบรหัสนักเรียนหรือชื่อ "${loginId}" ในระบบ\nกรุณาติดต่ออาจารย์ผู้สอนเพื่อเพิ่มรายชื่อลงในระบบก่อนเข้าสอบ`,
+                    message: `ไม่พบรหัสนักเรียนหรือชื่อ "${loginId}" ในระบบ\n\n📌 คำแนะนำ:\n1. ตรวจสอบว่าอาจารย์ได้เพิ่มรายชื่อนักเรียนในระบบหรือยัง\n2. หากใช้วงแลนในห้องเรียน กรุณาเข้าผ่านเครื่องแม่: http://192.168.100.50:5500/`,
                     icon: 'fas fa-user-xmark'
                 });
                 return;
