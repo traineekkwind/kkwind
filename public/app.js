@@ -1495,6 +1495,27 @@ window.startExam = async function(examId) {
                 state.antiCheat.cheatingReasons = [];
                 state.remainingSeconds = (exam.duration_minutes || 60) * 60;
 
+                // อัปเดตข้อมูลหัวห้องสอบให้ตรงกับชุดข้อสอบจริง
+                const titleEl = document.getElementById('exam-room-title');
+                const courseBadgeEl = document.getElementById('exam-room-course-badge');
+                const studentEl = document.getElementById('exam-room-student');
+                const tabBadgeEl = document.getElementById('exam-room-tab-badge');
+
+                if (titleEl) titleEl.textContent = exam.title || 'ชุดข้อสอบ';
+                if (courseBadgeEl) {
+                    const cName = exam.course?.course_name || exam.course_name || 'วิชาทั่วไป';
+                    courseBadgeEl.textContent = cName;
+                }
+                if (studentEl) {
+                    const sInfo = [state.currentUser?.year, state.currentUser?.dept, state.currentUser?.room].filter(Boolean).join(' ');
+                    studentEl.textContent = `${state.currentUser?.name || 'นักเรียน'}${sInfo ? ` (${sInfo})` : ''}`;
+                }
+                const maxSwitches = exam.max_tab_switches_allowed != null ? Number(exam.max_tab_switches_allowed) : 3;
+                if (tabBadgeEl) {
+                    tabBadgeEl.innerHTML = `<i class="fas fa-eye text-amber-500"></i> สลับจอ: 0/${maxSwitches}`;
+                    tabBadgeEl.className = 'px-3 py-1.5 text-xs font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1.5 shadow-2xs';
+                }
+
                 showView('view-student-exam');
                 renderExamQuestion();
                 renderQuestionPalette();
@@ -1927,9 +1948,11 @@ function triggerCheatWarning(reason) {
 
     const badgeEl = document.getElementById('exam-room-tab-badge');
     if (badgeEl && state.currentExam) {
-        badgeEl.textContent = `สลับจอ: ${state.antiCheat.tabSwitches}/${maxSwitches}`;
+        badgeEl.innerHTML = `<i class="fas fa-eye ${isExceeded ? 'text-red-500' : 'text-amber-500'}"></i> สลับจอ: ${state.antiCheat.tabSwitches}/${maxSwitches}`;
         if (isExceeded) {
-            badgeEl.className = 'px-3 py-1 text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-300 warning-pulse';
+            badgeEl.className = 'px-3 py-1.5 text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-300 warning-pulse flex items-center gap-1.5 shadow-2xs';
+        } else {
+            badgeEl.className = 'px-3 py-1.5 text-xs font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1.5 shadow-2xs';
         }
     }
 
