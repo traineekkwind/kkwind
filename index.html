@@ -95,13 +95,16 @@
             <!-- User Info & Action Controls -->
             <div class="flex items-center gap-3">
                 <!-- User Info Bar (แสดงเมื่อ Login เท่านั้น) -->
-                <div id="user-info-bar" class="hidden flex items-center gap-3">
+                <div id="user-info-bar" class="hidden flex items-center gap-2 sm:gap-3">
                     <span id="current-user-role-badge" class="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700">
-                        👨‍🎓 นักเรียน
+                        👨‍🎓 นักศึกษา
                     </span>
-                    <span id="current-user-name" class="text-sm font-semibold text-slate-700 max-w-[180px] truncate">
+                    <span id="current-user-name" class="text-sm font-semibold text-slate-700 max-w-[130px] sm:max-w-[180px] truncate">
                         สมชาย ใจดี
                     </span>
+                    <button id="btn-change-password-nav" onclick="openChangePasswordModal()" title="เปลี่ยนรหัสผ่านเข้าสู่ระบบ" class="hidden text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-xl border border-amber-200 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
+                        <i class="fas fa-key text-amber-600 text-xs"></i> <span class="hidden sm:inline">เปลี่ยนรหัส</span>
+                    </button>
                     <button id="btn-logout" title="ออกจากระบบ" class="text-slate-400 hover:text-red-500 transition p-1.5 rounded-lg hover:bg-red-50">
                         <i class="fas fa-arrow-right-from-bracket"></i>
                     </button>
@@ -210,19 +213,26 @@
         <!-- ========================================================================== -->
         <section id="view-student-lobby" class="hidden max-w-5xl mx-auto w-full">
             <div class="bg-gradient-to-r from-indigo-900 via-indigo-800 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white mb-8 shadow-xl shadow-indigo-900/10">
-                <div class="max-w-2xl">
-                    <div class="flex flex-wrap items-center gap-2 mb-3">
-                        <span class="px-3 py-1 bg-white/10 rounded-full text-xs font-medium text-indigo-200 border border-white/10">
-                            <i class="fas fa-shield-alt mr-1"></i> Anti-Cheating Monitoring
-                        </span>
-                        <span id="student-class-badge" class="px-3 py-1 bg-indigo-500/30 rounded-full text-xs font-bold text-amber-300 border border-indigo-400/30">
-                            ปวช.2 | เทคโนโลยีธุรกิจดิจิทัล | ห้อง 1
-                        </span>
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="max-w-2xl">
+                        <div class="flex flex-wrap items-center gap-2 mb-3">
+                            <span class="px-3 py-1 bg-white/10 rounded-full text-xs font-medium text-indigo-200 border border-white/10">
+                                <i class="fas fa-shield-alt mr-1"></i> Anti-Cheating Monitoring
+                            </span>
+                            <span id="student-class-badge" class="px-3 py-1 bg-indigo-500/30 rounded-full text-xs font-bold text-amber-300 border border-indigo-400/30">
+                                ปวส.1 | เทคโนโลยีธุรกิจดิจิทัล | ห้อง 1
+                            </span>
+                        </div>
+                        <h2 class="text-2xl sm:text-3xl font-extrabold mb-2">ยินดีต้อนรับสู่ห้องสอบออนไลน์</h2>
+                        <p class="text-indigo-100 text-sm leading-relaxed">
+                            ระบบได้คัดกรองชุดข้อสอบที่ตรงกับระดับชั้น แผนกวิชา และห้องเรียนของคุณเรียบร้อยแล้ว
+                        </p>
                     </div>
-                    <h2 class="text-2xl sm:text-3xl font-extrabold mb-2">ยินดีต้อนรับสู่ห้องสอบออนไลน์</h2>
-                    <p class="text-indigo-100 text-sm leading-relaxed">
-                        ระบบได้คัดกรองชุดข้อสอบที่ตรงกับระดับชั้น แผนกวิชา และห้องเรียนของคุณเรียบร้อยแล้ว
-                    </p>
+                    <div class="flex flex-row md:flex-col gap-2 shrink-0">
+                        <button onclick="openChangePasswordModal()" class="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer">
+                            <i class="fas fa-key text-slate-900"></i> เปลี่ยนรหัสผ่านของฉัน
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1482,11 +1492,10 @@
             <form id="form-manage-student" onsubmit="saveStudentFromForm(event)" class="space-y-3.5">
                 <input type="hidden" id="student-form-mode" value="create">
                 <input type="hidden" id="student-form-id" value="">
-                <input type="hidden" id="student-form-citizen-id" value="">
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">รหัสนักศึกษา (รหัสผ่านเข้าสอบ) *</label>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">รหัสนักศึกษา *</label>
                         <input type="text" id="student-form-code" required placeholder="กรอกรหัสนักศึกษา" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 font-mono">
                     </div>
                     <div>
@@ -1495,7 +1504,14 @@
                     </div>
                 </div>
 
-                <p class="text-[11px] text-slate-400">💡 รหัสนักศึกษาจะถูกใช้เป็นรหัสผ่านในการเข้าสู่ระบบของนักศึกษา</p>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">รหัสผ่านเข้าสอบ (รหัสนักศึกษา หรือ รหัสผ่านที่นักศึกษาตั้งใหม่) *</label>
+                    <div class="relative">
+                        <i class="fas fa-key absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="student-form-citizen-id" placeholder="กรอกรหัสผ่านเข้าสอบ (ค่าเริ่มต้นคือรหัสนักศึกษา)" class="w-full pl-10 pr-4 py-2.5 bg-amber-50/50 border border-amber-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 font-mono text-amber-950 font-semibold">
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">💡 หากเว้นว่างไว้ ระบบจะใช้รหัสนักศึกษาเป็นรหัสผ่านเริ่มต้น</p>
+                </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                     <div>
@@ -1592,6 +1608,72 @@
                     <i class="fas fa-check"></i> นำเข้ารายชื่อนักศึกษาทั้งหมดเข้าสู่ระบบ
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- 3.4.3 STUDENT CHANGE PASSWORD MODAL -->
+    <div id="modal-student-change-password" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xl animate-fade-in space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fas fa-key text-amber-500"></i> เปลี่ยนรหัสผ่านเข้าสู่ระบบ
+                </h3>
+                <button type="button" onclick="closeChangePasswordModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-950 flex items-start gap-2.5">
+                <i class="fas fa-circle-info text-amber-600 mt-0.5 text-sm"></i>
+                <div>
+                    <span class="font-bold text-amber-900" id="change-pass-student-name">นักศึกษา</span>
+                    <p class="text-[11px] text-amber-800 mt-0.5">เมื่อเปลี่ยนรหัสผ่านสำเร็จแล้ว รหัสใหม่จะถูกซิงก์ไปยังอาจารย์ทันที และต้องใช้รหัสใหม่นี้ในการเข้าสู่ระบบครั้งต่อไป</p>
+                </div>
+            </div>
+
+            <form id="form-student-change-password" onsubmit="handleStudentChangePassword(event)" class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">รหัสผ่านปัจจุบัน *</label>
+                    <div class="relative">
+                        <i class="fas fa-lock absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                        <input type="password" id="student-old-password" required placeholder="กรอกรหัสผ่านปัจจุบัน (เช่น รหัสนักศึกษา)" class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 font-mono">
+                        <button type="button" onclick="togglePasswordVisibility('student-old-password', 'eye-old-pass')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600">
+                            <i id="eye-old-pass" class="fas fa-eye text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">รหัสผ่านใหม่ *</label>
+                    <div class="relative">
+                        <i class="fas fa-key absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                        <input type="password" id="student-new-password" minlength="4" required placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 4 ตัวอักษร)" class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 font-mono">
+                        <button type="button" onclick="togglePasswordVisibility('student-new-password', 'eye-new-pass')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600">
+                            <i id="eye-new-pass" class="fas fa-eye text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">ยืนยันรหัสผ่านใหม่ *</label>
+                    <div class="relative">
+                        <i class="fas fa-check-double absolute left-3.5 top-3.5 text-slate-400 text-xs"></i>
+                        <input type="password" id="student-confirm-password" minlength="4" required placeholder="กรอกยืนยันรหัสผ่านใหม่อีกครั้ง" class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 font-mono">
+                        <button type="button" onclick="togglePasswordVisibility('student-confirm-password', 'eye-confirm-pass')" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600">
+                            <i id="eye-confirm-pass" class="fas fa-eye text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="closeChangePasswordModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 transition cursor-pointer">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-100 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        <i class="fas fa-save"></i> บันทึกรหัสผ่านใหม่
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1700,6 +1782,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.8.33"></script>
+    <script src="./public/app.js?v=2.8.34"></script>
 </body>
 </html>

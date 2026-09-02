@@ -861,12 +861,20 @@ function updateUserInfoBar() {
     const bar = document.getElementById('user-info-bar');
     const nameEl = document.getElementById('current-user-name');
     const roleBadge = document.getElementById('current-user-role-badge');
+    const changePassBtn = document.getElementById('btn-change-password-nav');
 
     if (!bar) return;
 
     if (state.currentUser) {
         bar.classList.remove('hidden');
         if (nameEl) nameEl.textContent = state.currentUser.name;
+        if (changePassBtn) {
+            if (state.currentUser.role === 'student') {
+                changePassBtn.classList.remove('hidden');
+            } else {
+                changePassBtn.classList.add('hidden');
+            }
+        }
         if (roleBadge) {
             if (state.currentUser.role === 'admin') {
                 roleBadge.textContent = '⚙️ แอดมิน';
@@ -875,12 +883,13 @@ function updateUserInfoBar() {
                 roleBadge.textContent = `👨‍🏫 ${state.currentUser.name}`;
                 roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300';
             } else {
-                roleBadge.textContent = `👨‍🎓 ${state.currentUser.year} ${state.currentUser.room}`;
+                roleBadge.textContent = `👨‍🎓 ${state.currentUser.year || ''} ${state.currentUser.room || ''}`.trim() || '👨‍🎓 นักศึกษา';
                 roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 border border-blue-300';
             }
         }
     } else {
         bar.classList.add('hidden');
+        if (changePassBtn) changePassBtn.classList.add('hidden');
     }
 }
 
@@ -973,6 +982,19 @@ function setupAuthEvents() {
         } else {
             input.type = 'password';
             icon.className = 'fas fa-eye text-xs';
+        }
+    };
+
+    window.togglePasswordVisibility = function(inputId, iconId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+        if (!input) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            if (icon) icon.className = 'fas fa-eye-slash text-xs text-indigo-600';
+        } else {
+            input.type = 'password';
+            if (icon) icon.className = 'fas fa-eye text-xs text-slate-400';
         }
     };
 
@@ -1145,35 +1167,38 @@ window.handleStudentLogin = async function(e) {
             return false;
         }
 
-        let allStudents = getLocalStudents();
+        // หากพบในทะเบียนรายชื่อ ให้ตรวจสอบความถูกต้องของรหัสผ่าน
+        if (candidate) {
+            const expectedPass = (candidate.citizen_id || candidate.password || candidate.code || '').toString().trim();
+            const studentCode = (candidate.code || '').toString().trim();
+            const rawEnteredPass = inputPass.trim();
+            const rawEnteredMain = inputMain.trim();
 
-        // 1. ค้นหา Candidate จากทะเบียนรายชื่อนักศึกษา (Smart Multi-Index Roster Linker)
-        let candidate = resolveStudentFromRoster({ student_name: inputMain, student_code: inputPass }, allStudents) ||
-                        resolveStudentFromRoster({ student_name: inputPass, student_code: inputMain }, allStudents);
+            const isPassCorrect = (expectedPass && (rawEnteredPass === expectedPass || rawEnteredMain === expectedPass)) ||
+                                  (studentCode && (rawEnteredPass === studentCode || rawEnteredMain === studentCode));
 
-        // ตรวจสอบข้อมูลจาก Supabase Cloud ด้วย Timeout 1.5 วินาที
-        if (!candidate && isSupabaseConfigured() && state.supabaseClient) {
-            try {
-                const { data: cloudStudents, error } = await withTimeout(state.supabaseClient.from('students').select('*'), 1500);
-                if (!error && Array.isArray(cloudStudents) && cloudStudents.length > 0) {
-                    localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(cloudStudents));
-                    allStudents = cloudStudents;
-                    candidate = resolveStudentFromRoster({ student_name: inputMain, student_code: inputPass }, allStudents) ||
-                                resolveStudentFromRoster({ student_name: inputPass, student_code: inputMain }, allStudents);
-                }
-            } catch (err) {}
+            if (!isPassCorrect) {
+                setButtonLoading(btn, false);
+                showCustomAlert({
+                    title: 'รหัสผ่านไม่ถูกต้อง',
+                    message: `รหัสผ่านสำหรับนักศึกษา "${candidate.name}" ไม่ถูกต้อง\n\nหากคุณได้เปลี่ยนรหัสผ่านแล้ว กรุณากรอกรหัสผ่านใหม่ หรือติดต่ออาจารย์ผู้สอนเพื่อตรวจสอบรหัสผ่าน`,
+                    icon: 'fas fa-lock'
+                });
+                return false;
+            }
         }
 
-        // หากพบในทะเบียนรายชื่อ ให้ใช้ข้อมูลจริง หากไม่พบ ให้สร้าง Session เข้าทดสอบทันทีโดยไม่บล็อก
         const realStudentCode = candidate?.code || (inputPass.match(/^\d+$/) ? inputPass : (inputMain.match(/^\d+$/) ? inputMain : inputPass));
         const realStudentName = candidate?.name || (inputMain !== realStudentCode ? inputMain : `นักศึกษา (${realStudentCode})`);
+        const realStudentPass = candidate?.citizen_id || candidate?.password || realStudentCode;
 
         const studentUser = {
             role: 'student',
             id: candidate?.id || generatePseudoUUID(),
             student_code: realStudentCode,
             name: realStudentName,
-            citizen_id: candidate?.citizen_id || realStudentCode,
+            password: realStudentPass,
+            citizen_id: realStudentPass,
             year: candidate?.year || 'ปวส.1',
             dept: candidate?.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
             room: candidate?.room || 'ห้อง 1'
@@ -1195,6 +1220,151 @@ window.handleStudentLogin = async function(e) {
         loadStudentLobby();
         return false;
     }
+};
+
+// 3.1.1 Student Self-Service Change Password Modal Handlers
+window.openChangePasswordModal = function() {
+    const modal = document.getElementById('modal-student-change-password');
+    const nameEl = document.getElementById('change-pass-student-name');
+    const oldPassInput = document.getElementById('student-old-password');
+    const newPassInput = document.getElementById('student-new-password');
+    const confirmPassInput = document.getElementById('student-confirm-password');
+
+    if (!modal) return;
+    if (oldPassInput) oldPassInput.value = '';
+    if (newPassInput) newPassInput.value = '';
+    if (confirmPassInput) confirmPassInput.value = '';
+
+    if (nameEl && state.currentUser) {
+        nameEl.textContent = `${state.currentUser.name} (รหัส: ${state.currentUser.student_code || state.currentUser.code || '-'})`;
+    }
+
+    modal.classList.remove('hidden');
+};
+
+window.closeChangePasswordModal = function() {
+    const modal = document.getElementById('modal-student-change-password');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.handleStudentChangePassword = async function(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (!state.currentUser || state.currentUser.role !== 'student') {
+        showToast('กรุณาเข้าสู่ระบบในฐานะนักศึกษาก่อนเปลี่ยนรหัสผ่าน', 'warning');
+        return;
+    }
+
+    const oldPass = (document.getElementById('student-old-password')?.value || '').trim();
+    const newPass = (document.getElementById('student-new-password')?.value || '').trim();
+    const confirmPass = (document.getElementById('student-confirm-password')?.value || '').trim();
+
+    if (!oldPass || !newPass || !confirmPass) {
+        showToast('กรุณากรอกข้อมูลให้ครบทุกช่อง', 'warning');
+        return;
+    }
+
+    if (newPass.length < 4) {
+        showCustomAlert({
+            title: 'รหัสผ่านสั้นเกินไป',
+            message: 'กรุณากำหนดรหัสผ่านใหม่อย่างน้อย 4 ตัวอักษร',
+            icon: 'fas fa-key'
+        });
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        showCustomAlert({
+            title: 'รหัสผ่านไม่ตรงกัน',
+            message: 'รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง',
+            icon: 'fas fa-triangle-exclamation'
+        });
+        return;
+    }
+
+    let allStudents = getLocalStudents();
+    const currentCode = (state.currentUser.student_code || state.currentUser.code || '').toString().trim();
+    const currentName = (state.currentUser.name || '').toString().trim();
+
+    // Find student in roster
+    let student = resolveStudentFromRoster({
+        student_id: state.currentUser.id,
+        student_code: currentCode,
+        student_name: currentName
+    }, allStudents);
+
+    if (!student && isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            const { data } = await state.supabaseClient.from('students').select('*');
+            if (Array.isArray(data) && data.length > 0) {
+                allStudents = data;
+                localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(data));
+                student = resolveStudentFromRoster({
+                    student_id: state.currentUser.id,
+                    student_code: currentCode,
+                    student_name: currentName
+                }, allStudents);
+            }
+        } catch (err) {}
+    }
+
+    // Verify current old password
+    const expectedOldPass = (student?.citizen_id || student?.password || student?.code || state.currentUser.password || state.currentUser.citizen_id || currentCode).toString().trim();
+    if (oldPass !== expectedOldPass && oldPass !== currentCode && oldPass !== student?.code) {
+        showCustomAlert({
+            title: 'รหัสผ่านปัจจุบันไม่ถูกต้อง',
+            message: 'รหัสผ่านปัจจุบันที่คุณกรอกไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง',
+            icon: 'fas fa-lock'
+        });
+        return;
+    }
+
+    // Update Student Record
+    const updatedStudent = {
+        ...(student || {}),
+        id: student?.id || state.currentUser.id || generatePseudoUUID(),
+        code: student?.code || currentCode,
+        name: student?.name || currentName,
+        password: newPass,
+        citizen_id: newPass,
+        year: student?.year || state.currentUser.year || 'ปวส.1',
+        dept: student?.dept || state.currentUser.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
+        room: student?.room || state.currentUser.room || 'ห้อง 1',
+        updated_at: new Date().toISOString()
+    };
+
+    saveLocalStudent(updatedStudent);
+
+    // Update Session
+    state.currentUser.password = newPass;
+    state.currentUser.citizen_id = newPass;
+    saveUserSession(state.currentUser);
+
+    // Sync to Supabase Cloud
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            if (updatedStudent.id) {
+                await state.supabaseClient
+                    .from('students')
+                    .update({ citizen_id: newPass })
+                    .eq('id', updatedStudent.id);
+            } else if (updatedStudent.code) {
+                await state.supabaseClient
+                    .from('students')
+                    .update({ citizen_id: newPass })
+                    .eq('code', updatedStudent.code);
+            }
+        } catch (err) {
+            console.warn('[handleStudentChangePassword Supabase Sync Warning]:', err);
+        }
+    }
+
+    closeChangePasswordModal();
+
+    showCustomAlert({
+        title: 'เปลี่ยนรหัสผ่านสำเร็จ 🎉',
+        message: `เปลี่ยนรหัสผ่านสำหรับ "${state.currentUser.name}" เป็น "${newPass}" เรียบร้อยแล้ว\n\nรหัสผ่านใหม่นี้ได้รับการอัปเดตไปยังระบบของอาจารย์ทันที และกรุณาใช้รหัสผ่านนี้ในการเข้าสู่ระบบครั้งต่อไป`,
+        icon: 'fas fa-circle-check'
+    });
 };
 
 // 3.2 Global Teacher Login Handler (Instant & 100% Reliable)
@@ -3714,8 +3884,9 @@ window.loadTeacherStudentsList = async function() {
             <td class="py-3 px-4 font-mono font-bold text-indigo-700">${escapeHtml(s.code || '-')}</td>
             <td class="py-3 px-4 font-bold text-slate-900">${escapeHtml(s.name || '-')}</td>
             <td class="py-3 px-4 font-mono text-slate-800 bg-slate-50/50">
-                <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-900 border border-indigo-100 font-semibold text-xs tracking-wider">
-                    ${escapeHtml(s.code || s.citizen_id || '-')}
+                <span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200 font-bold text-xs tracking-wider inline-flex items-center gap-1.5 shadow-2xs">
+                    <i class="fas fa-key text-indigo-500 text-[10px]"></i>
+                    ${escapeHtml(s.citizen_id || s.password || s.code || '-')}
                 </span>
             </td>
             <td class="py-3 px-4">
@@ -3761,7 +3932,7 @@ window.openAddStudentModal = function(studentId = null) {
             if (idInput) idInput.value = student.id;
             if (codeInput) codeInput.value = student.code || '';
             if (nameInput) nameInput.value = student.name || '';
-            if (citizenInput) citizenInput.value = student.citizen_id || student.code || '';
+            if (citizenInput) citizenInput.value = student.citizen_id || student.password || student.code || '';
             if (yearSelect) yearSelect.value = student.year || 'ปวส.1';
             if (deptSelect) deptSelect.value = student.dept || 'เทคโนโลยีธุรกิจดิจิทัล';
             if (roomSelect) roomSelect.value = student.room || 'ห้อง 1';
@@ -3820,6 +3991,7 @@ window.saveStudentFromForm = function(event) {
         id: id,
         code: code,
         name: name,
+        password: citizenId,
         citizen_id: citizenId,
         year: year,
         dept: dept,
