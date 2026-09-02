@@ -975,96 +975,103 @@ function setupAuthEvents() {
         }
     };
 
-    function saveUserSession(user) {
-        state.currentUser = user;
-        try {
-            sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(user));
-            localStorage.setItem('EXAM_SAVED_USER', JSON.stringify(user));
-        } catch (e) {}
+function saveUserSession(user) {
+    state.currentUser = user;
+    try {
+        sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(user));
+        localStorage.setItem('EXAM_SAVED_USER', JSON.stringify(user));
+    } catch (e) {}
+}
+
+function clearUserSession() {
+    state.currentUser = null;
+    try {
+        sessionStorage.removeItem('EXAM_SESSION_USER');
+        localStorage.removeItem('EXAM_SAVED_USER');
+    } catch (e) {}
+}
+
+function ensureSupabaseReady() {
+    if (!state.supabaseClient && typeof initSupabase === 'function') {
+        initSupabase();
+    }
+}
+
+// 3.1 Global Student Login Handler
+window.handleStudentLogin = async function(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    ensureSupabaseReady();
+    const rawLoginId = (document.getElementById('student-login-id-input')?.value || '').trim();
+    const rawPass = (document.getElementById('student-login-pass-input')?.value || '').trim();
+
+    if (!rawLoginId) {
+        showToast('กรุณากรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล', 'warning');
+        return false;
     }
 
-    function clearUserSession() {
-        state.currentUser = null;
-        try {
-            sessionStorage.removeItem('EXAM_SESSION_USER');
-            localStorage.removeItem('EXAM_SAVED_USER');
-        } catch (e) {}
-    }
-
-    // 3.1 Global Student Login Handler
-    window.handleStudentLogin = async function(e) {
-        if (e && typeof e.preventDefault === 'function') e.preventDefault();
-        const rawLoginId = (document.getElementById('student-login-id-input')?.value || '').trim();
-        const rawPass = (document.getElementById('student-login-pass-input')?.value || '').trim();
-
-        if (!rawLoginId) {
-            showToast('กรุณากรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล', 'warning');
-            return false;
-        }
-
-        // 0. Auto-detect Admin Credentials in Student form
-        const cleanLoginLower = rawLoginId.toLowerCase();
-        if (cleanLoginLower === 'admin' || rawPass === 'admin1234' || rawPass === 'admin9999' || rawPass === 'admin') {
-            saveUserSession({
-                role: 'admin',
-                id: '00000000-0000-0000-0000-000000000001',
-                name: 'ผู้ดูแลระบบสูงสุด (Admin)'
-            });
-            showToast('ยินดีต้อนรับผู้ดูแลระบบ (Admin)', 'success');
-            loadAdminDashboard();
-            return false;
-        }
-
-        // 0.1 Auto-detect Teacher Credentials in Student form
-        let registeredTeachers = getLocalTeachers();
-        if (isSupabaseConfigured() && state.supabaseClient) {
-            try {
-                const { data: dbTeachers } = await state.supabaseClient.from('teachers').select('*');
-                if (Array.isArray(dbTeachers) && dbTeachers.length > 0) {
-                    registeredTeachers = dbTeachers;
-                    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(registeredTeachers));
-                }
-            } catch (err) {}
-        }
-
-        const isTeacherPass = (rawPass === 'teacher1234' || rawPass === 'teacher' || rawPass === '1234' || rawPass === 'admin1234');
-        const matchedTeacher = (registeredTeachers || []).find(t => {
-            const tCode = (t.teacher_code || t.code || '').toString().trim().toLowerCase();
-            const tName = (t.name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
-            const inputClean = cleanLoginLower.replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
-            return (tCode && tCode === cleanLoginLower) || (tName && inputClean && (tName === inputClean || tName.includes(inputClean)));
+    // 0. Auto-detect Admin Credentials in Student form
+    const cleanLoginLower = rawLoginId.toLowerCase();
+    if (cleanLoginLower === 'admin' || rawPass === 'admin1234' || rawPass === 'admin9999' || rawPass === 'admin') {
+        saveUserSession({
+            role: 'admin',
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'ผู้ดูแลระบบสูงสุด (Admin)'
         });
+        showToast('ยินดีต้อนรับผู้ดูแลระบบ (Admin)', 'success');
+        loadAdminDashboard();
+        return false;
+    }
 
-        if (cleanLoginLower === 't001' || matchedTeacher || isTeacherPass) {
-            const finalTeacher = matchedTeacher || {
-                id: generateTeacherUUID(rawLoginId),
-                name: cleanLoginLower === 't001' ? 'อาจารย์ผู้สอน' : rawLoginId,
-                teacher_code: 'T001',
-                department: 'เทคโนโลยีธุรกิจดิจิทัล'
-            };
-            saveUserSession({
-                role: 'teacher',
-                id: finalTeacher.id,
-                name: finalTeacher.name,
-                code: finalTeacher.teacher_code || finalTeacher.code || 'T001',
-                dept: finalTeacher.department || finalTeacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
-            });
-            const portalNameEl = document.getElementById('teacher-portal-name');
-            if (portalNameEl) portalNameEl.textContent = `${state.currentUser.name} (${state.currentUser.dept})`;
-            showToast(`ยินดีต้อนรับอาจารย์ ${state.currentUser.name}`, 'success');
-            loadTeacherDashboard();
-            return false;
-        }
+    // 0.1 Auto-detect Teacher Credentials in Student form
+    let registeredTeachers = getLocalTeachers();
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            const { data: dbTeachers } = await state.supabaseClient.from('teachers').select('*');
+            if (Array.isArray(dbTeachers) && dbTeachers.length > 0) {
+                registeredTeachers = dbTeachers;
+                localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(registeredTeachers));
+            }
+        } catch (err) {}
+    }
 
-        const cleanPass = rawPass.replace(/\D/g, '').trim();
-        if (!cleanPass || cleanPass.length !== 13) {
-            showCustomAlert({
-                title: 'เลขบัตรประชาชนไม่ถูกต้อง',
-                message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลักตัวเลข\n(ใช้เป็นรหัสผ่านเข้าสอบ)',
-                icon: 'fas fa-id-card'
-            });
-            return false;
-        }
+    const isTeacherPass = (rawPass === 'teacher1234' || rawPass === 'teacher' || rawPass === '1234' || rawPass === 'admin1234');
+    const matchedTeacher = (registeredTeachers || []).find(t => {
+        const tCode = (t.teacher_code || t.code || '').toString().trim().toLowerCase();
+        const tName = (t.name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
+        const inputClean = cleanLoginLower.replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
+        return (tCode && tCode === cleanLoginLower) || (tName && inputClean && (tName === inputClean || tName.includes(inputClean)));
+    });
+
+    if (cleanLoginLower === 't001' || matchedTeacher || isTeacherPass) {
+        const finalTeacher = matchedTeacher || {
+            id: generateTeacherUUID(rawLoginId),
+            name: cleanLoginLower === 't001' ? 'อาจารย์ผู้สอน' : rawLoginId,
+            teacher_code: 'T001',
+            department: 'เทคโนโลยีธุรกิจดิจิทัล'
+        };
+        saveUserSession({
+            role: 'teacher',
+            id: finalTeacher.id,
+            name: finalTeacher.name,
+            code: finalTeacher.teacher_code || finalTeacher.code || 'T001',
+            dept: finalTeacher.department || finalTeacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
+        });
+        const portalNameEl = document.getElementById('teacher-portal-name');
+        if (portalNameEl) portalNameEl.textContent = `${state.currentUser.name} (${state.currentUser.dept})`;
+        showToast(`ยินดีต้อนรับอาจารย์ ${state.currentUser.name}`, 'success');
+        loadTeacherDashboard();
+        return false;
+    }
+
+    const cleanPass = rawPass.replace(/\D/g, '').trim();
+    if (!cleanPass || cleanPass.length !== 13) {
+        showCustomAlert({
+            title: 'เลขบัตรประชาชนไม่ถูกต้อง',
+            message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลักตัวเลข\n(ใช้เป็นรหัสผ่านเข้าสอบ)',
+            icon: 'fas fa-id-card'
+        });
+        return false;
+    }
 
         let allStudents = getLocalStudents();
 
@@ -6449,7 +6456,7 @@ function showToast(msg, type = 'info') {
     }, 3500);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function bootApp() {
     // ล้างข้อมูลชุดทดสอบตัวอย่าง (Dummy) เก่าออกจาก LocalStorage
     try {
         const rawExams = localStorage.getItem('EXAM_LOCAL_EXAMS');
@@ -6504,4 +6511,10 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {}
 
     showView('view-auth');
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootApp);
+} else {
+    bootApp();
+}
