@@ -1164,7 +1164,26 @@ window.handleStudentLogin = async function(e) {
             return false;
         }
 
-        // หากพบในทะเบียนรายชื่อ ให้ตรวจสอบความถูกต้องของรหัสผ่าน
+        let allStudents = getLocalStudents();
+
+        // 1. ค้นหา Candidate จากทะเบียนรายชื่อนักศึกษา (Smart Multi-Index Roster Linker)
+        let candidate = resolveStudentFromRoster({ student_name: inputMain, student_code: inputPass }, allStudents) ||
+                        resolveStudentFromRoster({ student_name: inputPass, student_code: inputMain }, allStudents);
+
+        // ตรวจสอบข้อมูลจาก Supabase Cloud ด้วย Timeout 1.5 วินาที
+        if (!candidate && isSupabaseConfigured() && state.supabaseClient) {
+            try {
+                const { data: cloudStudents, error } = await withTimeout(state.supabaseClient.from('students').select('*'), 1500);
+                if (!error && Array.isArray(cloudStudents) && cloudStudents.length > 0) {
+                    localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(cloudStudents));
+                    allStudents = cloudStudents;
+                    candidate = resolveStudentFromRoster({ student_name: inputMain, student_code: inputPass }, allStudents) ||
+                                resolveStudentFromRoster({ student_name: inputPass, student_code: inputMain }, allStudents);
+                }
+            } catch (err) {}
+        }
+
+        // หากพบในทะเบียนรายชื่อ ให้ตรวจสอบความถูกต้องของรหัสผ่าน (รหัสนักศึกษา)
         if (candidate) {
             const expectedPass = (candidate.citizen_id || candidate.password || candidate.code || '').toString().trim();
             const studentCode = (candidate.code || '').toString().trim();
@@ -1178,7 +1197,7 @@ window.handleStudentLogin = async function(e) {
                 setButtonLoading(btn, false);
                 showCustomAlert({
                     title: 'รหัสผ่านไม่ถูกต้อง',
-                    message: `รหัสผ่านสำหรับนักศึกษา "${candidate.name}" ไม่ถูกต้อง\n\nหากคุณได้เปลี่ยนรหัสผ่านแล้ว กรุณากรอกรหัสผ่านใหม่ หรือติดต่ออาจารย์ผู้สอนเพื่อตรวจสอบรหัสผ่าน`,
+                    message: `รหัสผ่านสำหรับนักศึกษา "${candidate.name}" ไม่ถูกต้อง\n\nกรุณากรอกรหัสนักศึกษา หรือติดต่ออาจารย์ผู้สอนเพื่อตรวจสอบรหัสผ่าน`,
                     icon: 'fas fa-lock'
                 });
                 return false;
@@ -1204,17 +1223,16 @@ window.handleStudentLogin = async function(e) {
         saveUserSession(studentUser);
 
         const badge = document.getElementById('student-class-badge');
-        if (badge) badge.textContent = `${state.currentUser.year} | ${state.currentUser.dept} | ${state.currentUser.room}`;
+        if (badge) badge.textContent = `${studentUser.year} | ${studentUser.dept} | ${studentUser.room}`;
 
         setButtonLoading(btn, false);
-        showToast(`ยินดีต้อนรับคุณ ${state.currentUser.name} (${state.currentUser.year} ${state.currentUser.room})`, 'success');
-        loadStudentLobby();
+        showToast(`ยินดีต้อนรับคุณ ${studentUser.name} (${studentUser.year} ${studentUser.room})`, 'success');
+        await loadStudentLobby();
         return false;
     } catch (err) {
         console.error('[handleStudentLogin Error]', err);
         setButtonLoading(btn, false);
-        showToast('กำลังนำเข้าสู่ระบบ...', 'info');
-        loadStudentLobby();
+        showToast('เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง', 'error');
         return false;
     }
 };
@@ -1561,16 +1579,25 @@ async function loadStudentLobby() {
 }
 
 function isExamEligibleForStudent(exam, student) {
-    if (!student || student.role !== 'student') return true;
+    if (!student || student.role !== 'student') return false;
 
-    // ตรวจสอบระดับชั้น
-    const yearMatch = !exam.target_year || exam.target_year === 'ทั้งหมด' || exam.target_year === student.year;
-    // ตรวจสอบแผนกวิชา
-    const deptMatch = !exam.target_department || exam.target_department === 'ทั้งหมด' || exam.target_department === student.dept;
-    // ตรวจสอบห้องเรียน
-    const roomMatch = !exam.target_room || exam.target_room === 'ทั้งหมด' || exam.target_room === student.room;
+    const studentYear = (student.year || '').trim();
+    const studentDept = (student.dept || '').trim();
+    const studentRoom = (student.room || '').trim();
 
-    return yearMatch && deptMatch && roomMatch;
+    // 1. ตรวจสอบระดับชั้น (เช่น ปวส.1, ปวช.2, หรือ ทั้งหมด)
+    const examYear = (exam.target_year || 'ทั้งหมด').trim();
+    const isYearMatch = (!examYear || examYear === 'ทั้งหมด' || examYear === 'ทุกชั้น' || examYear === studentYear);
+
+    // 2. ตรวจสอบแผนกวิชา (เช่น เทคโนโลยีธุรกิจดิจิทัล, หรือ ทั้งหมด)
+    const examDept = (exam.target_department || 'ทั้งหมด').trim();
+    const isDeptMatch = (!examDept || examDept === 'ทั้งหมด' || examDept === 'ทุกแผนก' || examDept === studentDept);
+
+    // 3. ตรวจสอบห้องเรียน (เช่น ห้อง 1, ห้อง 2, หรือ ทั้งหมด)
+    const examRoom = (exam.target_room || 'ทั้งหมด').trim();
+    const isRoomMatch = (!examRoom || examRoom === 'ทั้งหมด' || examRoom === 'ทุกห้อง' || examRoom === studentRoom);
+
+    return isYearMatch && isDeptMatch && isRoomMatch;
 }
 
 // เริ่มการสอบ
