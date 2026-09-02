@@ -997,95 +997,111 @@ function ensureSupabaseReady() {
     }
 }
 
-// 3.1 Global Student Login Handler
+function withTimeout(promise, ms = 2000) {
+    let timer;
+    const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('NETWORK_TIMEOUT')), ms);
+    });
+    return Promise.race([
+        promise.then(res => { clearTimeout(timer); return res; }),
+        timeoutPromise
+    ]).catch(err => {
+        clearTimeout(timer);
+        console.warn('[Network Timeout / Bypass]', err);
+        return { data: null, error: err };
+    });
+}
+
+// Helper: Set Button Loading State
+function setButtonLoading(btn, isLoading, originalHtml = '') {
+    if (!btn) return;
+    if (isLoading) {
+        btn.dataset.originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> กำลังเข้าสู่ระบบ...';
+    } else {
+        btn.disabled = false;
+        if (btn.dataset.originalHtml) {
+            btn.innerHTML = btn.dataset.originalHtml;
+        } else if (originalHtml) {
+            btn.innerHTML = originalHtml;
+        }
+    }
+}
+
+// 3.1 Global Student Login Handler (Ultra-Fast & Non-blocking)
 window.handleStudentLogin = async function(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    ensureSupabaseReady();
-    const rawLoginId = (document.getElementById('student-login-id-input')?.value || '').trim();
-    const rawPass = (document.getElementById('student-login-pass-input')?.value || '').trim();
+    const btn = document.querySelector('#form-login-student button[type="button"]') || document.querySelector('#form-login-student button');
+    setButtonLoading(btn, true);
 
-    if (!rawLoginId) {
-        showToast('กรุณากรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล', 'warning');
-        return false;
-    }
+    try {
+        ensureSupabaseReady();
+        const rawLoginId = (document.getElementById('student-login-id-input')?.value || '').trim();
+        const rawPass = (document.getElementById('student-login-pass-input')?.value || '').trim();
 
-    // 0. Auto-detect Admin Credentials in Student form
-    const cleanLoginLower = rawLoginId.toLowerCase();
-    if (cleanLoginLower === 'admin' || rawPass === 'admin1234' || rawPass === 'admin9999' || rawPass === 'admin') {
-        saveUserSession({
-            role: 'admin',
-            id: '00000000-0000-0000-0000-000000000001',
-            name: 'ผู้ดูแลระบบสูงสุด (Admin)'
+        if (!rawLoginId) {
+            setButtonLoading(btn, false);
+            showToast('กรุณากรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล', 'warning');
+            return false;
+        }
+
+        const cleanLoginLower = rawLoginId.toLowerCase();
+
+        // 0. Auto-detect Admin Credentials in Student form
+        if (cleanLoginLower === 'admin' || rawPass === 'admin1234' || rawPass === 'admin9999' || rawPass === 'admin') {
+            saveUserSession({
+                role: 'admin',
+                id: '00000000-0000-0000-0000-000000000001',
+                name: 'ผู้ดูแลระบบสูงสุด (Admin)'
+            });
+            setButtonLoading(btn, false);
+            showToast('ยินดีต้อนรับผู้ดูแลระบบ (Admin)', 'success');
+            loadAdminDashboard();
+            return false;
+        }
+
+        // 0.1 Auto-detect Teacher Credentials in Student form (Instant Check)
+        let registeredTeachers = getLocalTeachers();
+        const isTeacherPass = (rawPass === 'teacher1234' || rawPass === 'teacher' || rawPass === '1234' || rawPass === 'admin1234');
+        const matchedTeacherLocal = (registeredTeachers || []).find(t => {
+            const tCode = (t.teacher_code || t.code || '').toString().trim().toLowerCase();
+            const tName = (t.name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
+            const inputClean = cleanLoginLower.replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
+            return (tCode && tCode === cleanLoginLower) || (tName && inputClean && (tName === inputClean || tName.includes(inputClean)));
         });
-        showToast('ยินดีต้อนรับผู้ดูแลระบบ (Admin)', 'success');
-        loadAdminDashboard();
-        return false;
-    }
 
-    // 0.1 Auto-detect Teacher Credentials in Student form
-    let registeredTeachers = getLocalTeachers();
-    if (isSupabaseConfigured() && state.supabaseClient) {
-        try {
-            const { data: dbTeachers } = await state.supabaseClient.from('teachers').select('*');
-            if (Array.isArray(dbTeachers) && dbTeachers.length > 0) {
-                registeredTeachers = dbTeachers;
-                localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(registeredTeachers));
-            }
-        } catch (err) {}
-    }
+        if (cleanLoginLower === 't001' || matchedTeacherLocal || (isTeacherPass && cleanLoginLower.length > 2)) {
+            const finalTeacher = matchedTeacherLocal || {
+                id: generateTeacherUUID(rawLoginId),
+                name: cleanLoginLower === 't001' ? 'อาจารย์ผู้สอน' : rawLoginId,
+                teacher_code: 'T001',
+                department: 'เทคโนโลยีธุรกิจดิจิทัล'
+            };
+            saveUserSession({
+                role: 'teacher',
+                id: finalTeacher.id,
+                name: finalTeacher.name,
+                code: finalTeacher.teacher_code || finalTeacher.code || 'T001',
+                dept: finalTeacher.department || finalTeacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
+            });
+            const portalNameEl = document.getElementById('teacher-portal-name');
+            if (portalNameEl) portalNameEl.textContent = `${state.currentUser.name} (${state.currentUser.dept})`;
+            setButtonLoading(btn, false);
+            showToast(`ยินดีต้อนรับอาจารย์ ${state.currentUser.name}`, 'success');
+            loadTeacherDashboard();
+            return false;
+        }
 
-    const isTeacherPass = (rawPass === 'teacher1234' || rawPass === 'teacher' || rawPass === '1234' || rawPass === 'admin1234');
-    const matchedTeacher = (registeredTeachers || []).find(t => {
-        const tCode = (t.teacher_code || t.code || '').toString().trim().toLowerCase();
-        const tName = (t.name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
-        const inputClean = cleanLoginLower.replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
-        return (tCode && tCode === cleanLoginLower) || (tName && inputClean && (tName === inputClean || tName.includes(inputClean)));
-    });
-
-    if (cleanLoginLower === 't001' || matchedTeacher || isTeacherPass) {
-        const finalTeacher = matchedTeacher || {
-            id: generateTeacherUUID(rawLoginId),
-            name: cleanLoginLower === 't001' ? 'อาจารย์ผู้สอน' : rawLoginId,
-            teacher_code: 'T001',
-            department: 'เทคโนโลยีธุรกิจดิจิทัล'
-        };
-        saveUserSession({
-            role: 'teacher',
-            id: finalTeacher.id,
-            name: finalTeacher.name,
-            code: finalTeacher.teacher_code || finalTeacher.code || 'T001',
-            dept: finalTeacher.department || finalTeacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
-        });
-        const portalNameEl = document.getElementById('teacher-portal-name');
-        if (portalNameEl) portalNameEl.textContent = `${state.currentUser.name} (${state.currentUser.dept})`;
-        showToast(`ยินดีต้อนรับอาจารย์ ${state.currentUser.name}`, 'success');
-        loadTeacherDashboard();
-        return false;
-    }
-
-    const cleanPass = rawPass.replace(/\D/g, '').trim();
-    if (!cleanPass || cleanPass.length !== 13) {
-        showCustomAlert({
-            title: 'เลขบัตรประชาชนไม่ถูกต้อง',
-            message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลักตัวเลข\n(ใช้เป็นรหัสผ่านเข้าสอบ)',
-            icon: 'fas fa-id-card'
-        });
-        return false;
-    }
-
-        let allStudents = getLocalStudents();
-
-        // ตรวจสอบข้อมูลจาก Supabase Cloud
-        if (isSupabaseConfigured() && state.supabaseClient) {
-            try {
-                const { data: cloudStudents, error } = await state.supabaseClient.from('students').select('*');
-                if (!error && Array.isArray(cloudStudents) && cloudStudents.length > 0) {
-                    localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(cloudStudents));
-                    allStudents = cloudStudents;
-                }
-            } catch (err) {
-                console.warn('[Student Login Supabase notice]:', err);
-            }
+        const cleanPass = rawPass.replace(/\D/g, '').trim();
+        if (!cleanPass || cleanPass.length !== 13) {
+            setButtonLoading(btn, false);
+            showCustomAlert({
+                title: 'เลขบัตรประชาชนไม่ถูกต้อง',
+                message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลักตัวเลข\n(ใช้เป็นรหัสผ่านเข้าสอบ)',
+                icon: 'fas fa-id-card'
+            });
+            return false;
         }
 
         function findCandidate(list, input) {
@@ -1114,7 +1130,23 @@ window.handleStudentLogin = async function(e) {
             });
         }
 
+        let allStudents = getLocalStudents();
         let candidate = findCandidate(allStudents, rawLoginId);
+
+        // ถ้าไม่พบใน Local ให้ดึงจาก Supabase Cloud ด้วย Timeout 2 วิ
+        if (!candidate && isSupabaseConfigured() && state.supabaseClient) {
+            try {
+                const { data: cloudStudents, error } = await withTimeout(state.supabaseClient.from('students').select('*'), 2000);
+                if (!error && Array.isArray(cloudStudents) && cloudStudents.length > 0) {
+                    localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(cloudStudents));
+                    allStudents = cloudStudents;
+                    candidate = findCandidate(allStudents, rawLoginId);
+                }
+            } catch (err) {
+                console.warn('[Student Login Supabase notice]:', err);
+            }
+        }
+
         let matchedStudent = null;
 
         if (candidate) {
@@ -1122,6 +1154,7 @@ window.handleStudentLogin = async function(e) {
             if (sCitizen === cleanPass) {
                 matchedStudent = candidate;
             } else {
+                setButtonLoading(btn, false);
                 showCustomAlert({
                     title: 'รหัสผ่านไม่ถูกต้อง',
                     message: `พบรายชื่อ "${candidate.name}" ในระบบ\nแต่เลขบัตรประจำตัวประชาชน 13 หลัก (รหัสผ่าน) ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง`,
@@ -1132,6 +1165,7 @@ window.handleStudentLogin = async function(e) {
         }
 
         if (!matchedStudent) {
+            setButtonLoading(btn, false);
             showCustomAlert({
                 title: 'ไม่พบข้อมูลนักเรียนในระบบ',
                 message: `ไม่พบรหัสนักเรียนหรือชื่อ "${rawLoginId}" ในระบบ\n\n📌 คำแนะนำ:\n1. ตรวจสอบว่าอาจารย์ได้เพิ่มรายชื่อนักเรียนในระบบหรือยัง\n2. เข้าสู่ระบบด้วยรหัสนักเรียน เช่น 69319100041 และรหัสผ่านเลขบัตร 13 หลัก`,
@@ -1154,41 +1188,41 @@ window.handleStudentLogin = async function(e) {
         const badge = document.getElementById('student-class-badge');
         if (badge) badge.textContent = `${state.currentUser.year} | ${state.currentUser.dept} | ${state.currentUser.room}`;
 
+        setButtonLoading(btn, false);
         showToast(`ยินดีต้อนรับคุณ ${state.currentUser.name} (${state.currentUser.year} ${state.currentUser.room})`, 'success');
         loadStudentLobby();
         return false;
-    };
+    } catch (err) {
+        console.error('[handleStudentLogin Error]', err);
+        setButtonLoading(btn, false);
+        showToast('เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง', 'error');
+        return false;
+    }
+};
 
-    // 3.2 Global Teacher Login Handler
-    window.handleTeacherLogin = async function(e) {
-        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+// 3.2 Global Teacher Login Handler (Instant & Bulletproof)
+window.handleTeacherLogin = async function(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    const btn = document.querySelector('#form-login-teacher button[type="button"]') || document.querySelector('#form-login-teacher button');
+    setButtonLoading(btn, true);
+
+    try {
+        ensureSupabaseReady();
         const loginInput = (document.getElementById('teacher-name-input')?.value || '').trim();
         const password = (document.getElementById('teacher-password-input')?.value || '').trim();
 
         if (!loginInput || !password) {
+            setButtonLoading(btn, false);
             showToast('กรุณากรอกชื่อ-นามสกุล หรือ รหัสอาจารย์ และ รหัสผ่าน', 'warning');
             return false;
         }
 
-        let registeredTeachers = getLocalTeachers();
-
-        if (isSupabaseConfigured() && state.supabaseClient) {
-            try {
-                const { data: dbTeachers, error: fetchErr } = await state.supabaseClient.from('teachers').select('*');
-                if (!fetchErr && Array.isArray(dbTeachers) && dbTeachers.length > 0) {
-                    registeredTeachers = dbTeachers;
-                    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(registeredTeachers));
-                }
-            } catch (err) {
-                console.warn('[Teacher Login] Supabase check notice:', err);
-            }
-        }
-
         const cleanLogin = loginInput.toLowerCase();
         const cleanLoginNoPrefix = cleanLogin.replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, '');
-
         const isUniversalTeacherPass = (password === 'teacher1234' || password === 'teacher' || password === '1234' || password === 'admin1234');
 
+        // 1. ตรวจสอบจาก Local Cache ทันที (Instant 0ms)
+        let registeredTeachers = getLocalTeachers();
         let matchedTeacher = (registeredTeachers || []).find(t => {
             const tCode = (t.teacher_code || t.code || '').toString().trim().toLowerCase();
             const tName = (t.name || '').trim().toLowerCase();
@@ -1202,6 +1236,31 @@ window.handleStudentLogin = async function(e) {
             return nameOrCodeMatch && passMatch;
         });
 
+        // 2. ถ้าไม่พบใน Local และเปิด Supabase ให้เช็ก Cloud ด้วย Timeout 2 วิ
+        if (!matchedTeacher && isSupabaseConfigured() && state.supabaseClient) {
+            try {
+                const { data: dbTeachers, error: fetchErr } = await withTimeout(state.supabaseClient.from('teachers').select('*'), 2000);
+                if (!fetchErr && Array.isArray(dbTeachers) && dbTeachers.length > 0) {
+                    registeredTeachers = dbTeachers;
+                    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(registeredTeachers));
+                    matchedTeacher = registeredTeachers.find(t => {
+                        const tCode = (t.teacher_code || t.code || '').toString().trim().toLowerCase();
+                        const tName = (t.name || '').trim().toLowerCase();
+                        const tNameNoPrefix = tName.replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, '');
+                        const passMatch = String(t.password).trim() === password || isUniversalTeacherPass;
+
+                        const nameOrCodeMatch = (tCode && tCode === cleanLogin) || 
+                                               (tName && tName === cleanLogin) ||
+                                               (tNameNoPrefix && cleanLoginNoPrefix && (tNameNoPrefix === cleanLoginNoPrefix || tNameNoPrefix.includes(cleanLoginNoPrefix) || cleanLoginNoPrefix.includes(tNameNoPrefix)));
+
+                        return nameOrCodeMatch && passMatch;
+                    });
+                }
+            } catch (err) {
+                console.warn('[Teacher Login] Supabase check notice:', err);
+            }
+        }
+
         if (matchedTeacher) {
             saveUserSession({
                 role: 'teacher',
@@ -1214,12 +1273,13 @@ window.handleStudentLogin = async function(e) {
             const portalNameEl = document.getElementById('teacher-portal-name');
             if (portalNameEl) portalNameEl.textContent = `${matchedTeacher.name} (${matchedTeacher.department || 'อาจารย์ผู้สอน'})`;
 
+            setButtonLoading(btn, false);
             showToast(`ยินดีต้อนรับ ${matchedTeacher.name}`, 'success');
             loadTeacherDashboard();
             return false;
         }
 
-        // กรณีไม่พบในฐานข้อมูล หรือเป็นรหัสผ่านมาตรฐานสำหรับอาจารย์
+        // กรณีใช้รหัสผ่านสากลอาจารย์ (Universal Teacher Pass) หรือพิมพ์ T001
         if (isUniversalTeacherPass || cleanLogin === 't001') {
             const teacherId = generateTeacherUUID(loginInput);
             saveUserSession({
@@ -1233,6 +1293,7 @@ window.handleStudentLogin = async function(e) {
             const portalNameEl = document.getElementById('teacher-portal-name');
             if (portalNameEl) portalNameEl.textContent = state.currentUser.name;
 
+            setButtonLoading(btn, false);
             showToast(`ยินดีต้อนรับ ${state.currentUser.name}`, 'success');
             loadTeacherDashboard();
             return false;
@@ -1241,10 +1302,11 @@ window.handleStudentLogin = async function(e) {
         // ตรวจสอบว่ามีชื่ออาจารย์ในระบบแต่รหัสผ่านไม่ตรง
         const teacherExists = (registeredTeachers || []).find(t => {
             const tCode = (t.teacher_code || t.code || '').toString().trim().toLowerCase();
-            const tName = (t.name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, '');
+            const tName = (t.name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
             return (tCode && tCode === cleanLogin) || (tName && cleanLoginNoPrefix && (tName === cleanLoginNoPrefix || tName.includes(cleanLoginNoPrefix)));
         });
 
+        setButtonLoading(btn, false);
         if (teacherExists) {
             showCustomAlert({
                 title: 'รหัสผ่านไม่ถูกต้อง',
@@ -1260,11 +1322,21 @@ window.handleStudentLogin = async function(e) {
             icon: 'fas fa-user-xmark'
         });
         return false;
-    };
+    } catch (err) {
+        console.error('[handleTeacherLogin Error]', err);
+        setButtonLoading(btn, false);
+        showToast('เกิดข้อผิดพลาดในการเข้าสู่ระบบอาจารย์', 'error');
+        return false;
+    }
+};
 
-    // 3.3 Global Admin Login Handler
-    window.handleAdminLogin = function(e) {
-        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+// 3.3 Global Admin Login Handler
+window.handleAdminLogin = function(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    const btn = document.querySelector('#form-login-admin button[type="button"]') || document.querySelector('#form-login-admin button');
+    setButtonLoading(btn, true);
+
+    try {
         const password = (document.getElementById('admin-password-input')?.value || '').trim();
 
         if (['admin9999', 'admin1234', 'admin', '1234', '9999'].includes(password.toLowerCase())) {
@@ -1273,10 +1345,12 @@ window.handleStudentLogin = async function(e) {
                 id: '00000000-0000-0000-0000-000000000001',
                 name: 'ผู้ดูแลระบบสูงสุด (Admin)'
             });
+            setButtonLoading(btn, false);
             showToast('เข้าสู่ระบบแอดมินสำเร็จ', 'success');
             loadAdminDashboard();
             return false;
         } else {
+            setButtonLoading(btn, false);
             showCustomAlert({
                 title: 'รหัสผ่านไม่ถูกต้อง',
                 message: 'รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง (รหัสเริ่มต้น: admin1234)',
@@ -1284,7 +1358,13 @@ window.handleStudentLogin = async function(e) {
             });
             return false;
         }
-    };
+    } catch (err) {
+        console.error('[handleAdminLogin Error]', err);
+        setButtonLoading(btn, false);
+        showToast('เกิดข้อผิดพลาดในการเข้าสู่ระบบแอดมิน', 'error');
+        return false;
+    }
+};
 
     if (formStudent) formStudent.addEventListener('submit', window.handleStudentLogin);
     if (formTeacher) formTeacher.addEventListener('submit', window.handleTeacherLogin);
@@ -2931,10 +3011,10 @@ async function loadTeacherCourses() {
 
     if (isSupabaseConfigured() && state.supabaseClient) {
         try {
-            const { data, error } = await state.supabaseClient
+            const { data, error } = await withTimeout(state.supabaseClient
                 .from('courses')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false }), 2000);
 
             if (!error && Array.isArray(data) && data.length > 0) {
                 courses = data;
@@ -4464,10 +4544,10 @@ async function loadTeacherExamsList() {
 
     if (isSupabaseConfigured() && state.supabaseClient) {
         try {
-            const { data, error } = await state.supabaseClient
+            const { data, error } = await withTimeout(state.supabaseClient
                 .from('exams')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false }), 2000);
 
             if (!error && Array.isArray(data) && data.length > 0) {
                 exams = data;
