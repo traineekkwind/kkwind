@@ -975,6 +975,36 @@ function setupAuthEvents() {
         }
     };
 
+    if (formStudent) formStudent.addEventListener('submit', (e) => window.handleStudentLogin(e));
+    if (formTeacher) formTeacher.addEventListener('submit', (e) => window.handleTeacherLogin(e));
+    if (formAdmin) formAdmin.addEventListener('submit', (e) => window.handleAdminLogin(e));
+
+    // ปุ่มออกจากระบบ (Custom In-App Modal - No browser popup!)
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+        btnLogout.addEventListener('click', () => {
+            showCustomConfirm({
+                title: 'ออกจากระบบ',
+                message: 'คุณต้องการออกจากระบบและกลับสู่หน้าหลักหรือไม่?',
+                icon: 'fas fa-arrow-right-from-bracket',
+                confirmText: 'ออกจากระบบ',
+                cancelText: 'ยกเลิก',
+                confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
+                onConfirm: () => {
+                    stopAntiCheatMonitor();
+                    clearInterval(state.examTimer);
+                    clearUserSession();
+                    state.currentExam = null;
+                    state.questions = [];
+                    state.answers = {};
+                    showView('view-auth');
+                    showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
+                }
+            });
+        });
+    }
+}
+
 function saveUserSession(user) {
     state.currentUser = user;
     try {
@@ -1366,35 +1396,6 @@ window.handleAdminLogin = function(e) {
     }
 };
 
-    if (formStudent) formStudent.addEventListener('submit', window.handleStudentLogin);
-    if (formTeacher) formTeacher.addEventListener('submit', window.handleTeacherLogin);
-    if (formAdmin) formAdmin.addEventListener('submit', window.handleAdminLogin);
-
-    // ปุ่มออกจากระบบ (Custom In-App Modal - No browser popup!)
-    const btnLogout = document.getElementById('btn-logout');
-    if (btnLogout) {
-        btnLogout.addEventListener('click', () => {
-            showCustomConfirm({
-                title: 'ออกจากระบบ',
-                message: 'คุณต้องการออกจากระบบและกลับสู่หน้าหลักหรือไม่?',
-                icon: 'fas fa-arrow-right-from-bracket',
-                confirmText: 'ออกจากระบบ',
-                cancelText: 'ยกเลิก',
-                confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
-                onConfirm: () => {
-                    stopAntiCheatMonitor();
-                    clearInterval(state.examTimer);
-                    clearUserSession();
-                    state.currentExam = null;
-                    state.questions = [];
-                    state.answers = {};
-                    showView('view-auth');
-                    showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
-                }
-            });
-        });
-    }
-}
 
 // ==============================================================================
 // 4. STUDENT LOBBY & EXAM ROOM (WITH TARGETING FILTER)
@@ -6521,18 +6522,27 @@ function escapeHtml(str) {
 function showToast(msg, type = 'info') {
     const toast = document.createElement('div');
     const colors = {
-        success: 'bg-green-600 text-white',
-        warning: 'bg-amber-500 text-white',
-        error: 'bg-red-600 text-white',
-        info: 'bg-indigo-600 text-white'
+        success: 'bg-emerald-600 text-white shadow-emerald-500/30',
+        warning: 'bg-amber-500 text-white shadow-amber-500/30',
+        error: 'bg-red-600 text-white shadow-red-500/30',
+        info: 'bg-indigo-600 text-white shadow-indigo-500/30'
     };
 
-    toast.className = `fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl font-medium text-sm flex items-center gap-2 animate-slide-down ${colors[type] || colors.info}`;
-    toast.innerHTML = `<i class="fas fa-info-circle"></i> <span>${escapeHtml(msg)}</span>`;
+    const icons = {
+        success: 'fa-circle-check',
+        warning: 'fa-triangle-exclamation',
+        error: 'fa-circle-xmark',
+        info: 'fa-circle-info'
+    };
+
+    toast.className = `fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-2xl shadow-2xl font-medium text-sm flex items-center gap-2.5 animate-slide-down max-w-[90vw] text-center ${colors[type] || colors.info}`;
+    toast.innerHTML = `<i class="fas ${icons[type] || 'fa-circle-info'} text-base"></i> <span>${escapeHtml(msg)}</span>`;
 
     document.body.appendChild(toast);
     setTimeout(() => {
-        toast.remove();
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
     }, 3500);
 }
 
