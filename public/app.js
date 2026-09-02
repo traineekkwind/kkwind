@@ -3445,7 +3445,7 @@ window.resetTeacherSubmissionFilters = function() {
     loadTeacherSubmissions();
 };
 
-// 7.3 ส่งออกคะแนนนักเรียนเป็นไฟล์ Excel (.xlsx) ตามโครงสร้างคอลัมน์ที่กำหนด
+// 7.3 ส่งออกคะแนนนักเรียนเป็นไฟล์ Excel (.xlsx) ตามโครงสร้างคอลัมน์และชื่อไฟล์ตามรายวิชาที่เลือก
 window.exportTeacherScoresToExcel = async function() {
     if (!window.XLSX) {
         showToast('ไลบรารี SheetJS ยังไม่พร้อมใช้งาน', 'warning');
@@ -3453,22 +3453,33 @@ window.exportTeacherScoresToExcel = async function() {
     }
 
     let subs = getLocalSubmissions();
+    let localStudents = getLocalStudents();
 
     if (isSupabaseConfigured() && state.supabaseClient) {
         try {
-            const { data, error } = await state.supabaseClient
-                .from('exam_results')
-                .select(`
-                    *,
-                    exam:exams(title, duration_minutes, target_year, target_department, target_room, teacher_id, teacher_name, course_id, course:courses(course_code, course_name))
-                `)
-                .order('graded_at', { ascending: false });
+            const [subsRes, stdRes] = await Promise.all([
+                state.supabaseClient
+                    .from('exam_results')
+                    .select(`
+                        *,
+                        exam:exams(title, duration_minutes, target_year, target_department, target_room, teacher_id, teacher_name, course_id, course:courses(course_code, course_name))
+                    `)
+                    .order('graded_at', { ascending: false }),
+                state.supabaseClient
+                    .from('students')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+            ]);
 
-            if (!error && Array.isArray(data) && data.length > 0) {
-                subs = data;
+            if (!subsRes.error && Array.isArray(subsRes.data) && subsRes.data.length > 0) {
+                subs = subsRes.data;
+            }
+            if (!stdRes.error && Array.isArray(stdRes.data) && stdRes.data.length > 0) {
+                localStudents = stdRes.data;
+                localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(stdRes.data));
             }
         } catch (err) {
-            console.warn('[exportTeacherScoresToExcel] Supabase fetch skipped, using local cache:', err);
+            console.warn('[exportTeacherScoresToExcel] Supabase fetch notice:', err);
         }
     }
 
@@ -3482,42 +3493,22 @@ window.exportTeacherScoresToExcel = async function() {
     const deptFilter = document.getElementById('teacher-sub-filter-dept')?.value || 'ทั้งหมด';
     const roomFilter = document.getElementById('teacher-sub-filter-room')?.value || 'ทั้งหมด';
 
-    const localStudents = getLocalStudents();
     const allCourses = getLocalCourses();
     const allExams = getLocalExams();
-
-    const studentRosterMap = new Map();
-    localStudents.forEach(st => {
-        if (st.id) studentRosterMap.set(st.id, st);
-        if (st.code) studentRosterMap.set(String(st.code).toLowerCase(), st);
-        if (st.citizen_id) studentRosterMap.set(String(st.citizen_id), st);
-        if (st.name) studentRosterMap.set(st.name.trim().toLowerCase(), st);
-    });
 
     let filtered = subs || [];
     if (searchVal) {
         filtered = filtered.filter(s => {
-            const name = (s.student_name || '').toLowerCase();
+            const linked = resolveStudentFromRoster(s, localStudents);
+            const name = (s.student_name || linked?.name || '').toLowerCase();
             const id = String(s.student_id || '').toLowerCase();
-            const code = String(s.student_code || s.code || '').toLowerCase();
-            const citizen = String(s.student_citizen_id || s.citizen_id || '').toLowerCase();
-
-            const linked = studentRosterMap.get(s.student_id) || 
-                           studentRosterMap.get(name) || 
-                           studentRosterMap.get(code) || 
-                           studentRosterMap.get(citizen);
-
-            const linkedCode = String(linked?.code || '').toLowerCase();
-            const linkedCitizen = String(linked?.citizen_id || '').toLowerCase();
-            const linkedName = String(linked?.name || '').toLowerCase();
+            const code = String(s.student_code || linked?.code || '').toLowerCase();
+            const citizen = String(s.student_citizen_id || linked?.citizen_id || '').toLowerCase();
 
             return name.includes(searchVal) || 
                    id.includes(searchVal) || 
                    code.includes(searchVal) || 
-                   citizen.includes(searchVal) ||
-                   linkedCode.includes(searchVal) ||
-                   linkedCitizen.includes(searchVal) ||
-                   linkedName.includes(searchVal);
+                   citizen.includes(searchVal);
         });
     }
 
@@ -3527,61 +3518,51 @@ window.exportTeacherScoresToExcel = async function() {
     if (yearFilter !== 'ทั้งหมด') {
         const cleanTargetYear = yearFilter.replace(/\s+/g, '').toLowerCase();
         filtered = filtered.filter(s => {
-            const sYear = (s.student_year || s.year || '').replace(/\s+/g, '').toLowerCase();
+            const linked = resolveStudentFromRoster(s, localStudents);
+            const sYear = (s.student_year || s.year || linked?.year || '').replace(/\s+/g, '').toLowerCase();
             const eYear = (s.exam?.target_year || '').replace(/\s+/g, '').toLowerCase();
-            const linked = studentRosterMap.get(s.student_id) || studentRosterMap.get((s.student_name || '').trim().toLowerCase());
-            const lYear = (linked?.year || '').replace(/\s+/g, '').toLowerCase();
 
-            return sYear.includes(cleanTargetYear) || eYear.includes(cleanTargetYear) || lYear.includes(cleanTargetYear);
+            return sYear.includes(cleanTargetYear) || eYear.includes(cleanTargetYear);
         });
     }
     if (deptFilter !== 'ทั้งหมด') {
         const targetDept = deptFilter.trim().toLowerCase();
         filtered = filtered.filter(s => {
-            const sDept = (s.student_department || s.dept || '').trim().toLowerCase();
+            const linked = resolveStudentFromRoster(s, localStudents);
+            const sDept = (s.student_department || s.dept || linked?.dept || '').trim().toLowerCase();
             const eDept = (s.exam?.target_department || '').trim().toLowerCase();
-            const linked = studentRosterMap.get(s.student_id) || studentRosterMap.get((s.student_name || '').trim().toLowerCase());
-            const lDept = (linked?.dept || '').trim().toLowerCase();
 
-            return sDept.includes(targetDept) || eDept.includes(targetDept) || lDept.includes(targetDept);
+            return sDept.includes(targetDept) || eDept.includes(targetDept);
         });
     }
     if (roomFilter !== 'ทั้งหมด') {
         const cleanTargetRoom = roomFilter.replace(/\s+/g, '').toLowerCase();
         filtered = filtered.filter(s => {
-            const sRoom = (s.student_room || s.room || '').replace(/\s+/g, '').toLowerCase();
+            const linked = resolveStudentFromRoster(s, localStudents);
+            const sRoom = (s.student_room || s.room || linked?.room || '').replace(/\s+/g, '').toLowerCase();
             const eRoom = (s.exam?.target_room || '').replace(/\s+/g, '').toLowerCase();
-            const linked = studentRosterMap.get(s.student_id) || studentRosterMap.get((s.student_name || '').trim().toLowerCase());
-            const lRoom = (linked?.room || '').replace(/\s+/g, '').toLowerCase();
 
-            return sRoom.includes(cleanTargetRoom) || eRoom.includes(cleanTargetRoom) || lRoom.includes(cleanTargetRoom);
+            return sRoom.includes(cleanTargetRoom) || eRoom.includes(cleanTargetRoom);
         });
     }
 
     const excelRows = filtered.map((d, index) => {
-        const cleanName = (d.student_name || '').trim().toLowerCase();
-        const cleanNameNoPrefix = cleanName.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '');
-        
-        const linkedStudent = studentRosterMap.get(d.student_id) || 
-                              studentRosterMap.get(String(d.student_code).trim()) || 
-                              studentRosterMap.get(cleanName) ||
-                              localStudents.find(st => {
-                                  const stName = (st.name || '').trim().toLowerCase().replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '');
-                                  return stName && cleanNameNoPrefix && (stName === cleanNameNoPrefix || stName.includes(cleanNameNoPrefix) || cleanNameNoPrefix.includes(stName));
-                              });
+        // 🔗 เชื่อมโยงรหัสและข้อมูลนักเรียนจากทะเบียนรายชื่อแบบอัจฉริยะ
+        const linkedStudent = resolveStudentFromRoster(d, localStudents);
 
         let realStudentCode = d.student_code || linkedStudent?.code || '';
-        if (!realStudentCode || String(realStudentCode).includes('-')) {
-            realStudentCode = linkedStudent?.code || linkedStudent?.citizen_id || (d.student_id && !String(d.student_id).includes('-') ? d.student_id : '-');
+        if (!realStudentCode || String(realStudentCode).includes('-') || realStudentCode === 'undefined') {
+            realStudentCode = linkedStudent?.code || (d.student_id && !String(d.student_id).includes('-') ? d.student_id : (linkedStudent?.citizen_id || '-'));
         }
+        if (!realStudentCode || realStudentCode === 'undefined') realStudentCode = '-';
 
         const subExam = allExams.find(e => e.id === d.exam_id) || d.exam;
         const subCourse = allCourses.find(c => c.id === subExam?.course_id) || subExam?.course;
 
-        const realStudentName = d.student_name || linkedStudent?.name || 'นักศึกษา';
-        const realYear = d.student_year || linkedStudent?.year || subExam?.target_year || '-';
-        const realRoom = d.student_room || linkedStudent?.room || subExam?.target_room || '-';
-        const realDept = d.student_department || linkedStudent?.dept || subExam?.target_department || '-';
+        const realStudentName = linkedStudent?.name || d.student_name || 'นักศึกษา';
+        const realYear = linkedStudent?.year || d.student_year || subExam?.target_year || '-';
+        const realRoom = linkedStudent?.room || d.student_room || subExam?.target_room || '-';
+        const realDept = linkedStudent?.dept || d.student_department || subExam?.target_department || '-';
 
         const courseCode = subCourse?.course_code || subCourse?.code || '-';
         const courseName = subCourse?.course_name || subCourse?.name || d.course_name || subExam?.course_name || '-';
@@ -3623,16 +3604,46 @@ window.exportTeacherScoresToExcel = async function() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'รายงานผลคะแนน');
 
-    const dateStr = new Date().toISOString().slice(0, 10);
-    let nameParts = ['รายงานผลคะแนนสอบ'];
+    // 📁 ตั้งชื่อไฟล์ตามรายวิชาที่เลือก / ตัวกรองที่ใช้งาน
+    let courseNameForFile = '';
+    let examTitleForFile = '';
+
+    if (examFilter !== 'ทั้งหมด') {
+        const foundExam = allExams.find(e => e.id === examFilter);
+        if (foundExam) {
+            examTitleForFile = foundExam.title || '';
+            const foundCourse = allCourses.find(c => c.id === foundExam.course_id) || foundExam.course;
+            courseNameForFile = foundCourse?.course_name || foundExam.course_name || '';
+        }
+    }
+
+    if (!courseNameForFile && filtered.length > 0) {
+        const first = filtered[0];
+        const subExam = allExams.find(e => e.id === first.exam_id) || first.exam;
+        const subCourse = allCourses.find(c => c.id === subExam?.course_id) || subExam?.course;
+        courseNameForFile = subCourse?.course_name || first.course_name || subExam?.course_name || '';
+    }
+
+    let nameParts = ['รายงานผลคะแนน'];
+    if (courseNameForFile && courseNameForFile !== '-' && courseNameForFile !== 'วิชาทั่วไป') {
+        nameParts.push(courseNameForFile);
+    }
+    if (examTitleForFile && examTitleForFile !== courseNameForFile) {
+        nameParts.push(examTitleForFile);
+    }
     if (yearFilter !== 'ทั้งหมด') nameParts.push(yearFilter);
     if (roomFilter !== 'ทั้งหมด') nameParts.push(roomFilter);
     if (deptFilter !== 'ทั้งหมด') nameParts.push(deptFilter);
-    nameParts.push(dateStr);
 
-    const fileName = `${nameParts.join('_')}.xlsx`;
+    const now = new Date();
+    const dateFormatted = `${now.getFullYear() + 543}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    nameParts.push(dateFormatted);
+
+    const safeFileName = nameParts.join('_').replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '_');
+    const fileName = `${safeFileName}.xlsx`;
+
     XLSX.writeFile(workbook, fileName);
-    showToast(`ดาวน์โหลดไฟล์ Excel (${filtered.length} รายการ) เรียบร้อยแล้ว!`, 'success');
+    showToast(`ดาวน์โหลดไฟล์ Excel "${fileName}" (${filtered.length} รายการ) เรียบร้อยแล้ว!`, 'success');
 };
 
 // ==============================================================================
