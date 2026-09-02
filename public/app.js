@@ -3238,7 +3238,7 @@ async function loadTeacherSubmissions() {
 
     if (isSupabaseConfigured() && state.supabaseClient) {
         try {
-            const [subsRes, stdRes] = await Promise.all([
+            const [subsRes, stdRes, examsRes, coursesRes] = await Promise.all([
                 state.supabaseClient
                     .from('exam_results')
                     .select(`
@@ -3248,6 +3248,14 @@ async function loadTeacherSubmissions() {
                     .order('graded_at', { ascending: false }),
                 state.supabaseClient
                     .from('students')
+                    .select('*')
+                    .order('created_at', { ascending: false }),
+                state.supabaseClient
+                    .from('exams')
+                    .select('*')
+                    .order('created_at', { ascending: false }),
+                state.supabaseClient
+                    .from('courses')
                     .select('*')
                     .order('created_at', { ascending: false })
             ]);
@@ -3259,10 +3267,19 @@ async function loadTeacherSubmissions() {
                 localStudents = stdRes.data;
                 localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(stdRes.data));
             }
+            if (!examsRes.error && Array.isArray(examsRes.data) && examsRes.data.length > 0) {
+                localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(examsRes.data));
+            }
+            if (!coursesRes.error && Array.isArray(coursesRes.data) && coursesRes.data.length > 0) {
+                localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(coursesRes.data));
+            }
         } catch (err) {
             console.warn('[loadTeacherSubmissions] Supabase fetch notice:', err);
         }
     }
+
+    // เติมตัวเลือกชุดข้อสอบใน Dropdown ตามชุดข้อสอบของครูท่านนี้
+    populateTeacherSubmissionExamFilter();
 
     // 🔒 Teacher Isolation: แสดงเฉพาะผลคะแนนในวิชาและชุดข้อสอบของอาจารย์ท่านนี้เท่านั้น
     subs = filterTeacherIsolatedSubmissions(subs);
@@ -3457,7 +3474,7 @@ window.exportTeacherScoresToExcel = async function() {
 
     if (isSupabaseConfigured() && state.supabaseClient) {
         try {
-            const [subsRes, stdRes] = await Promise.all([
+            const [subsRes, stdRes, examsRes, coursesRes] = await Promise.all([
                 state.supabaseClient
                     .from('exam_results')
                     .select(`
@@ -3468,6 +3485,14 @@ window.exportTeacherScoresToExcel = async function() {
                 state.supabaseClient
                     .from('students')
                     .select('*')
+                    .order('created_at', { ascending: false }),
+                state.supabaseClient
+                    .from('exams')
+                    .select('*')
+                    .order('created_at', { ascending: false }),
+                state.supabaseClient
+                    .from('courses')
+                    .select('*')
                     .order('created_at', { ascending: false })
             ]);
 
@@ -3477,6 +3502,12 @@ window.exportTeacherScoresToExcel = async function() {
             if (!stdRes.error && Array.isArray(stdRes.data) && stdRes.data.length > 0) {
                 localStudents = stdRes.data;
                 localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(stdRes.data));
+            }
+            if (!examsRes.error && Array.isArray(examsRes.data) && examsRes.data.length > 0) {
+                localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(examsRes.data));
+            }
+            if (!coursesRes.error && Array.isArray(coursesRes.data) && coursesRes.data.length > 0) {
+                localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(coursesRes.data));
             }
         } catch (err) {
             console.warn('[exportTeacherScoresToExcel] Supabase fetch notice:', err);
