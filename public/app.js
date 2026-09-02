@@ -3413,14 +3413,7 @@ window.exportTeacherScoresToExcel = async function() {
         });
     }
 
-    const studentRoster = getLocalStudents();
-    const studentRosterMap = new Map();
-    studentRoster.forEach(s => {
-        if (s.id) studentRosterMap.set(s.id, s);
-        if (s.code) studentRosterMap.set(String(s.code).trim(), s);
-        if (s.citizen_id) studentRosterMap.set(String(s.citizen_id).trim(), s);
-        if (s.name) studentRosterMap.set(s.name.trim().toLowerCase(), s);
-    });
+    const studentRoster = localStudents;
 
     const excelRows = filtered.map((d, index) => {
         const cleanName = (d.student_name || '').trim().toLowerCase();
