@@ -139,27 +139,27 @@
                     </button>
                 </div>
 
-                <!-- 1.1 Form Student Login with Student ID & Citizen ID Password -->
+                <!-- 1.1 Form Student Login with Student Code & Password -->
                 <form id="form-login-student" onsubmit="event.preventDefault(); window.handleStudentLogin(event); return false;" class="space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">รหัสนักเรียน หรือ ชื่อ-นามสกุล *</label>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">ชื่อ-นามสกุล หรือ รหัสนักศึกษา *</label>
                         <div class="relative">
                             <i class="far fa-id-card absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
-                            <input type="text" id="student-login-id-input" required placeholder="กรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล" onkeydown="if(event.key==='Enter'){event.preventDefault(); window.handleStudentLogin(event);}" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition font-medium">
+                            <input type="text" id="student-login-id-input" required placeholder="กรอกรหัสนักศึกษา หรือ ชื่อ-นามสกุล" onkeydown="if(event.key==='Enter'){event.preventDefault(); window.handleStudentLogin(event);}" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition font-medium">
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">รหัสผ่าน (เลขบัตรประชาชน 13 หลัก) *</label>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">รหัสผ่าน (รหัสนักศึกษา) *</label>
                         <div class="relative">
                             <i class="fas fa-shield-halved absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
-                            <input type="password" id="student-login-pass-input" maxlength="13" required placeholder="กรอกเลขประจำตัวประชาชน 13 หลัก" onkeydown="if(event.key==='Enter'){event.preventDefault(); window.handleStudentLogin(event);}" class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition font-mono tracking-wider">
+                            <input type="password" id="student-login-pass-input" required placeholder="กรอกรหัสนักศึกษา (รหัสผ่านเข้าสอบ)" onkeydown="if(event.key==='Enter'){event.preventDefault(); window.handleStudentLogin(event);}" class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition font-mono tracking-wider">
                             <button type="button" onclick="toggleStudentPasswordVisibility()" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 transition" title="แสดง/ซ่อนรหัสผ่าน">
                                 <i id="student-pass-eye-icon" class="fas fa-eye text-xs"></i>
                             </button>
                         </div>
                         <p class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1.5">
-                            <i class="fas fa-circle-info text-indigo-500"></i> ใช้เลขประจำตัวประชาชน 13 หลักเป็นรหัสผ่านเข้าสอบ (หรือกด Enter เพื่อเข้าสู่ระบบ)
+                            <i class="fas fa-circle-info text-indigo-500"></i> ใช้รหัสนักศึกษาเป็นรหัสผ่านเข้าสอบ (หรือกด Enter เพื่อเข้าสู่ระบบ)
                         </p>
                     </div>
 
@@ -573,17 +573,17 @@
                 </div>
             </div>
 
-            <!-- Tab 4: Student Management (จัดการรายชื่อนักเรียน & รหัสผ่านเลขบัตรประชาชน) -->
+            <!-- Tab 4: Student Management (จัดการรายชื่อนักศึกษา & รหัสผ่านรหัสนักศึกษา) -->
             <div id="teacher-content-students" class="hidden space-y-5">
                 <!-- Top Action Bar & Stats -->
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                                <i class="fas fa-users text-indigo-600"></i> ทะเบียนรายชื่อนักเรียน
+                                <i class="fas fa-users text-indigo-600"></i> ทะเบียนรายชื่อนักศึกษา
                                 <span id="teacher-students-count-badge" class="text-xs px-2.5 py-0.5 bg-indigo-50 text-indigo-700 font-bold rounded-lg border border-indigo-100">0 คน</span>
                             </h3>
-                            <p class="text-xs text-slate-400">เพิ่มรายชื่อนักเรียนทีละคน หรือนำเข้าจากไฟล์ Excel (รหัสผ่านเข้าสอบคือนเลขบัตรประชาชน 13 หลัก)</p>
+                            <p class="text-xs text-slate-400">เพิ่มรายชื่อนักศึกษาทีละคน หรือนำเข้าจากไฟล์ Excel (รหัสผ่านเข้าสอบคือรหัสนักศึกษา)</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <button onclick="downloadStudentExcelTemplate()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5" title="ดาวน์โหลดเทมเพลตสำหรับนำเข้ารายชื่อ">
@@ -593,7 +593,7 @@
                                 <i class="fas fa-file-excel text-emerald-600"></i> นำเข้าจาก Excel
                             </button>
                             <button onclick="openAddStudentModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-md shadow-indigo-100">
-                                <i class="fas fa-user-plus"></i> เพิ่มนักเรียนรายคน
+                                <i class="fas fa-user-plus"></i> เพิ่มนักศึกษา
                             </button>
                         </div>
                     </div>
@@ -602,7 +602,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-2 border-t border-slate-100">
                         <div class="relative">
                             <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-                            <input type="text" id="teacher-student-search-input" oninput="loadTeacherStudentsList()" placeholder="ค้นหาชื่อ, รหัสนักเรียน..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            <input type="text" id="teacher-student-search-input" oninput="loadTeacherStudentsList()" placeholder="ค้นหาชื่อ, รหัสนักศึกษา..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
                         </div>
                         <div>
                             <select id="teacher-student-filter-year" onchange="loadTeacherStudentsList()" class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
@@ -643,9 +643,9 @@
                             <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
                                 <tr>
                                     <th class="py-3 px-4 text-center w-12">#</th>
-                                    <th class="py-3 px-4">รหัสนักเรียน</th>
+                                    <th class="py-3 px-4">รหัสนักศึกษา</th>
                                     <th class="py-3 px-4">ชื่อ - นามสกุล</th>
-                                    <th class="py-3 px-4">เลขบัตรประชาชน (รหัสผ่าน)</th>
+                                    <th class="py-3 px-4">รหัสผ่านเข้าสอบ (รหัสนักศึกษา)</th>
                                     <th class="py-3 px-4">ระดับชั้น / แผนก / ห้อง</th>
                                     <th class="py-3 px-4 text-center">วันที่ลงทะเบียน</th>
                                     <th class="py-3 px-4 text-right">การจัดการ</th>
@@ -1472,7 +1472,7 @@
         <div class="bg-white max-w-lg w-full rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xl animate-fade-in">
             <div class="flex items-center justify-between mb-4">
                 <h3 id="modal-student-form-title" class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <i class="fas fa-user-plus text-indigo-600"></i> เพิ่มข้อมูลนักเรียนใหม่
+                    <i class="fas fa-user-plus text-indigo-600"></i> เพิ่มข้อมูลนักศึกษาใหม่
                 </h3>
                 <button type="button" onclick="closeStudentModal()" class="text-slate-400 hover:text-slate-600">
                     <i class="fas fa-xmark"></i>
@@ -1482,11 +1482,12 @@
             <form id="form-manage-student" onsubmit="saveStudentFromForm(event)" class="space-y-3.5">
                 <input type="hidden" id="student-form-mode" value="create">
                 <input type="hidden" id="student-form-id" value="">
+                <input type="hidden" id="student-form-citizen-id" value="">
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">รหัสนักเรียน *</label>
-                        <input type="text" id="student-form-code" required placeholder="กรอกรหัสนักเรียน" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 font-mono">
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">รหัสนักศึกษา (รหัสผ่านเข้าสอบ) *</label>
+                        <input type="text" id="student-form-code" required placeholder="กรอกรหัสนักศึกษา" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 font-mono">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">ชื่อ - นามสกุล *</label>
@@ -1494,25 +1495,16 @@
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                        🔒 เลขบัตรประชาชน 13 หลัก (ใช้เป็นรหัสผ่านเข้าสอบ) *
-                    </label>
-                    <div class="relative">
-                        <i class="fas fa-id-card-clip absolute left-3.5 top-3 text-slate-400 text-sm"></i>
-                        <input type="text" id="student-form-citizen-id" maxlength="13" minlength="13" required placeholder="กรอกเลขประจำตัวประชาชน 13 หลัก" class="w-full pl-10 pr-4 py-2.5 bg-indigo-50/50 border border-indigo-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 font-mono tracking-wider text-indigo-900 font-semibold">
-                    </div>
-                    <p class="text-[11px] text-slate-400 mt-1">ใช้เลข 13 หลักนี้เป็นรหัสผ่านในการเข้าทำข้อสอบ</p>
-                </div>
+                <p class="text-[11px] text-slate-400">💡 รหัสนักศึกษาจะถูกใช้เป็นรหัสผ่านในการเข้าสู่ระบบของนักศึกษา</p>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-600 mb-1">ระดับชั้น *</label>
                         <select id="student-form-year" required class="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
                             <option value="ปวช.1">ปวช.1</option>
-                            <option value="ปวช.2" selected>ปวช.2</option>
+                            <option value="ปวช.2">ปวช.2</option>
                             <option value="ปวช.3">ปวช.3</option>
-                            <option value="ปวส.1">ปวส.1</option>
+                            <option value="ปวส.1" selected>ปวส.1</option>
                             <option value="ปวส.2">ปวส.2</option>
                         </select>
                     </div>
@@ -1550,7 +1542,7 @@
         <div class="bg-white max-w-2xl w-full rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-2xl animate-fade-in space-y-4">
             <div class="flex items-center justify-between">
                 <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <i class="fas fa-file-excel text-emerald-600"></i> นำเข้ารายชื่อนักเรียนจาก Excel
+                    <i class="fas fa-file-excel text-emerald-600"></i> นำเข้ารายชื่อนักศึกษาจาก Excel
                 </h3>
                 <button type="button" onclick="document.getElementById('modal-student-excel-import').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
                     <i class="fas fa-xmark"></i>
@@ -1570,7 +1562,7 @@
                 <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-2 text-xl">
                     <i class="fas fa-cloud-arrow-up"></i>
                 </div>
-                <h4 class="font-bold text-slate-800 text-xs mb-0.5">คลิกเพื่อเลือกไฟล์รายชื่อนักเรียน หรือลากไฟล์มาวาง</h4>
+                <h4 class="font-bold text-slate-800 text-xs mb-0.5">คลิกเพื่อเลือกไฟล์รายชื่อนักศึกษา หรือลากไฟล์มาวาง</h4>
                 <p class="text-[11px] text-slate-400">รองรับ .xlsx, .xls, .csv</p>
             </div>
 
@@ -1586,10 +1578,10 @@
                         <thead class="bg-slate-100 text-slate-600 font-semibold sticky top-0">
                             <tr>
                                 <th class="p-2">#</th>
-                                <th class="p-2">รหัสนักเรียน</th>
+                                <th class="p-2">รหัสนักศึกษา</th>
                                 <th class="p-2">ชื่อ - นามสกุล</th>
-                                <th class="p-2">เลขบัตรประชาชน</th>
-                                <th class="p-2">ชั้น/แผนก/ห้อง</th>
+                                <th class="p-2">ระดับชั้น</th>
+                                <th class="p-2">แผนกวิชา / ห้อง</th>
                             </tr>
                         </thead>
                         <tbody id="student-excel-preview-tbody" class="divide-y divide-slate-100"></tbody>
@@ -1597,7 +1589,7 @@
                 </div>
 
                 <button type="button" onclick="executeStudentExcelImport()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition shadow-md shadow-emerald-100 flex items-center justify-center gap-2">
-                    <i class="fas fa-check"></i> นำเข้ารายชื่อนักเรียนทั้งหมดเข้าสู่ระบบ
+                    <i class="fas fa-check"></i> นำเข้ารายชื่อนักศึกษาทั้งหมดเข้าสู่ระบบ
                 </button>
             </div>
         </div>
@@ -1708,6 +1700,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.8.32"></script>
+    <script src="./public/app.js?v=2.8.33"></script>
 </body>
 </html>

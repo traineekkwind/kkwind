@@ -1077,7 +1077,7 @@ function setButtonLoading(btn, isLoading, originalHtml = '') {
     }
 }
 
-// 3.1 Global Student Login Handler (100% Fail-Safe, Instant, Welcoming)
+// 3.1 Global Student Login Handler (100% Fail-Safe, Instant, Welcoming with Student Code)
 window.handleStudentLogin = async function(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     const btn = document.querySelector('#form-login-student button[type="button"]') || document.querySelector('#form-login-student button');
@@ -1088,17 +1088,19 @@ window.handleStudentLogin = async function(e) {
         const rawLoginId = (document.getElementById('student-login-id-input')?.value || '').trim();
         const rawPass = (document.getElementById('student-login-pass-input')?.value || '').trim();
 
-        if (!rawLoginId) {
+        if (!rawLoginId && !rawPass) {
             setButtonLoading(btn, false);
-            showToast('กรุณากรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล', 'warning');
+            showToast('กรุณากรอกรหัสนักศึกษา หรือ ชื่อ-นามสกุล', 'warning');
             return false;
         }
 
-        const cleanLoginLower = rawLoginId.toLowerCase();
+        const inputMain = rawLoginId || rawPass;
+        const inputPass = rawPass || rawLoginId;
+        const cleanLoginLower = inputMain.toLowerCase();
 
         // 0. Auto-detect Admin Credentials in Student form
-        if (cleanLoginLower === 'admin' || rawPass === 'admin1234' || rawPass === 'admin9999' || rawPass === 'admin' || rawPass === '1234') {
-            if (cleanLoginLower === 'admin' || rawPass.startsWith('admin')) {
+        if (cleanLoginLower === 'admin' || inputPass === 'admin1234' || inputPass === 'admin9999' || inputPass === 'admin' || inputPass === '1234') {
+            if (cleanLoginLower === 'admin' || inputPass.startsWith('admin')) {
                 saveUserSession({
                     role: 'admin',
                     id: '00000000-0000-0000-0000-000000000001',
@@ -1113,7 +1115,7 @@ window.handleStudentLogin = async function(e) {
 
         // 0.1 Auto-detect Teacher Credentials in Student form
         let registeredTeachers = getLocalTeachers();
-        const isTeacherPass = (rawPass === 'teacher1234' || rawPass === 'teacher');
+        const isTeacherPass = (inputPass === 'teacher1234' || inputPass === 'teacher');
         const matchedTeacherLocal = (registeredTeachers || []).find(t => {
             const tCode = (t.teacher_code || t.code || '').toString().trim().toLowerCase();
             const tName = (t.name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
@@ -1123,8 +1125,8 @@ window.handleStudentLogin = async function(e) {
 
         if (cleanLoginLower === 't001' || matchedTeacherLocal || (isTeacherPass && cleanLoginLower.length > 2)) {
             const finalTeacher = matchedTeacherLocal || {
-                id: generateTeacherUUID(rawLoginId),
-                name: cleanLoginLower === 't001' ? 'อาจารย์ผู้สอน' : rawLoginId,
+                id: generateTeacherUUID(inputMain),
+                name: cleanLoginLower === 't001' ? 'อาจารย์ผู้สอน' : inputMain,
                 teacher_code: 'T001',
                 department: 'เทคโนโลยีธุรกิจดิจิทัล'
             };
@@ -1143,34 +1145,11 @@ window.handleStudentLogin = async function(e) {
             return false;
         }
 
-        function findCandidate(list, input) {
-            if (!Array.isArray(list) || list.length === 0) return null;
-            const cleanInput = (input || '').trim().toLowerCase();
-            const inputDigits = cleanInput.replace(/\D/g, '');
-            const cleanNoPrefix = cleanInput.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '').trim();
-
-            return list.find(s => {
-                if (!s) return false;
-                const sCode = (s.code || '').toString().trim().toLowerCase();
-                const sCodeDigits = sCode.replace(/\D/g, '');
-                const sCitizen = (s.citizen_id || '').toString().replace(/\D/g, '').trim();
-                const sName = (s.name || '').trim().toLowerCase();
-                const sNameClean = sName.replace(/\s+/g, ' ');
-                const sNameNoPrefix = sNameClean.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '').trim();
-
-                const isCodeMatch = sCode === cleanInput || (inputDigits && sCodeDigits === inputDigits);
-                const isCitizenMatch = sCitizen === cleanInput || (inputDigits && sCitizen === inputDigits);
-                const isNameMatch = sName === cleanInput || 
-                                    sNameClean === cleanInput.replace(/\s+/g, ' ') ||
-                                    (cleanNoPrefix && sNameNoPrefix === cleanNoPrefix) ||
-                                    (cleanNoPrefix.length >= 4 && (sNameNoPrefix.includes(cleanNoPrefix) || cleanNoPrefix.includes(sNameNoPrefix)));
-
-                return isCodeMatch || isCitizenMatch || isNameMatch;
-            });
-        }
-
         let allStudents = getLocalStudents();
-        let candidate = findCandidate(allStudents, rawLoginId);
+
+        // 1. ค้นหา Candidate จากทะเบียนรายชื่อนักศึกษา (Smart Multi-Index Roster Linker)
+        let candidate = resolveStudentFromRoster({ student_name: inputMain, student_code: inputPass }, allStudents) ||
+                        resolveStudentFromRoster({ student_name: inputPass, student_code: inputMain }, allStudents);
 
         // ตรวจสอบข้อมูลจาก Supabase Cloud ด้วย Timeout 1.5 วินาที
         if (!candidate && isSupabaseConfigured() && state.supabaseClient) {
@@ -1179,30 +1158,25 @@ window.handleStudentLogin = async function(e) {
                 if (!error && Array.isArray(cloudStudents) && cloudStudents.length > 0) {
                     localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(cloudStudents));
                     allStudents = cloudStudents;
-                    candidate = findCandidate(allStudents, rawLoginId);
+                    candidate = resolveStudentFromRoster({ student_name: inputMain, student_code: inputPass }, allStudents) ||
+                                resolveStudentFromRoster({ student_name: inputPass, student_code: inputMain }, allStudents);
                 }
             } catch (err) {}
         }
 
-        // หากพบในฐานข้อมูล ให้ใช้ข้อมูลจริง หากไม่พบ ให้สร้าง Session เข้าทดสอบทันทีโดยไม่บล็อก
-        const studentUser = candidate ? {
+        // หากพบในทะเบียนรายชื่อ ให้ใช้ข้อมูลจริง หากไม่พบ ให้สร้าง Session เข้าทดสอบทันทีโดยไม่บล็อก
+        const realStudentCode = candidate?.code || (inputPass.match(/^\d+$/) ? inputPass : (inputMain.match(/^\d+$/) ? inputMain : inputPass));
+        const realStudentName = candidate?.name || (inputMain !== realStudentCode ? inputMain : `นักศึกษา (${realStudentCode})`);
+
+        const studentUser = {
             role: 'student',
-            id: candidate.id || generatePseudoUUID(),
-            student_code: candidate.code || rawLoginId,
-            name: candidate.name || rawLoginId,
-            citizen_id: candidate.citizen_id || rawPass || '1234567890123',
-            year: candidate.year || 'ปวช.2',
-            dept: candidate.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
-            room: candidate.room || 'ห้อง 1'
-        } : {
-            role: 'student',
-            id: generatePseudoUUID(),
-            student_code: rawLoginId,
-            name: rawLoginId,
-            citizen_id: rawPass || '1234567890123',
-            year: 'ปวช.2',
-            dept: 'เทคโนโลยีธุรกิจดิจิทัล',
-            room: 'ห้อง 1'
+            id: candidate?.id || generatePseudoUUID(),
+            student_code: realStudentCode,
+            name: realStudentName,
+            citizen_id: candidate?.citizen_id || realStudentCode,
+            year: candidate?.year || 'ปวส.1',
+            dept: candidate?.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
+            room: candidate?.room || 'ห้อง 1'
         };
 
         saveUserSession(studentUser);
@@ -3726,8 +3700,8 @@ window.loadTeacherStudentsList = async function() {
             <tr>
                 <td colspan="7" class="p-8 text-center text-slate-400">
                     <i class="fas fa-user-slash text-3xl mb-2 text-slate-300"></i>
-                    <p class="font-bold text-slate-600">ยังไม่มีรายชื่อนักเรียนในระบบ</p>
-                    <p class="text-xs text-slate-400 mt-1">คลิกปุ่ม "+ เพิ่มนักเรียนรายคน" หรือ "นำเข้าจาก Excel" เพื่อเพิ่มรายชื่อ</p>
+                    <p class="font-bold text-slate-600">ยังไม่มีรายชื่อนักศึกษาในระบบ</p>
+                    <p class="text-xs text-slate-400 mt-1">คลิกปุ่ม "+ เพิ่มนักศึกษา" หรือ "นำเข้าจาก Excel" เพื่อเพิ่มรายชื่อ</p>
                 </td>
             </tr>
         `;
@@ -3741,7 +3715,7 @@ window.loadTeacherStudentsList = async function() {
             <td class="py-3 px-4 font-bold text-slate-900">${escapeHtml(s.name || '-')}</td>
             <td class="py-3 px-4 font-mono text-slate-800 bg-slate-50/50">
                 <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-900 border border-indigo-100 font-semibold text-xs tracking-wider">
-                    ${escapeHtml(s.citizen_id || '-')}
+                    ${escapeHtml(s.code || s.citizen_id || '-')}
                 </span>
             </td>
             <td class="py-3 px-4">
@@ -3782,24 +3756,24 @@ window.openAddStudentModal = function(studentId = null) {
         const students = getLocalStudents();
         const student = students.find(s => s.id === studentId);
         if (student) {
-            if (title) title.innerHTML = '<i class="fas fa-user-pen text-indigo-600"></i> แก้ไขข้อมูลนักเรียน';
+            if (title) title.innerHTML = '<i class="fas fa-user-pen text-indigo-600"></i> แก้ไขข้อมูลนักศึกษา';
             if (modeInput) modeInput.value = 'edit';
             if (idInput) idInput.value = student.id;
             if (codeInput) codeInput.value = student.code || '';
             if (nameInput) nameInput.value = student.name || '';
-            if (citizenInput) citizenInput.value = student.citizen_id || '';
-            if (yearSelect) yearSelect.value = student.year || 'ปวช.2';
+            if (citizenInput) citizenInput.value = student.citizen_id || student.code || '';
+            if (yearSelect) yearSelect.value = student.year || 'ปวส.1';
             if (deptSelect) deptSelect.value = student.dept || 'เทคโนโลยีธุรกิจดิจิทัล';
             if (roomSelect) roomSelect.value = student.room || 'ห้อง 1';
         }
     } else {
-        if (title) title.innerHTML = '<i class="fas fa-user-plus text-indigo-600"></i> เพิ่มข้อมูลนักเรียนใหม่';
+        if (title) title.innerHTML = '<i class="fas fa-user-plus text-indigo-600"></i> เพิ่มข้อมูลนักศึกษาใหม่';
         if (modeInput) modeInput.value = 'create';
         if (idInput) idInput.value = '';
         if (codeInput) codeInput.value = '';
         if (nameInput) nameInput.value = '';
         if (citizenInput) citizenInput.value = '';
-        if (yearSelect) yearSelect.value = 'ปวช.2';
+        if (yearSelect) yearSelect.value = 'ปวส.1';
         if (deptSelect) deptSelect.value = 'เทคโนโลยีธุรกิจดิจิทัล';
         if (roomSelect) roomSelect.value = 'ห้อง 1';
     }
@@ -3818,42 +3792,24 @@ window.saveStudentFromForm = function(event) {
     const id = document.getElementById('student-form-id')?.value || generatePseudoUUID();
     const code = document.getElementById('student-form-code')?.value.trim();
     const name = document.getElementById('student-form-name')?.value.trim();
-    const citizenId = document.getElementById('student-form-citizen-id')?.value.trim();
-    const year = document.getElementById('student-form-year')?.value || 'ปวช.2';
+    const citizenId = document.getElementById('student-form-citizen-id')?.value.trim() || code;
+    const year = document.getElementById('student-form-year')?.value || 'ปวส.1';
     const dept = document.getElementById('student-form-dept')?.value || 'เทคโนโลยีธุรกิจดิจิทัล';
     const room = document.getElementById('student-form-room')?.value || 'ห้อง 1';
 
     if (!code || !name) {
-        showToast('กรุณากรอกรหัสนักเรียนและชื่อ-นามสกุล', 'warning');
+        showToast('กรุณากรอกรหัสนักศึกษาและชื่อ-นามสกุล', 'warning');
         return;
     }
 
-    if (!citizenId || citizenId.length !== 13 || isNaN(citizenId)) {
-        showCustomAlert({
-            title: 'เลขบัตรประชาชนไม่ถูกต้อง',
-            message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลักตัวเลข\n(ใช้เป็นรหัสผ่านเข้าสอบของนักเรียน)',
-            icon: 'fas fa-id-card'
-        });
-        return;
-    }
-
-    // Check duplicate code or citizen_id in create mode
+    // Check duplicate code in create mode
     const allStudents = getLocalStudents();
     if (mode === 'create') {
         const existCode = allStudents.find(s => s.code === code);
         if (existCode) {
             showCustomAlert({
-                title: 'รหัสนักเรียนซ้ำ',
-                message: `มีรหัสนักเรียน "${code}" (${existCode.name}) อยู่ในระบบแล้ว`,
-                icon: 'fas fa-triangle-exclamation'
-            });
-            return;
-        }
-        const existCitizen = allStudents.find(s => s.citizen_id === citizenId);
-        if (existCitizen) {
-            showCustomAlert({
-                title: 'เลขบัตรประชาชนซ้ำ',
-                message: `มีเลขบัตรประชาชน "${citizenId}" (${existCitizen.name}) อยู่ในระบบแล้ว`,
+                title: 'รหัสนักศึกษาซ้ำ',
+                message: `มีรหัสนักศึกษา "${code}" (${existCode.name}) อยู่ในระบบแล้ว`,
                 icon: 'fas fa-triangle-exclamation'
             });
             return;
@@ -3871,22 +3827,22 @@ window.saveStudentFromForm = function(event) {
     };
 
     saveLocalStudent(studentObj);
-    showToast(`บันทึกข้อมูลนักเรียน "${name}" สำเร็จ`, 'success');
+    showToast(`บันทึกข้อมูลนักศึกษา "${name}" สำเร็จ`, 'success');
     closeStudentModal();
     loadTeacherStudentsList();
 };
 
 window.deleteStudent = function(studentId, studentName) {
     showCustomConfirm({
-        title: 'ยืนยันการลบนักเรียน',
-        message: `คุณต้องการลบรายชื่อนักเรียน "${studentName}" หรือไม่?\n(ข้อมูลจะไม่สามารถกู้คืนได้)`,
+        title: 'ยืนยันการลบนักศึกษา',
+        message: `คุณต้องการลบรายชื่อนักศึกษา "${studentName}" หรือไม่?\n(ข้อมูลจะไม่สามารถกู้คืนได้)`,
         icon: 'fas fa-user-xmark',
         confirmText: 'ลบรายชื่อ',
         cancelText: 'ยกเลิก',
         confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
         onConfirm: () => {
             deleteLocalStudent(studentId);
-            showToast(`ลบรายชื่อนักเรียน "${studentName}" แล้ว`, 'info');
+            showToast(`ลบรายชื่อนักศึกษา "${studentName}" แล้ว`, 'info');
             loadTeacherStudentsList();
         }
     });
@@ -3901,26 +3857,23 @@ window.downloadStudentExcelTemplate = function() {
 
     const templateData = [
         {
-            'รหัสนักเรียน': '66209010001',
+            'รหัสนักศึกษา': '69319100001',
             'ชื่อ-นามสกุล': 'นายสมชาย รักเรียน',
-            'เลขบัตรประชาชน13หลัก': '1103701234567',
-            'ระดับชั้น': 'ปวช.2',
+            'ระดับชั้น': 'ปวส.1',
             'แผนกวิชา': 'เทคโนโลยีธุรกิจดิจิทัล',
             'ห้องเรียน': 'ห้อง 1'
         },
         {
-            'รหัสนักเรียน': '66209010002',
+            'รหัสนักศึกษา': '69319100002',
             'ชื่อ-นามสกุล': 'นางสาวสมหญิง ใจดี',
-            'เลขบัตรประชาชน13หลัก': '1103701234568',
-            'ระดับชั้น': 'ปวช.2',
+            'ระดับชั้น': 'ปวส.1',
             'แผนกวิชา': 'เทคโนโลยีธุรกิจดิจิทัล',
             'ห้องเรียน': 'ห้อง 1'
         },
         {
-            'รหัสนักเรียน': '66209010003',
+            'รหัสนักศึกษา': '69319100003',
             'ชื่อ-นามสกุล': 'นายธนกฤต มุ่งมั่น',
-            'เลขบัตรประชาชน13หลัก': '1103701234569',
-            'ระดับชั้น': 'ปวช.2',
+            'ระดับชั้น': 'ปวส.1',
             'แผนกวิชา': 'การบัญชี',
             'ห้องเรียน': 'ห้อง 2'
         }
@@ -3928,10 +3881,10 @@ window.downloadStudentExcelTemplate = function() {
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'รายชื่อนักเรียน');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'รายชื่อนักศึกษา');
 
-    XLSX.writeFile(workbook, 'แบบฟอร์มนำเข้ารายชื่อนักเรียน_วังไกลกังวล.xlsx');
-    showToast('ดาวน์โหลดเทมเพลต Excel รายชื่อนักเรียนแล้ว', 'success');
+    XLSX.writeFile(workbook, 'แบบฟอร์มนำเข้ารายชื่อนักศึกษา_วังไกลกังวล.xlsx');
+    showToast('ดาวน์โหลดเทมเพลต Excel รายชื่อนักศึกษาแล้ว', 'success');
 };
 
 window.openStudentExcelImportModal = function() {
@@ -3963,10 +3916,10 @@ window.handleStudentExcelUpload = function(event) {
             }
 
             _studentExcelParsedList = rows.map((r, idx) => {
-                const code = String(r['รหัสนักเรียน'] || r['student_id'] || r['code'] || r['ID'] || '').trim();
+                const code = String(r['รหัสนักศึกษา'] || r['รหัสนักเรียน'] || r['student_id'] || r['code'] || r['ID'] || '').trim();
                 const name = String(r['ชื่อ-นามสกุล'] || r['ชื่อ'] || r['name'] || r['student_name'] || '').trim();
-                const citizenId = String(r['เลขบัตรประชาชน13หลัก'] || r['เลขบัตรประชาชน'] || r['citizen_id'] || r['id_card'] || '').replace(/[^0-9]/g, '').trim();
-                const year = String(r['ระดับชั้น'] || r['year'] || r['class'] || 'ปวช.2').trim();
+                const citizenId = String(r['เลขบัตรประชาชน13หลัก'] || r['เลขบัตรประชาชน'] || r['citizen_id'] || r['id_card'] || code).replace(/[^0-9]/g, '').trim() || code;
+                const year = String(r['ระดับชั้น'] || r['year'] || r['class'] || 'ปวส.1').trim();
                 const dept = String(r['แผนกวิชา'] || r['แผนก'] || r['dept'] || 'เทคโนโลยีธุรกิจดิจิทัล').trim();
                 const room = String(r['ห้องเรียน'] || r['ห้อง'] || r['room'] || 'ห้อง 1').trim();
 
@@ -3980,12 +3933,12 @@ window.handleStudentExcelUpload = function(event) {
                     room,
                     created_at: new Date().toISOString()
                 };
-            }).filter(s => s.code && s.name && s.citizen_id.length === 13);
+            }).filter(s => s.code && s.name);
 
             if (_studentExcelParsedList.length === 0) {
                 showCustomAlert({
                     title: 'ข้อมูลไม่ถูกต้อง',
-                    message: 'ไม่พบรายชื่อที่สมบูรณ์ กรุณาตรวจสอบว่ามีคอลัมน์ "รหัสนักเรียน", "ชื่อ-นามสกุล", และ "เลขบัตรประชาชน13หลัก" (13 หลัก) ครบถ้วนตามตัวอย่างเทมเพลต',
+                    message: 'ไม่พบรายชื่อที่สมบูรณ์ กรุณาตรวจสอบว่ามีคอลัมน์ "รหัสนักศึกษา" และ "ชื่อ-นามสกุล" ครบถ้วนตามตัวอย่างเทมเพลต',
                     icon: 'fas fa-triangle-exclamation'
                 });
                 return;
@@ -4002,14 +3955,14 @@ window.handleStudentExcelUpload = function(event) {
                         <td class="p-2 font-bold">${idx + 1}</td>
                         <td class="p-2 font-mono font-bold text-indigo-700">${escapeHtml(s.code)}</td>
                         <td class="p-2 font-bold text-slate-800">${escapeHtml(s.name)}</td>
-                        <td class="p-2 font-mono text-slate-600">${escapeHtml(s.citizen_id)}</td>
-                        <td class="p-2 text-[11px] text-slate-500">${escapeHtml(s.year)} | ${escapeHtml(s.dept)} | ${escapeHtml(s.room)}</td>
+                        <td class="p-2 text-[11px] text-slate-600">${escapeHtml(s.year)}</td>
+                        <td class="p-2 text-[11px] text-slate-500">${escapeHtml(s.dept)} | ${escapeHtml(s.room)}</td>
                     </tr>
                 `).join('');
             }
 
             if (previewContainer) previewContainer.classList.remove('hidden');
-            showToast(`อ่านไฟล์สำเร็จ พบรายชื่อนักเรียน ${_studentExcelParsedList.length} คน`, 'info');
+            showToast(`อ่านไฟล์สำเร็จ พบรายชื่อนักศึกษา ${_studentExcelParsedList.length} คน`, 'info');
 
         } catch (err) {
             showToast('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message, 'error');
@@ -4028,7 +3981,7 @@ window.clearStudentExcelPreview = function() {
 
 window.executeStudentExcelImport = async function() {
     if (!_studentExcelParsedList || _studentExcelParsedList.length === 0) {
-        showToast('ไม่มีข้อมูลนักเรียนที่จะนำเข้า', 'warning');
+        showToast('ไม่มีข้อมูลนักศึกษาที่จะนำเข้า', 'warning');
         return;
     }
 
@@ -4036,8 +3989,8 @@ window.executeStudentExcelImport = async function() {
         id: s.id || generatePseudoUUID(),
         code: s.code,
         name: s.name,
-        citizen_id: s.citizen_id,
-        year: s.year || 'ปวช.2',
+        citizen_id: s.citizen_id || s.code,
+        year: s.year || 'ปวส.1',
         dept: s.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
         room: s.room || 'ห้อง 1'
     }));
@@ -4050,13 +4003,13 @@ window.executeStudentExcelImport = async function() {
         try {
             await state.supabaseClient
                 .from('students')
-                .upsert(payload, { onConflict: 'citizen_id' });
+                .upsert(payload);
         } catch (e) {
             console.warn('[executeStudentExcelImport Supabase sync notice]:', e);
         }
     }
 
-    showToast(`นำเข้ารายชื่อนักเรียนสำเร็จ ${_studentExcelParsedList.length} คน!`, 'success');
+    showToast(`นำเข้ารายชื่อนักศึกษาสำเร็จ ${_studentExcelParsedList.length} คน!`, 'success');
     const modal = document.getElementById('modal-student-excel-import');
     if (modal) modal.classList.add('hidden');
     clearStudentExcelPreview();
