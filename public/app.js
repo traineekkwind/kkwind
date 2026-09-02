@@ -15,6 +15,14 @@ function isValidUUID(str) {
     return typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 }
 
+// Pre-declare login handlers immediately so inline onclick attributes always have a valid function
+// The real implementations are assigned in setupAuthEvents() after DOMContentLoaded.
+// However because app.js is loaded BEFORE body rendering completes (deferred by browser),
+// clicking the button after DOMContentLoaded will always call the real handler below.
+window.handleStudentLogin = function(e) { if (e && e.preventDefault) e.preventDefault(); showToast && showToast('กำลังโหลดระบบ... กรุณารอสักครู่', 'info'); };
+window.handleTeacherLogin  = function(e) { if (e && e.preventDefault) e.preventDefault(); showToast && showToast('กำลังโหลดระบบ... กรุณารอสักครู่', 'info'); };
+window.handleAdminLogin    = function(e) { if (e && e.preventDefault) e.preventDefault(); showToast && showToast('กำลังโหลดระบบ... กรุณารอสักครู่', 'info'); };
+
 // Global App State
 const state = {
     currentAddQuestionImage: null,
