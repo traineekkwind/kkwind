@@ -861,13 +861,26 @@ function updateUserInfoBar() {
     const bar = document.getElementById('user-info-bar');
     const nameEl = document.getElementById('current-user-name');
     const roleBadge = document.getElementById('current-user-role-badge');
+    const btnEditName = document.getElementById('btn-edit-student-name');
+    const lobbyGreeting = document.getElementById('student-lobby-greeting-name');
 
     if (!bar) return;
 
     if (state.currentUser) {
         bar.classList.remove('hidden');
         bar.style.display = 'flex';
-        if (nameEl) nameEl.textContent = state.currentUser.name || 'นักศึกษา';
+        const displayName = state.currentUser.name || 'นักศึกษา';
+        if (nameEl) nameEl.textContent = displayName;
+        if (lobbyGreeting) lobbyGreeting.textContent = displayName;
+
+        if (btnEditName) {
+            if (state.currentUser.role === 'student') {
+                btnEditName.classList.remove('hidden');
+            } else {
+                btnEditName.classList.add('hidden');
+            }
+        }
+
         if (roleBadge) {
             if (state.currentUser.role === 'admin') {
                 roleBadge.textContent = '⚙️ แอดมิน';
@@ -885,6 +898,7 @@ function updateUserInfoBar() {
     } else {
         bar.classList.add('hidden');
         bar.style.display = 'none';
+        if (btnEditName) btnEditName.classList.add('hidden');
     }
 }
 
@@ -1205,7 +1219,16 @@ window.handleStudentLogin = async function(e) {
         }
 
         const realStudentCode = candidate?.code || (inputPass.match(/^\d+$/) ? inputPass : (inputMain.match(/^\d+$/) ? inputMain : inputPass));
-        const realStudentName = candidate?.name || (inputMain !== realStudentCode ? inputMain : `นักศึกษา (${realStudentCode})`);
+        let realStudentName = candidate?.name || (inputMain !== realStudentCode && !inputMain.match(/^\d+$/) ? inputMain : '');
+
+        // หากไม่พบในทะเบียน และยังไม่มีชื่อจริง ให้แสดงหน้าต่างระบุชื่อ-นามสกุลทันที
+        if (!candidate && !realStudentName) {
+            setButtonLoading(btn, false);
+            window.openStudentNamePrompt(realStudentCode, '');
+            return false;
+        }
+
+        realStudentName = realStudentName || `นักศึกษา (${realStudentCode})`;
         const realStudentPass = candidate?.citizen_id || candidate?.password || realStudentCode;
 
         const studentUser = {
@@ -1235,6 +1258,108 @@ window.handleStudentLogin = async function(e) {
         showToast('เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง', 'error');
         return false;
     }
+};
+
+// 3.1.2 Student Real Name Prompt Modal Handlers (ระบุและแก้ไขชื่อ-นามสกุลจริง)
+window.openStudentNamePrompt = function(studentCode = '', currentName = '') {
+    const modal = document.getElementById('modal-student-name-prompt');
+    const codeDisplay = document.getElementById('prompt-student-code-display');
+    const codeHidden = document.getElementById('prompt-student-code-hidden');
+    const nameInput = document.getElementById('prompt-student-name-input');
+    const yearSelect = document.getElementById('prompt-student-year-select');
+    const roomSelect = document.getElementById('prompt-student-room-select');
+
+    if (!modal) return;
+
+    const code = studentCode || state.currentUser?.student_code || state.currentUser?.code || '';
+    if (codeDisplay) codeDisplay.textContent = code || '-';
+    if (codeHidden) codeHidden.value = code;
+
+    const existingName = currentName || (state.currentUser?.name && !state.currentUser.name.startsWith('นักศึกษา (') && !state.currentUser.name.match(/^\d+$/) ? state.currentUser.name : '');
+    if (nameInput) {
+        nameInput.value = existingName;
+        setTimeout(() => nameInput.focus(), 200);
+    }
+
+    if (yearSelect && state.currentUser?.year) yearSelect.value = state.currentUser.year;
+    if (roomSelect && state.currentUser?.room) roomSelect.value = state.currentUser.room;
+
+    modal.classList.remove('hidden');
+};
+
+window.promptEditStudentName = function() {
+    window.openStudentNamePrompt(state.currentUser?.student_code, state.currentUser?.name);
+};
+
+window.closeStudentNamePrompt = function() {
+    const modal = document.getElementById('modal-student-name-prompt');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.submitStudentNamePrompt = async function(event) {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    const modal = document.getElementById('modal-student-name-prompt');
+    const codeHidden = document.getElementById('prompt-student-code-hidden')?.value.trim();
+    const nameInput = document.getElementById('prompt-student-name-input')?.value.trim();
+    const yearSelect = document.getElementById('prompt-student-year-select')?.value || 'ปวส.1';
+    const roomSelect = document.getElementById('prompt-student-room-select')?.value || 'ห้อง 1';
+
+    if (!nameInput) {
+        showToast('กรุณากรอกชื่อ-นามสกุลจริง', 'warning');
+        return;
+    }
+
+    const studentCode = codeHidden || state.currentUser?.student_code || state.currentUser?.code || '';
+
+    // Create or update student in local students & Supabase
+    const allStudents = getLocalStudents();
+    let student = resolveStudentFromRoster({ student_code: studentCode, student_name: nameInput }, allStudents) ||
+                  allStudents.find(s => s.code === studentCode);
+
+    const studentObj = {
+        ...(student || {}),
+        id: student?.id || state.currentUser?.id || generatePseudoUUID(),
+        code: studentCode,
+        name: nameInput,
+        citizen_id: student?.citizen_id || studentCode,
+        year: yearSelect,
+        dept: student?.dept || state.currentUser?.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
+        room: roomSelect,
+        updated_at: new Date().toISOString()
+    };
+
+    saveLocalStudent(studentObj);
+
+    // Update state.currentUser
+    state.currentUser = {
+        ...(state.currentUser || {}),
+        role: 'student',
+        id: studentObj.id,
+        student_code: studentCode,
+        name: nameInput,
+        year: yearSelect,
+        dept: studentObj.dept,
+        room: roomSelect
+    };
+    saveUserSession(state.currentUser);
+
+    // Sync to Supabase
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            await state.supabaseClient.from('students').upsert(studentObj);
+        } catch (e) {
+            console.warn('[submitStudentNamePrompt Supabase error]:', e);
+        }
+    }
+
+    if (modal) modal.classList.add('hidden');
+
+    const badge = document.getElementById('student-class-badge');
+    if (badge) badge.textContent = `${state.currentUser.year} | ${state.currentUser.dept} | ${state.currentUser.room}`;
+
+    updateUserInfoBar();
+    showToast(`ยินดีต้อนรับคุณ ${nameInput}`, 'success');
+    await loadStudentLobby();
 };
 
 // 3.2 Global Teacher Login Handler (Instant & 100% Reliable)
@@ -1405,6 +1530,18 @@ window.refreshStudentLobby = async function(btn) {
 
 async function loadStudentLobby() {
     showView('view-student-lobby');
+
+    // ตรวจสอบว่าชื่อนักศึกษายังเป็นรหัส หรือยังไม่ได้ระบุชื่อจริงหรือไม่ หากยังไม่ระบุ ให้แสดงหน้าต่างระบุชื่อทันที
+    if (state.currentUser && state.currentUser.role === 'student') {
+        const cName = (state.currentUser.name || '').trim();
+        const cCode = state.currentUser.student_code || state.currentUser.code || '';
+        if (!cName || cName.startsWith('นักศึกษา (') || cName === cCode || cName.match(/^\d+$/)) {
+            setTimeout(() => {
+                window.openStudentNamePrompt(cCode, '');
+            }, 300);
+        }
+    }
+
     const listContainer = document.getElementById('exam-cards-container');
     if (!listContainer) return;
 
