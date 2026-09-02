@@ -979,6 +979,23 @@ function setupAuthEvents() {
     if (formTeacher) formTeacher.addEventListener('submit', (e) => window.handleTeacherLogin(e));
     if (formAdmin) formAdmin.addEventListener('submit', (e) => window.handleAdminLogin(e));
 
+    const bindEnter = (id, fn) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    fn(e);
+                }
+            });
+        }
+    };
+    bindEnter('student-login-id-input', window.handleStudentLogin);
+    bindEnter('student-login-pass-input', window.handleStudentLogin);
+    bindEnter('teacher-name-input', window.handleTeacherLogin);
+    bindEnter('teacher-password-input', window.handleTeacherLogin);
+    bindEnter('admin-password-input', window.handleAdminLogin);
+
     // ปุ่มออกจากระบบ (Custom In-App Modal - No browser popup!)
     const btnLogout = document.getElementById('btn-logout');
     if (btnLogout) {
