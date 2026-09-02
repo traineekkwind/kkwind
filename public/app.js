@@ -975,6 +975,22 @@ function setupAuthEvents() {
         }
     };
 
+    function saveUserSession(user) {
+        state.currentUser = user;
+        try {
+            sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(user));
+            localStorage.setItem('EXAM_SAVED_USER', JSON.stringify(user));
+        } catch (e) {}
+    }
+
+    function clearUserSession() {
+        state.currentUser = null;
+        try {
+            sessionStorage.removeItem('EXAM_SESSION_USER');
+            localStorage.removeItem('EXAM_SAVED_USER');
+        } catch (e) {}
+    }
+
     // 3.1 Global Student Login Handler
     window.handleStudentLogin = async function(e) {
         if (e && typeof e.preventDefault === 'function') e.preventDefault();
@@ -989,12 +1005,11 @@ function setupAuthEvents() {
         // 0. Auto-detect Admin Credentials in Student form
         const cleanLoginLower = rawLoginId.toLowerCase();
         if (cleanLoginLower === 'admin' || rawPass === 'admin1234' || rawPass === 'admin9999' || rawPass === 'admin') {
-            state.currentUser = {
+            saveUserSession({
                 role: 'admin',
                 id: '00000000-0000-0000-0000-000000000001',
                 name: 'ผู้ดูแลระบบสูงสุด (Admin)'
-            };
-            try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (err) {}
+            });
             showToast('ยินดีต้อนรับผู้ดูแลระบบ (Admin)', 'success');
             loadAdminDashboard();
             return false;
@@ -1027,14 +1042,13 @@ function setupAuthEvents() {
                 teacher_code: 'T001',
                 department: 'เทคโนโลยีธุรกิจดิจิทัล'
             };
-            state.currentUser = {
+            saveUserSession({
                 role: 'teacher',
                 id: finalTeacher.id,
                 name: finalTeacher.name,
                 code: finalTeacher.teacher_code || finalTeacher.code || 'T001',
                 dept: finalTeacher.department || finalTeacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
-            };
-            try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (err) {}
+            });
             const portalNameEl = document.getElementById('teacher-portal-name');
             if (portalNameEl) portalNameEl.textContent = `${state.currentUser.name} (${state.currentUser.dept})`;
             showToast(`ยินดีต้อนรับอาจารย์ ${state.currentUser.name}`, 'success');
@@ -1119,7 +1133,7 @@ function setupAuthEvents() {
             return false;
         }
 
-        state.currentUser = {
+        saveUserSession({
             role: 'student',
             id: matchedStudent.id || generatePseudoUUID(),
             student_code: matchedStudent.code,
@@ -1128,8 +1142,7 @@ function setupAuthEvents() {
             year: matchedStudent.year || 'ปวช.2',
             dept: matchedStudent.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
             room: matchedStudent.room || 'ห้อง 1'
-        };
-        try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (err) {}
+        });
 
         const badge = document.getElementById('student-class-badge');
         if (badge) badge.textContent = `${state.currentUser.year} | ${state.currentUser.dept} | ${state.currentUser.room}`;
@@ -1183,14 +1196,13 @@ function setupAuthEvents() {
         });
 
         if (matchedTeacher) {
-            state.currentUser = {
+            saveUserSession({
                 role: 'teacher',
                 id: matchedTeacher.id,
                 name: matchedTeacher.name,
                 code: matchedTeacher.teacher_code || matchedTeacher.code || 'T001',
                 dept: matchedTeacher.department || matchedTeacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
-            };
-            try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (err) {}
+            });
 
             const portalNameEl = document.getElementById('teacher-portal-name');
             if (portalNameEl) portalNameEl.textContent = `${matchedTeacher.name} (${matchedTeacher.department || 'อาจารย์ผู้สอน'})`;
@@ -1203,14 +1215,13 @@ function setupAuthEvents() {
         // กรณีไม่พบในฐานข้อมูล หรือเป็นรหัสผ่านมาตรฐานสำหรับอาจารย์
         if (isUniversalTeacherPass || cleanLogin === 't001') {
             const teacherId = generateTeacherUUID(loginInput);
-            state.currentUser = {
+            saveUserSession({
                 role: 'teacher',
                 id: teacherId,
                 name: cleanLogin === 't001' ? 'อาจารย์ผู้สอน' : loginInput,
                 code: cleanLogin === 't001' ? 'T001' : 'T001',
                 dept: 'เทคโนโลยีธุรกิจดิจิทัล'
-            };
-            try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (err) {}
+            });
 
             const portalNameEl = document.getElementById('teacher-portal-name');
             if (portalNameEl) portalNameEl.textContent = state.currentUser.name;
@@ -1250,12 +1261,11 @@ function setupAuthEvents() {
         const password = (document.getElementById('admin-password-input')?.value || '').trim();
 
         if (['admin9999', 'admin1234', 'admin', '1234', '9999'].includes(password.toLowerCase())) {
-            state.currentUser = {
+            saveUserSession({
                 role: 'admin',
                 id: '00000000-0000-0000-0000-000000000001',
                 name: 'ผู้ดูแลระบบสูงสุด (Admin)'
-            };
-            try { sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(state.currentUser)); } catch (err) {}
+            });
             showToast('เข้าสู่ระบบแอดมินสำเร็จ', 'success');
             loadAdminDashboard();
             return false;
@@ -1287,8 +1297,7 @@ function setupAuthEvents() {
                 onConfirm: () => {
                     stopAntiCheatMonitor();
                     clearInterval(state.examTimer);
-                    try { sessionStorage.removeItem('EXAM_SESSION_USER'); } catch (e) {}
-                    state.currentUser = null;
+                    clearUserSession();
                     state.currentExam = null;
                     state.questions = [];
                     state.answers = {};
@@ -2762,15 +2771,15 @@ window.clearLiveFeedLogs = function() {
 
 async function loadTeacherDashboard() {
     showView('view-teacher');
-    initTeacherRealtimeAlerts();
-    setupTeacherTabs();
-    await loadTeacherCourses();
-    await loadTeacherExamsList();
-    loadTeacherSubmissions();
-    loadTeacherStudentsList();
-    populateCourseSelects();
-    await populateTeacherExamSelects();
-    setupExcelDragDrop();
+    try { initTeacherRealtimeAlerts(); } catch (e) { console.warn('initTeacherRealtimeAlerts:', e); }
+    try { setupTeacherTabs(); } catch (e) { console.warn('setupTeacherTabs:', e); }
+    try { await loadTeacherCourses(); } catch (e) { console.warn('loadTeacherCourses:', e); }
+    try { await loadTeacherExamsList(); } catch (e) { console.warn('loadTeacherExamsList:', e); }
+    try { loadTeacherSubmissions(); } catch (e) { console.warn('loadTeacherSubmissions:', e); }
+    try { loadTeacherStudentsList(); } catch (e) { console.warn('loadTeacherStudentsList:', e); }
+    try { populateCourseSelects(); } catch (e) { console.warn('populateCourseSelects:', e); }
+    try { await populateTeacherExamSelects(); } catch (e) { console.warn('populateTeacherExamSelects:', e); }
+    try { setupExcelDragDrop(); } catch (e) { console.warn('setupExcelDragDrop:', e); }
 }
 
 function setupTeacherTabs() {
@@ -6471,7 +6480,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // กู้คืน Session ของแท็บปัจจุบัน (เพื่อให้อาจารย์/นักเรียนไม่ต้องล็อกอินซ้ำเมื่อกด Refresh)
     try {
-        const savedSession = sessionStorage.getItem('EXAM_SESSION_USER');
+        const savedSession = sessionStorage.getItem('EXAM_SESSION_USER') || localStorage.getItem('EXAM_SAVED_USER');
         if (savedSession) {
             const user = JSON.parse(savedSession);
             if (user && user.role) {
