@@ -1266,23 +1266,30 @@ window.handleTeacherLogin = async function(e) {
                    (tNameNoPrefix && cleanLoginNoPrefix && (tNameNoPrefix === cleanLoginNoPrefix || tNameNoPrefix.includes(cleanLoginNoPrefix) || cleanLoginNoPrefix.includes(tNameNoPrefix)));
         });
 
-        const finalTeacher = matchedTeacher || {
-            id: generateTeacherUUID(loginInput),
-            name: cleanLogin === 't001' ? 'อาจารย์ผู้สอน' : loginInput,
-            teacher_code: cleanLogin === 't001' ? 'T001' : (cleanLogin.toUpperCase().startsWith('T') ? cleanLogin.toUpperCase() : 'T001'),
-            department: 'เทคโนโลยีธุรกิจดิจิทัล'
+        let realTeacherName = (matchedTeacher?.name || loginInput).trim();
+        let realTeacherCode = matchedTeacher?.teacher_code || matchedTeacher?.code || 'T001';
+        if (realTeacherName.startsWith('T00') && !loginInput.startsWith('T00') && loginInput.length > 2) {
+            realTeacherCode = realTeacherName;
+            realTeacherName = loginInput;
+        }
+
+        const finalTeacher = {
+            id: matchedTeacher?.id || generateTeacherUUID(realTeacherName),
+            name: cleanLogin === 't001' ? 'อาจารย์ผู้สอน' : realTeacherName,
+            teacher_code: realTeacherCode,
+            department: matchedTeacher?.department || matchedTeacher?.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
         };
 
         saveUserSession({
             role: 'teacher',
             id: finalTeacher.id,
             name: finalTeacher.name,
-            code: finalTeacher.teacher_code || finalTeacher.code || 'T001',
-            dept: finalTeacher.department || finalTeacher.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
+            code: finalTeacher.teacher_code,
+            dept: finalTeacher.department
         });
 
         const portalNameEl = document.getElementById('teacher-portal-name');
-        if (portalNameEl) portalNameEl.textContent = `${finalTeacher.name} (${finalTeacher.department || finalTeacher.dept || 'อาจารย์ผู้สอน'})`;
+        if (portalNameEl) portalNameEl.textContent = `${finalTeacher.name} (${finalTeacher.department || 'อาจารย์ผู้สอน'})`;
 
         setButtonLoading(btn, false);
         showToast(`ยินดีต้อนรับ ${finalTeacher.name}`, 'success');
