@@ -41,6 +41,7 @@ const state = {
     globalRealtimeChannel: null,
     liveFeedLogs: []
 };
+window.state = state;
 
 // ==============================================================================
 // QUESTION IMAGE & FORMATTING HELPERS
@@ -3003,6 +3004,7 @@ function resolveStudentFromRoster(d, rosterList) {
 
     return null;
 }
+window.resolveStudentFromRoster = resolveStudentFromRoster;
 
 // 🔒 Helper สำหรับจับคู่อาจารย์อย่างแม่นยำ พร้อมแยกข้อมูลระหว่างอาจารย์แต่ละท่าน (Teacher Data Isolation)
 function isMatchingTeacher(entityTeacherId, entityTeacherName, currentTeacherId, currentTeacherName) {
