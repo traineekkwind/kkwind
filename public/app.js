@@ -861,35 +861,30 @@ function updateUserInfoBar() {
     const bar = document.getElementById('user-info-bar');
     const nameEl = document.getElementById('current-user-name');
     const roleBadge = document.getElementById('current-user-role-badge');
-    const changePassBtn = document.getElementById('btn-change-password-nav');
 
     if (!bar) return;
 
     if (state.currentUser) {
         bar.classList.remove('hidden');
-        if (nameEl) nameEl.textContent = state.currentUser.name;
-        if (changePassBtn) {
-            if (state.currentUser.role === 'student') {
-                changePassBtn.classList.remove('hidden');
-            } else {
-                changePassBtn.classList.add('hidden');
-            }
-        }
+        bar.style.display = 'flex';
+        if (nameEl) nameEl.textContent = state.currentUser.name || 'นักศึกษา';
         if (roleBadge) {
             if (state.currentUser.role === 'admin') {
                 roleBadge.textContent = '⚙️ แอดมิน';
-                roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 border border-purple-300';
+                roleBadge.className = 'px-3 py-1 text-xs font-bold rounded-full bg-purple-100 text-purple-800 border border-purple-300 shadow-2xs';
             } else if (state.currentUser.role === 'teacher') {
-                roleBadge.textContent = `👨‍🏫 ${state.currentUser.name}`;
-                roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300';
+                roleBadge.textContent = `👨‍🏫 ${state.currentUser.name || 'อาจารย์'}`;
+                roleBadge.className = 'px-3 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs';
             } else {
-                roleBadge.textContent = `👨‍🎓 ${state.currentUser.year || ''} ${state.currentUser.room || ''}`.trim() || '👨‍🎓 นักศึกษา';
-                roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 border border-blue-300';
+                const year = state.currentUser.year || 'ปวส.1';
+                const room = state.currentUser.room || 'ห้อง 1';
+                roleBadge.textContent = `👨‍🎓 ${year} ${room}`;
+                roleBadge.className = 'px-3 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-800 border border-blue-200 shadow-2xs';
             }
         }
     } else {
         bar.classList.add('hidden');
-        if (changePassBtn) changePassBtn.classList.add('hidden');
+        bar.style.display = 'none';
     }
 }
 
@@ -1051,6 +1046,7 @@ function saveUserSession(user) {
         sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(user));
         localStorage.setItem('EXAM_SAVED_USER', JSON.stringify(user));
     } catch (e) {}
+    updateUserInfoBar();
 }
 
 function clearUserSession() {
@@ -1059,6 +1055,7 @@ function clearUserSession() {
         sessionStorage.removeItem('EXAM_SESSION_USER');
         localStorage.removeItem('EXAM_SAVED_USER');
     } catch (e) {}
+    updateUserInfoBar();
 }
 
 function ensureSupabaseReady() {
@@ -1220,151 +1217,6 @@ window.handleStudentLogin = async function(e) {
         loadStudentLobby();
         return false;
     }
-};
-
-// 3.1.1 Student Self-Service Change Password Modal Handlers
-window.openChangePasswordModal = function() {
-    const modal = document.getElementById('modal-student-change-password');
-    const nameEl = document.getElementById('change-pass-student-name');
-    const oldPassInput = document.getElementById('student-old-password');
-    const newPassInput = document.getElementById('student-new-password');
-    const confirmPassInput = document.getElementById('student-confirm-password');
-
-    if (!modal) return;
-    if (oldPassInput) oldPassInput.value = '';
-    if (newPassInput) newPassInput.value = '';
-    if (confirmPassInput) confirmPassInput.value = '';
-
-    if (nameEl && state.currentUser) {
-        nameEl.textContent = `${state.currentUser.name} (รหัส: ${state.currentUser.student_code || state.currentUser.code || '-'})`;
-    }
-
-    modal.classList.remove('hidden');
-};
-
-window.closeChangePasswordModal = function() {
-    const modal = document.getElementById('modal-student-change-password');
-    if (modal) modal.classList.add('hidden');
-};
-
-window.handleStudentChangePassword = async function(e) {
-    if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    if (!state.currentUser || state.currentUser.role !== 'student') {
-        showToast('กรุณาเข้าสู่ระบบในฐานะนักศึกษาก่อนเปลี่ยนรหัสผ่าน', 'warning');
-        return;
-    }
-
-    const oldPass = (document.getElementById('student-old-password')?.value || '').trim();
-    const newPass = (document.getElementById('student-new-password')?.value || '').trim();
-    const confirmPass = (document.getElementById('student-confirm-password')?.value || '').trim();
-
-    if (!oldPass || !newPass || !confirmPass) {
-        showToast('กรุณากรอกข้อมูลให้ครบทุกช่อง', 'warning');
-        return;
-    }
-
-    if (newPass.length < 4) {
-        showCustomAlert({
-            title: 'รหัสผ่านสั้นเกินไป',
-            message: 'กรุณากำหนดรหัสผ่านใหม่อย่างน้อย 4 ตัวอักษร',
-            icon: 'fas fa-key'
-        });
-        return;
-    }
-
-    if (newPass !== confirmPass) {
-        showCustomAlert({
-            title: 'รหัสผ่านไม่ตรงกัน',
-            message: 'รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง',
-            icon: 'fas fa-triangle-exclamation'
-        });
-        return;
-    }
-
-    let allStudents = getLocalStudents();
-    const currentCode = (state.currentUser.student_code || state.currentUser.code || '').toString().trim();
-    const currentName = (state.currentUser.name || '').toString().trim();
-
-    // Find student in roster
-    let student = resolveStudentFromRoster({
-        student_id: state.currentUser.id,
-        student_code: currentCode,
-        student_name: currentName
-    }, allStudents);
-
-    if (!student && isSupabaseConfigured() && state.supabaseClient) {
-        try {
-            const { data } = await state.supabaseClient.from('students').select('*');
-            if (Array.isArray(data) && data.length > 0) {
-                allStudents = data;
-                localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(data));
-                student = resolveStudentFromRoster({
-                    student_id: state.currentUser.id,
-                    student_code: currentCode,
-                    student_name: currentName
-                }, allStudents);
-            }
-        } catch (err) {}
-    }
-
-    // Verify current old password
-    const expectedOldPass = (student?.citizen_id || student?.password || student?.code || state.currentUser.password || state.currentUser.citizen_id || currentCode).toString().trim();
-    if (oldPass !== expectedOldPass && oldPass !== currentCode && oldPass !== student?.code) {
-        showCustomAlert({
-            title: 'รหัสผ่านปัจจุบันไม่ถูกต้อง',
-            message: 'รหัสผ่านปัจจุบันที่คุณกรอกไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง',
-            icon: 'fas fa-lock'
-        });
-        return;
-    }
-
-    // Update Student Record
-    const updatedStudent = {
-        ...(student || {}),
-        id: student?.id || state.currentUser.id || generatePseudoUUID(),
-        code: student?.code || currentCode,
-        name: student?.name || currentName,
-        password: newPass,
-        citizen_id: newPass,
-        year: student?.year || state.currentUser.year || 'ปวส.1',
-        dept: student?.dept || state.currentUser.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
-        room: student?.room || state.currentUser.room || 'ห้อง 1',
-        updated_at: new Date().toISOString()
-    };
-
-    saveLocalStudent(updatedStudent);
-
-    // Update Session
-    state.currentUser.password = newPass;
-    state.currentUser.citizen_id = newPass;
-    saveUserSession(state.currentUser);
-
-    // Sync to Supabase Cloud
-    if (isSupabaseConfigured() && state.supabaseClient) {
-        try {
-            if (updatedStudent.id) {
-                await state.supabaseClient
-                    .from('students')
-                    .update({ citizen_id: newPass })
-                    .eq('id', updatedStudent.id);
-            } else if (updatedStudent.code) {
-                await state.supabaseClient
-                    .from('students')
-                    .update({ citizen_id: newPass })
-                    .eq('code', updatedStudent.code);
-            }
-        } catch (err) {
-            console.warn('[handleStudentChangePassword Supabase Sync Warning]:', err);
-        }
-    }
-
-    closeChangePasswordModal();
-
-    showCustomAlert({
-        title: 'เปลี่ยนรหัสผ่านสำเร็จ 🎉',
-        message: `เปลี่ยนรหัสผ่านสำหรับ "${state.currentUser.name}" เป็น "${newPass}" เรียบร้อยแล้ว\n\nรหัสผ่านใหม่นี้ได้รับการอัปเดตไปยังระบบของอาจารย์ทันที และกรุณาใช้รหัสผ่านนี้ในการเข้าสู่ระบบครั้งต่อไป`,
-        icon: 'fas fa-circle-check'
-    });
 };
 
 // 3.2 Global Teacher Login Handler (Instant & 100% Reliable)
