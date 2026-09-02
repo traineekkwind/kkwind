@@ -56,6 +56,20 @@
                 if (formAdmin) formAdmin.classList.remove('hidden');
             }
         };
+
+        // Quick Password Toggle
+        window.toggleStudentPasswordVisibility = function() {
+            const input = document.getElementById('student-login-pass-input');
+            const icon = document.getElementById('student-pass-eye-icon');
+            if (!input || !icon) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fas fa-eye-slash text-xs text-indigo-600';
+            } else {
+                input.type = 'password';
+                icon.className = 'fas fa-eye text-xs';
+            }
+        };
     </script>
     <!-- SheetJS (XLSX) CDN สำหรับ Import & Export Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -1694,6 +1708,6 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.8.22"></script>
+    <script src="./public/app.js?v=2.8.23"></script>
 </body>
 </html>
