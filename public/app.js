@@ -3050,23 +3050,53 @@ window.deleteCourse = async function(courseId, courseName) {
     });
 };
 
-// 7.2 ฟังก์ชันเติมรายการชุดข้อสอบในตัวกรองผลสอบ
+// 7.2 ฟังก์ชันดึงเฉพาะชุดข้อสอบของอาจารย์ท่านนี้ (Strict Teacher Exam Isolation)
+function getTeacherIsolatedExams() {
+    const allExams = getLocalExams();
+    if (state.currentUser?.role !== 'teacher') return allExams;
+
+    const currentTeacherId = state.currentUser?.id;
+    const currentTeacherName = (state.currentUser?.name || '').trim();
+    const allCourses = getLocalCourses();
+    const myCourses = allCourses.filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName));
+    const myCourseIds = myCourses.map(c => c.id);
+
+    return allExams.filter(e => 
+        (e.course_id && myCourseIds.includes(e.course_id)) ||
+        isMatchingTeacher(e.teacher_id, e.teacher_name, currentTeacherId, currentTeacherName)
+    );
+}
+
+// 7.2.0 ฟังก์ชันกรองเฉพาะผลสอบของอาจารย์ท่านนี้ (Strict Teacher Submission Isolation)
+function filterTeacherIsolatedSubmissions(subs) {
+    if (state.currentUser?.role !== 'teacher') return subs || [];
+
+    const currentTeacherId = state.currentUser?.id;
+    const currentTeacherName = (state.currentUser?.name || '').trim();
+    const myExams = getTeacherIsolatedExams();
+    const myExamIds = myExams.map(e => e.id);
+    const myCourseIds = (getLocalCourses() || [])
+        .filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName))
+        .map(c => c.id);
+
+    return (subs || []).filter(sub => {
+        if (sub.exam_id && myExamIds.includes(sub.exam_id)) return true;
+        if (sub.exam) {
+            if (sub.exam.course_id && myCourseIds.includes(sub.exam.course_id)) return true;
+            if (isMatchingTeacher(sub.exam.teacher_id, sub.exam.teacher_name, currentTeacherId, currentTeacherName)) return true;
+        }
+        return false;
+    });
+}
+
+// 7.2.1 ฟังก์ชันเติมรายการชุดข้อสอบในตัวกรองผลสอบ (เฉพาะข้อสอบของครูท่านนี้)
 function populateTeacherSubmissionExamFilter() {
     const select = document.getElementById('teacher-sub-filter-exam');
     if (!select) return;
 
-    let exams = state.localExams || getLocalExams();
-    if (state.currentUser?.role === 'teacher') {
-        const myCourseIds = (state.courses || []).map(c => c.id);
-        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
-        exams = exams.filter(e => 
-            (e.teacher_name && e.teacher_name.trim().toLowerCase() === currentTeacherName) ||
-            (e.course_id && myCourseIds.includes(e.course_id))
-        );
-    }
-
+    const myExams = getTeacherIsolatedExams();
     const currentVal = select.value;
-    select.innerHTML = `<option value="ทั้งหมด">ชุดข้อสอบ: ทั้งหมด</option>` + exams.map(e => `
+    select.innerHTML = `<option value="ทั้งหมด">ชุดข้อสอบ: ทั้งหมด</option>` + myExams.map(e => `
         <option value="${e.id}">[${escapeHtml(e.title)}] (${escapeHtml(e.target_year || 'ทุกชั้น')} ${escapeHtml(e.target_room || 'ทุกห้อง')})</option>
     `).join('');
 
@@ -3075,7 +3105,7 @@ function populateTeacherSubmissionExamFilter() {
     }
 }
 
-// 7.2.1 โหลดตารางผลสอบอาจารย์ (พร้อมตัวกรองแยกชุดข้อสอบ/ระดับชั้น/แผนก/ห้องเรียน)
+// 7.2.2 โหลดตารางผลสอบอาจารย์ (พร้อมตัวกรองแยกชุดข้อสอบ/ระดับชั้น/แผนก/ห้องเรียน)
 async function loadTeacherSubmissions() {
     const tableBody = document.getElementById('teacher-submissions-table-body');
     const statTotal = document.getElementById('teacher-stat-total-submissions');
@@ -3094,7 +3124,7 @@ async function loadTeacherSubmissions() {
                 .from('exam_results')
                 .select(`
                     *,
-                    exam:exams(title, max_tab_switches_allowed, target_year, target_department, target_room, course:courses(course_name))
+                    exam:exams(title, max_tab_switches_allowed, target_year, target_department, target_room, teacher_id, teacher_name, course_id, course:courses(course_name, course_code))
                 `)
                 .order('graded_at', { ascending: false });
 
@@ -3106,15 +3136,8 @@ async function loadTeacherSubmissions() {
         }
     }
 
-    // 🔒 Teacher Isolation: แสดงเฉพาะผลคะแนนในวิชาและชุดข้อสอบของอาจารย์ท่านนี้เท่านั้น (เว้นแต่ Admin)
-    if (state.currentUser?.role === 'teacher') {
-        const myExamIds = (state.localExams || getLocalExams()).map(e => e.id);
-        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
-        subs = (subs || []).filter(sub => 
-            myExamIds.includes(sub.exam_id) || 
-            (sub.exam?.teacher_name && sub.exam.teacher_name.trim().toLowerCase() === currentTeacherName)
-        );
-    }
+    // 🔒 Teacher Isolation: แสดงเฉพาะผลคะแนนในวิชาและชุดข้อสอบของอาจารย์ท่านนี้เท่านั้น (ป้องกันข้อมูลปนกับอาจารย์ท่านอื่น)
+    subs = filterTeacherIsolatedSubmissions(subs);
 
     // 🔍 Apply Filters: Search, Exam, Year, Department, Room
     const searchVal = (document.getElementById('teacher-sub-filter-search')?.value || '').trim().toLowerCase();
@@ -3314,7 +3337,7 @@ window.resetTeacherSubmissionFilters = function() {
     loadTeacherSubmissions();
 };
 
-// 7.3 ส่งออกคะแนนนักเรียนเป็นไฟล์ Excel (.xlsx) ตามตัวกรองระดับชั้น/แผนก/ห้องเรียน
+// 7.3 ส่งออกคะแนนนักเรียนเป็นไฟล์ Excel (.xlsx) ตามโครงสร้างคอลัมน์ที่กำหนด
 window.exportTeacherScoresToExcel = async function() {
     if (!window.XLSX) {
         showToast('ไลบรารี SheetJS ยังไม่พร้อมใช้งาน', 'warning');
@@ -3329,7 +3352,7 @@ window.exportTeacherScoresToExcel = async function() {
                 .from('exam_results')
                 .select(`
                     *,
-                    exam:exams(title, duration_minutes, target_year, target_department, target_room, course:courses(course_code, course_name))
+                    exam:exams(title, duration_minutes, target_year, target_department, target_room, teacher_id, teacher_name, course_id, course:courses(course_code, course_name))
                 `)
                 .order('graded_at', { ascending: false });
 
@@ -3341,14 +3364,8 @@ window.exportTeacherScoresToExcel = async function() {
         }
     }
 
-    if (state.currentUser?.role === 'teacher') {
-        const myExamIds = (state.localExams || getLocalExams()).map(e => e.id);
-        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
-        subs = (subs || []).filter(sub => 
-            myExamIds.includes(sub.exam_id) || 
-            (sub.exam?.teacher_name && sub.exam.teacher_name.trim().toLowerCase() === currentTeacherName)
-        );
-    }
+    // 🔒 Teacher Isolation: แสดงเฉพาะผลสอบของอาจารย์ท่านนี้
+    subs = filterTeacherIsolatedSubmissions(subs);
 
     // Apply active filters to export
     const searchVal = (document.getElementById('teacher-sub-filter-search')?.value || '').trim().toLowerCase();
@@ -3358,6 +3375,9 @@ window.exportTeacherScoresToExcel = async function() {
     const roomFilter = document.getElementById('teacher-sub-filter-room')?.value || 'ทั้งหมด';
 
     const localStudents = getLocalStudents();
+    const allCourses = getLocalCourses();
+    const allExams = getLocalExams();
+
     const studentRosterMap = new Map();
     localStudents.forEach(st => {
         if (st.id) studentRosterMap.set(st.id, st);
@@ -3430,8 +3450,6 @@ window.exportTeacherScoresToExcel = async function() {
         });
     }
 
-    const studentRoster = localStudents;
-
     const excelRows = filtered.map((d, index) => {
         const cleanName = (d.student_name || '').trim().toLowerCase();
         const cleanNameNoPrefix = cleanName.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '');
@@ -3439,41 +3457,61 @@ window.exportTeacherScoresToExcel = async function() {
         const linkedStudent = studentRosterMap.get(d.student_id) || 
                               studentRosterMap.get(String(d.student_code).trim()) || 
                               studentRosterMap.get(cleanName) ||
-                              studentRoster.find(st => {
+                              localStudents.find(st => {
                                   const stName = (st.name || '').trim().toLowerCase().replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '');
                                   return stName && cleanNameNoPrefix && (stName === cleanNameNoPrefix || stName.includes(cleanNameNoPrefix) || cleanNameNoPrefix.includes(stName));
                               });
 
         let realStudentCode = d.student_code || linkedStudent?.code || '';
         if (!realStudentCode || String(realStudentCode).includes('-')) {
-            realStudentCode = linkedStudent?.code || linkedStudent?.citizen_id || (d.student_id && !String(d.student_id).includes('-') ? d.student_id : (linkedStudent?.citizen_id || '-'));
+            realStudentCode = linkedStudent?.code || linkedStudent?.citizen_id || (d.student_id && !String(d.student_id).includes('-') ? d.student_id : '-');
         }
 
-        const realYear = d.student_year || linkedStudent?.year || '-';
-        const realDept = d.student_department || linkedStudent?.dept || '-';
-        const realRoom = d.student_room || linkedStudent?.room || '-';
+        const subExam = allExams.find(e => e.id === d.exam_id) || d.exam;
+        const subCourse = allCourses.find(c => c.id === subExam?.course_id) || subExam?.course;
 
+        const realStudentName = d.student_name || linkedStudent?.name || 'นักศึกษา';
+        const realYear = d.student_year || linkedStudent?.year || subExam?.target_year || '-';
+        const realRoom = d.student_room || linkedStudent?.room || subExam?.target_room || '-';
+        const realDept = d.student_department || linkedStudent?.dept || subExam?.target_department || '-';
+
+        const courseCode = subCourse?.course_code || subCourse?.code || '-';
+        const courseName = subCourse?.course_name || subCourse?.name || d.course_name || subExam?.course_name || '-';
+        const formattedDate = d.graded_at ? new Date(d.graded_at).toLocaleString('th-TH') : '-';
+
+        // 📋 โครงสร้างคอลัมน์ตรงตามที่กำหนดเป๊ะ 100%
         return {
-            'ลำดับ': index + 1,
-            'ชื่อ-นามสกุล': d.student_name || linkedStudent?.name || 'นักเรียน',
-            'รหัสนักเรียน': String(realStudentCode),
-            'ระดับชั้น/ปี': realYear,
-            'แผนกวิชา/สาขา': realDept,
-            'ห้องเรียน': realRoom,
-            'รายวิชา': d.course_name || d.exam?.course?.course_name || '-',
-            'ชุดข้อสอบ': d.exam_title || d.exam?.title || '-',
-            'คะแนนที่ได้': Number(d.total_score || 0),
-            'คะแนนเต็ม': Number(d.max_score || 0),
-            'ร้อยละ (%)': Number(d.percentage || 0),
-            'จำนวนสลับหน้าจอ (ครั้ง)': Number(d.total_tab_switches || 0),
-            'จำนวนออกจากเต็มจอ (ครั้ง)': Number(d.total_fullscreen_exits || 0),
-            'สถานะการตรวจ': d.is_flagged_cheating ? '⚠️ พบพฤติกรรมน่าสงสัย' : '✅ ผ่านการตรวจสอบ',
-            'สาเหตุที่ติดสถานะ': (d.cheating_reasons || []).join('; ') || '-',
-            'วันที่และเวลาที่ส่ง': new Date(d.graded_at).toLocaleString('th-TH')
+            'รหัสนักศึกษา': String(realStudentCode),
+            'ชื่อ นามสกุล': String(realStudentName),
+            'ชั้น': String(realYear),
+            'ห้อง': String(realRoom),
+            'แผนก': String(realDept),
+            'รหัสวิชา': String(courseCode),
+            'ชื่อวิชา': String(courseName),
+            'คะแนน': Number(d.total_score || 0),
+            'จำนวนครั้งที่สลับจอ': Number(d.total_tab_switches || 0),
+            'จำนวนการออกหน้าจอเต็ม': Number(d.total_fullscreen_exits || 0),
+            'วันที่และเวลาที่ส่ง': String(formattedDate)
         };
     });
 
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
+
+    // ปรับความกว้างคอลัมน์ให้อ่านง่าย สวยงาม
+    worksheet['!cols'] = [
+        { wch: 18 }, // รหัสนักศึกษา
+        { wch: 26 }, // ชื่อ นามสกุล
+        { wch: 12 }, // ชั้น
+        { wch: 10 }, // ห้อง
+        { wch: 24 }, // แผนก
+        { wch: 16 }, // รหัสวิชา
+        { wch: 32 }, // ชื่อวิชา
+        { wch: 10 }, // คะแนน
+        { wch: 22 }, // จำนวนครั้งที่สลับจอ
+        { wch: 24 }, // จำนวนการออกหน้าจอเต็ม
+        { wch: 22 }  // วันที่และเวลาที่ส่ง
+    ];
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'รายงานผลคะแนน');
 
