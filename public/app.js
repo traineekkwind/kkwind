@@ -3241,10 +3241,7 @@ async function loadTeacherSubmissions() {
             const [subsRes, stdRes, examsRes, coursesRes] = await Promise.all([
                 state.supabaseClient
                     .from('exam_results')
-                    .select(`
-                        *,
-                        exam:exams(title, max_tab_switches_allowed, target_year, target_department, target_room, teacher_id, teacher_name, course_id, course:courses(course_name, course_code))
-                    `)
+                    .select('*, exam:exams(title, duration_minutes, max_tab_switches_allowed, target_year, target_department, target_room, teacher_name, course_id)')
                     .order('graded_at', { ascending: false }),
                 state.supabaseClient
                     .from('students')
@@ -3477,10 +3474,7 @@ window.exportTeacherScoresToExcel = async function() {
             const [subsRes, stdRes, examsRes, coursesRes] = await Promise.all([
                 state.supabaseClient
                     .from('exam_results')
-                    .select(`
-                        *,
-                        exam:exams(title, duration_minutes, target_year, target_department, target_room, teacher_id, teacher_name, course_id, course:courses(course_code, course_name))
-                    `)
+                    .select('*, exam:exams(title, duration_minutes, max_tab_switches_allowed, target_year, target_department, target_room, teacher_name, course_id)')
                     .order('graded_at', { ascending: false }),
                 state.supabaseClient
                     .from('students')
