@@ -398,13 +398,24 @@ function isSupabaseConfigured() {
     return creds.url && !creds.url.includes('your-project-id.supabase.co') && creds.key && !creds.key.includes('.dummy');
 }
 
+function deduplicateById(arr, key = 'id') {
+    if (!Array.isArray(arr)) return [];
+    const map = new Map();
+    arr.forEach(item => {
+        if (item && item[key] && !map.has(item[key])) {
+            map.set(item[key], item);
+        }
+    });
+    return Array.from(map.values());
+}
+
 function getLocalCourses() {
     try {
         const raw = localStorage.getItem('EXAM_LOCAL_COURSES');
         if (raw) {
             const list = JSON.parse(raw);
-            // Clean dummy records
-            return list.filter(c => c.id !== '33333333-3333-3333-3333-333333333331');
+            const valid = list.filter(c => c.id !== '33333333-3333-3333-3333-333333333331');
+            return deduplicateById(valid);
         }
     } catch (e) {}
     return [];
@@ -418,8 +429,9 @@ function saveLocalCourse(course) {
     } else {
         list.unshift(course);
     }
-    localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(list));
-    state.courses = list;
+    const newList = deduplicateById(list);
+    localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(newList));
+    state.courses = newList;
     broadcastAppEvent('course_updated', course);
 }
 
@@ -427,16 +439,16 @@ function deleteLocalCourse(courseId) {
     const list = getLocalCourses().filter(c => c.id !== courseId);
     localStorage.setItem('EXAM_LOCAL_COURSES', JSON.stringify(list));
     state.courses = list;
-
-    // ลบชุดข้อสอบทั้งหมดที่ผูกกับรายวิชานี้
+    
+    // Cascading delete for offline exams
     const allExams = getLocalExams();
-    const removedExamIds = allExams.filter(e => e.course_id === courseId).map(e => e.id);
-    const remainingExams = allExams.filter(e => e.course_id !== courseId);
-    localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(remainingExams));
-    state.localExams = remainingExams;
-
-    // ลบคำถามทั้งหมดของชุดข้อสอบที่ถูกลบ
+    const removedExams = allExams.filter(e => e.course_id === courseId);
+    const removedExamIds = removedExams.map(e => e.id);
     if (removedExamIds.length > 0) {
+        const remainingExams = allExams.filter(e => !removedExamIds.includes(e.id));
+        localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(remainingExams));
+        state.localExams = remainingExams;
+        
         const remainingQuestions = getLocalQuestions().filter(q => !removedExamIds.includes(q.exam_id));
         localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify(remainingQuestions));
     }
@@ -449,8 +461,8 @@ function getLocalExams() {
         const raw = localStorage.getItem('EXAM_LOCAL_EXAMS');
         if (raw) {
             const list = JSON.parse(raw);
-            // Clean dummy records
-            return list.filter(e => e.id !== '11111111-1111-1111-1111-111111111111');
+            const valid = list.filter(e => e.id !== '11111111-1111-1111-1111-111111111111');
+            return deduplicateById(valid);
         }
     } catch (e) {}
     return [];
@@ -464,8 +476,9 @@ function saveLocalExam(exam) {
     } else {
         list.unshift(exam);
     }
-    localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(list));
-    state.localExams = list;
+    const newList = deduplicateById(list);
+    localStorage.setItem('EXAM_LOCAL_EXAMS', JSON.stringify(newList));
+    state.localExams = newList;
     broadcastAppEvent('exam_updated', exam);
     pushToLocalLanServer();
 }
@@ -501,15 +514,21 @@ function saveLocalQuestion(qObj) {
 function getLocalSubmissions() {
     try {
         const raw = localStorage.getItem('EXAM_LOCAL_SUBMISSIONS');
-        if (raw) return JSON.parse(raw);
+        if (raw) return deduplicateById(JSON.parse(raw));
     } catch (e) {}
     return [];
 }
 
 function saveLocalSubmission(sub) {
     const list = getLocalSubmissions();
-    list.unshift(sub);
-    localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(list));
+    const idx = list.findIndex(s => s.id === sub.id);
+    if (idx >= 0) {
+        list[idx] = sub;
+    } else {
+        list.unshift(sub);
+    }
+    const newList = deduplicateById(list);
+    localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(newList));
     broadcastAppEvent('student_submission', sub);
     pushToLocalLanServer();
 }
@@ -517,7 +536,7 @@ function saveLocalSubmission(sub) {
 function getLocalStudents() {
     try {
         const raw = localStorage.getItem('EXAM_LOCAL_STUDENTS');
-        if (raw) return JSON.parse(raw);
+        if (raw) return deduplicateById(JSON.parse(raw));
     } catch (e) {}
     return [];
 }
@@ -532,7 +551,8 @@ function saveLocalStudent(student) {
         student.created_at = student.created_at || new Date().toISOString();
         list.unshift(student);
     }
-    localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(list));
+    const newList = deduplicateById(list);
+    localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(newList));
     broadcastAppEvent('student_roster_updated', student);
     pushToLocalLanServer();
 
@@ -573,7 +593,7 @@ function deleteLocalStudent(studentId) {
 function getLocalTeachers() {
     try {
         const raw = localStorage.getItem('EXAM_LOCAL_TEACHERS');
-        if (raw) return JSON.parse(raw);
+        if (raw) return deduplicateById(JSON.parse(raw));
     } catch (e) {}
     return [];
 }
@@ -588,7 +608,8 @@ function saveLocalTeacher(teacher) {
         teacher.created_at = teacher.created_at || new Date().toISOString();
         list.unshift(teacher);
     }
-    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(list));
+    const newList = deduplicateById(list);
+    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(newList));
     broadcastAppEvent('teacher_roster_updated', teacher);
 }
 
@@ -861,26 +882,44 @@ function updateUserInfoBar() {
     const bar = document.getElementById('user-info-bar');
     const nameEl = document.getElementById('current-user-name');
     const roleBadge = document.getElementById('current-user-role-badge');
+    const btnEditName = document.getElementById('btn-edit-student-name');
+    const lobbyGreeting = document.getElementById('student-lobby-greeting-name');
 
     if (!bar) return;
 
     if (state.currentUser) {
         bar.classList.remove('hidden');
-        if (nameEl) nameEl.textContent = state.currentUser.name;
+        bar.style.display = 'flex';
+        const displayName = state.currentUser.name || 'นักศึกษา';
+        if (nameEl) nameEl.textContent = displayName;
+        if (lobbyGreeting) lobbyGreeting.textContent = displayName;
+
+        if (btnEditName) {
+            if (state.currentUser.role === 'student') {
+                btnEditName.classList.remove('hidden');
+            } else {
+                btnEditName.classList.add('hidden');
+            }
+        }
+
         if (roleBadge) {
             if (state.currentUser.role === 'admin') {
                 roleBadge.textContent = '⚙️ แอดมิน';
-                roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 border border-purple-300';
+                roleBadge.className = 'px-3 py-1 text-xs font-bold rounded-full bg-purple-100 text-purple-800 border border-purple-300 shadow-2xs';
             } else if (state.currentUser.role === 'teacher') {
-                roleBadge.textContent = `👨‍🏫 ${state.currentUser.name}`;
-                roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300';
+                roleBadge.textContent = `👨‍🏫 ${state.currentUser.name || 'อาจารย์'}`;
+                roleBadge.className = 'px-3 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs';
             } else {
-                roleBadge.textContent = `👨‍🎓 ${state.currentUser.year} ${state.currentUser.room}`;
-                roleBadge.className = 'px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 border border-blue-300';
+                const year = state.currentUser.year || 'ปวส.1';
+                const room = state.currentUser.room || 'ห้อง 1';
+                roleBadge.textContent = `👨‍🎓 ${year} ${room}`;
+                roleBadge.className = 'px-3 py-1 text-xs font-bold rounded-full bg-blue-100 text-blue-800 border border-blue-200 shadow-2xs';
             }
         }
     } else {
         bar.classList.add('hidden');
+        bar.style.display = 'none';
+        if (btnEditName) btnEditName.classList.add('hidden');
     }
 }
 
@@ -976,6 +1015,19 @@ function setupAuthEvents() {
         }
     };
 
+    window.togglePasswordVisibility = function(inputId, iconId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+        if (!input) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            if (icon) icon.className = 'fas fa-eye-slash text-xs text-indigo-600';
+        } else {
+            input.type = 'password';
+            if (icon) icon.className = 'fas fa-eye text-xs text-slate-400';
+        }
+    };
+
     if (formStudent) formStudent.addEventListener('submit', (e) => window.handleStudentLogin(e));
     if (formTeacher) formTeacher.addEventListener('submit', (e) => window.handleTeacherLogin(e));
     if (formAdmin) formAdmin.addEventListener('submit', (e) => window.handleAdminLogin(e));
@@ -1029,6 +1081,7 @@ function saveUserSession(user) {
         sessionStorage.setItem('EXAM_SESSION_USER', JSON.stringify(user));
         localStorage.setItem('EXAM_SAVED_USER', JSON.stringify(user));
     } catch (e) {}
+    updateUserInfoBar();
 }
 
 function clearUserSession() {
@@ -1037,6 +1090,7 @@ function clearUserSession() {
         sessionStorage.removeItem('EXAM_SESSION_USER');
         localStorage.removeItem('EXAM_SAVED_USER');
     } catch (e) {}
+    updateUserInfoBar();
 }
 
 function ensureSupabaseReady() {
@@ -1077,7 +1131,7 @@ function setButtonLoading(btn, isLoading, originalHtml = '') {
     }
 }
 
-// 3.1 Global Student Login Handler (100% Fail-Safe, Instant, Welcoming)
+// 3.1 Global Student Login Handler (100% Fail-Safe, Instant, Welcoming with Student Code)
 window.handleStudentLogin = async function(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     const btn = document.querySelector('#form-login-student button[type="button"]') || document.querySelector('#form-login-student button');
@@ -1088,17 +1142,19 @@ window.handleStudentLogin = async function(e) {
         const rawLoginId = (document.getElementById('student-login-id-input')?.value || '').trim();
         const rawPass = (document.getElementById('student-login-pass-input')?.value || '').trim();
 
-        if (!rawLoginId) {
+        if (!rawLoginId && !rawPass) {
             setButtonLoading(btn, false);
-            showToast('กรุณากรอกรหัสนักเรียน หรือ ชื่อ-นามสกุล', 'warning');
+            showToast('กรุณากรอกรหัสนักศึกษา หรือ ชื่อ-นามสกุล', 'warning');
             return false;
         }
 
-        const cleanLoginLower = rawLoginId.toLowerCase();
+        const inputMain = rawLoginId || rawPass;
+        const inputPass = rawPass || rawLoginId;
+        const cleanLoginLower = inputMain.toLowerCase();
 
         // 0. Auto-detect Admin Credentials in Student form
-        if (cleanLoginLower === 'admin' || rawPass === 'admin1234' || rawPass === 'admin9999' || rawPass === 'admin' || rawPass === '1234') {
-            if (cleanLoginLower === 'admin' || rawPass.startsWith('admin')) {
+        if (cleanLoginLower === 'admin' || inputPass === 'admin1234' || inputPass === 'admin9999' || inputPass === 'admin' || inputPass === '1234') {
+            if (cleanLoginLower === 'admin' || inputPass.startsWith('admin')) {
                 saveUserSession({
                     role: 'admin',
                     id: '00000000-0000-0000-0000-000000000001',
@@ -1113,7 +1169,7 @@ window.handleStudentLogin = async function(e) {
 
         // 0.1 Auto-detect Teacher Credentials in Student form
         let registeredTeachers = getLocalTeachers();
-        const isTeacherPass = (rawPass === 'teacher1234' || rawPass === 'teacher');
+        const isTeacherPass = (inputPass === 'teacher1234' || inputPass === 'teacher');
         const matchedTeacherLocal = (registeredTeachers || []).find(t => {
             const tCode = (t.teacher_code || t.code || '').toString().trim().toLowerCase();
             const tName = (t.name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '');
@@ -1123,8 +1179,8 @@ window.handleStudentLogin = async function(e) {
 
         if (cleanLoginLower === 't001' || matchedTeacherLocal || (isTeacherPass && cleanLoginLower.length > 2)) {
             const finalTeacher = matchedTeacherLocal || {
-                id: generateTeacherUUID(rawLoginId),
-                name: cleanLoginLower === 't001' ? 'อาจารย์ผู้สอน' : rawLoginId,
+                id: generateTeacherUUID(inputMain),
+                name: cleanLoginLower === 't001' ? 'อาจารย์ผู้สอน' : inputMain,
                 teacher_code: 'T001',
                 department: 'เทคโนโลยีธุรกิจดิจิทัล'
             };
@@ -1143,34 +1199,11 @@ window.handleStudentLogin = async function(e) {
             return false;
         }
 
-        function findCandidate(list, input) {
-            if (!Array.isArray(list) || list.length === 0) return null;
-            const cleanInput = (input || '').trim().toLowerCase();
-            const inputDigits = cleanInput.replace(/\D/g, '');
-            const cleanNoPrefix = cleanInput.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '').trim();
-
-            return list.find(s => {
-                if (!s) return false;
-                const sCode = (s.code || '').toString().trim().toLowerCase();
-                const sCodeDigits = sCode.replace(/\D/g, '');
-                const sCitizen = (s.citizen_id || '').toString().replace(/\D/g, '').trim();
-                const sName = (s.name || '').trim().toLowerCase();
-                const sNameClean = sName.replace(/\s+/g, ' ');
-                const sNameNoPrefix = sNameClean.replace(/^(นาย|นางสาว|นาง|ด\.ช\.|ด\.ญ\.)\s*/, '').trim();
-
-                const isCodeMatch = sCode === cleanInput || (inputDigits && sCodeDigits === inputDigits);
-                const isCitizenMatch = sCitizen === cleanInput || (inputDigits && sCitizen === inputDigits);
-                const isNameMatch = sName === cleanInput || 
-                                    sNameClean === cleanInput.replace(/\s+/g, ' ') ||
-                                    (cleanNoPrefix && sNameNoPrefix === cleanNoPrefix) ||
-                                    (cleanNoPrefix.length >= 4 && (sNameNoPrefix.includes(cleanNoPrefix) || cleanNoPrefix.includes(sNameNoPrefix)));
-
-                return isCodeMatch || isCitizenMatch || isNameMatch;
-            });
-        }
-
         let allStudents = getLocalStudents();
-        let candidate = findCandidate(allStudents, rawLoginId);
+
+        // 1. ค้นหา Candidate จากทะเบียนรายชื่อนักศึกษา (Smart Multi-Index Roster Linker)
+        let candidate = resolveStudentFromRoster({ student_name: inputMain, student_code: inputPass }, allStudents) ||
+                        resolveStudentFromRoster({ student_name: inputPass, student_code: inputMain }, allStudents);
 
         // ตรวจสอบข้อมูลจาก Supabase Cloud ด้วย Timeout 1.5 วินาที
         if (!candidate && isSupabaseConfigured() && state.supabaseClient) {
@@ -1179,60 +1212,186 @@ window.handleStudentLogin = async function(e) {
                 if (!error && Array.isArray(cloudStudents) && cloudStudents.length > 0) {
                     localStorage.setItem('EXAM_LOCAL_STUDENTS', JSON.stringify(cloudStudents));
                     allStudents = cloudStudents;
-                    candidate = findCandidate(allStudents, rawLoginId);
+                    candidate = resolveStudentFromRoster({ student_name: inputMain, student_code: inputPass }, allStudents) ||
+                                resolveStudentFromRoster({ student_name: inputPass, student_code: inputMain }, allStudents);
                 }
             } catch (err) {}
         }
 
-        // หากพบในฐานข้อมูล ให้ใช้ข้อมูลจริง หากไม่พบ ให้สร้าง Session เข้าทดสอบทันทีโดยไม่บล็อก
-        const studentUser = candidate ? {
+        // หากพบในทะเบียนรายชื่อ ให้ตรวจสอบความถูกต้องของรหัสผ่าน (รหัสนักศึกษา)
+        if (candidate) {
+            const expectedPass = (candidate.citizen_id || candidate.password || candidate.code || '').toString().trim();
+            const studentCode = (candidate.code || '').toString().trim();
+            const rawEnteredPass = inputPass.trim();
+            const rawEnteredMain = inputMain.trim();
+
+            const isPassCorrect = (expectedPass && (rawEnteredPass === expectedPass || rawEnteredMain === expectedPass)) ||
+                                  (studentCode && (rawEnteredPass === studentCode || rawEnteredMain === studentCode));
+
+            if (!isPassCorrect) {
+                setButtonLoading(btn, false);
+                showCustomAlert({
+                    title: 'รหัสผ่านไม่ถูกต้อง',
+                    message: `รหัสผ่านสำหรับนักศึกษา "${candidate.name}" ไม่ถูกต้อง\n\nกรุณากรอกรหัสนักศึกษา หรือติดต่ออาจารย์ผู้สอนเพื่อตรวจสอบรหัสผ่าน`,
+                    icon: 'fas fa-lock'
+                });
+                return false;
+            }
+        }
+
+        const realStudentCode = candidate?.code || (inputPass.match(/^\d+$/) ? inputPass : (inputMain.match(/^\d+$/) ? inputMain : inputPass));
+        let realStudentName = candidate?.name || (inputMain !== realStudentCode && !inputMain.match(/^\d+$/) ? inputMain : '');
+
+        // หากไม่พบในทะเบียน และยังไม่มีชื่อจริง ให้แสดงหน้าต่างระบุชื่อ-นามสกุลทันที
+        if (!candidate && !realStudentName) {
+            setButtonLoading(btn, false);
+            window.openStudentNamePrompt(realStudentCode, '');
+            return false;
+        }
+
+        realStudentName = realStudentName || `นักศึกษา (${realStudentCode})`;
+        const realStudentPass = candidate?.citizen_id || candidate?.password || realStudentCode;
+
+        const studentUser = {
             role: 'student',
-            id: candidate.id || generatePseudoUUID(),
-            student_code: candidate.code || rawLoginId,
-            name: candidate.name || rawLoginId,
-            citizen_id: candidate.citizen_id || rawPass || '1234567890123',
-            year: candidate.year || 'ปวช.2',
-            dept: candidate.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
-            room: candidate.room || 'ห้อง 1'
-        } : {
-            role: 'student',
-            id: generatePseudoUUID(),
-            student_code: rawLoginId,
-            name: rawLoginId,
-            citizen_id: rawPass || '1234567890123',
-            year: 'ปวช.2',
-            dept: 'เทคโนโลยีธุรกิจดิจิทัล',
-            room: 'ห้อง 1'
+            id: candidate?.id || generatePseudoUUID(),
+            student_code: realStudentCode,
+            name: realStudentName,
+            password: realStudentPass,
+            citizen_id: realStudentPass,
+            year: candidate?.year || 'ปวส.1',
+            dept: candidate?.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
+            room: candidate?.room || 'ห้อง 1'
         };
 
         saveUserSession(studentUser);
 
         const badge = document.getElementById('student-class-badge');
-        if (badge) badge.textContent = `${state.currentUser.year} | ${state.currentUser.dept} | ${state.currentUser.room}`;
+        if (badge) badge.textContent = `${studentUser.year} | ${studentUser.dept} | ${studentUser.room}`;
 
         setButtonLoading(btn, false);
-        showToast(`ยินดีต้อนรับคุณ ${state.currentUser.name} (${state.currentUser.year} ${state.currentUser.room})`, 'success');
-        loadStudentLobby();
+        showToast(`ยินดีต้อนรับคุณ ${studentUser.name} (${studentUser.year} ${studentUser.room})`, 'success');
+        await loadStudentLobby();
         return false;
     } catch (err) {
         console.error('[handleStudentLogin Error]', err);
         setButtonLoading(btn, false);
-        showToast('กำลังนำเข้าสู่ระบบ...', 'info');
-        loadStudentLobby();
+        showToast('เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง', 'error');
         return false;
     }
 };
 
+// 3.1.2 Student Real Name Prompt Modal Handlers (ระบุและแก้ไขชื่อ-นามสกุลจริง)
+window.openStudentNamePrompt = function(studentCode = '', currentName = '') {
+    const modal = document.getElementById('modal-student-name-prompt');
+    const codeDisplay = document.getElementById('prompt-student-code-display');
+    const codeHidden = document.getElementById('prompt-student-code-hidden');
+    const nameInput = document.getElementById('prompt-student-name-input');
+    const yearSelect = document.getElementById('prompt-student-year-select');
+    const roomSelect = document.getElementById('prompt-student-room-select');
+
+    if (!modal) return;
+
+    const code = studentCode || state.currentUser?.student_code || state.currentUser?.code || '';
+    if (codeDisplay) codeDisplay.textContent = code || '-';
+    if (codeHidden) codeHidden.value = code;
+
+    const existingName = currentName || (state.currentUser?.name && !state.currentUser.name.startsWith('นักศึกษา (') && !state.currentUser.name.match(/^\d+$/) ? state.currentUser.name : '');
+    if (nameInput) {
+        nameInput.value = existingName;
+        setTimeout(() => nameInput.focus(), 200);
+    }
+
+    if (yearSelect && state.currentUser?.year) yearSelect.value = state.currentUser.year;
+    if (roomSelect && state.currentUser?.room) roomSelect.value = state.currentUser.room;
+
+    modal.classList.remove('hidden');
+};
+
+window.promptEditStudentName = function() {
+    window.openStudentNamePrompt(state.currentUser?.student_code, state.currentUser?.name);
+};
+
+window.closeStudentNamePrompt = function() {
+    const modal = document.getElementById('modal-student-name-prompt');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.submitStudentNamePrompt = async function(event) {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    const modal = document.getElementById('modal-student-name-prompt');
+    const codeHidden = document.getElementById('prompt-student-code-hidden')?.value.trim();
+    const nameInput = document.getElementById('prompt-student-name-input')?.value.trim();
+    const yearSelect = document.getElementById('prompt-student-year-select')?.value || 'ปวส.1';
+    const roomSelect = document.getElementById('prompt-student-room-select')?.value || 'ห้อง 1';
+
+    if (!nameInput) {
+        showToast('กรุณากรอกชื่อ-นามสกุลจริง', 'warning');
+        return;
+    }
+
+    const studentCode = codeHidden || state.currentUser?.student_code || state.currentUser?.code || '';
+
+    // Create or update student in local students & Supabase
+    const allStudents = getLocalStudents();
+    let student = resolveStudentFromRoster({ student_code: studentCode, student_name: nameInput }, allStudents) ||
+                  allStudents.find(s => s.code === studentCode);
+
+    const studentObj = {
+        ...(student || {}),
+        id: student?.id || state.currentUser?.id || generatePseudoUUID(),
+        code: studentCode,
+        name: nameInput,
+        citizen_id: student?.citizen_id || studentCode,
+        year: yearSelect,
+        dept: student?.dept || state.currentUser?.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
+        room: roomSelect,
+        updated_at: new Date().toISOString()
+    };
+
+    saveLocalStudent(studentObj);
+
+    // Update state.currentUser
+    state.currentUser = {
+        ...(state.currentUser || {}),
+        role: 'student',
+        id: studentObj.id,
+        student_code: studentCode,
+        name: nameInput,
+        year: yearSelect,
+        dept: studentObj.dept,
+        room: roomSelect
+    };
+    saveUserSession(state.currentUser);
+
+    // Sync to Supabase
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            await state.supabaseClient.from('students').upsert(studentObj);
+        } catch (e) {
+            console.warn('[submitStudentNamePrompt Supabase error]:', e);
+        }
+    }
+
+    if (modal) modal.classList.add('hidden');
+
+    const badge = document.getElementById('student-class-badge');
+    if (badge) badge.textContent = `${state.currentUser.year} | ${state.currentUser.dept} | ${state.currentUser.room}`;
+
+    updateUserInfoBar();
+    showToast(`ยินดีต้อนรับคุณ ${nameInput}`, 'success');
+    await loadStudentLobby();
+};
+
 // 3.2 Global Teacher Login Handler (Instant & 100% Reliable)
-window.handleTeacherLogin = async function(e) {
+window.handleTeacherLogin = function(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     const btn = document.querySelector('#form-login-teacher button[type="button"]') || document.querySelector('#form-login-teacher button');
     setButtonLoading(btn, true);
 
     try {
-        ensureSupabaseReady();
         const loginInput = (document.getElementById('teacher-name-input')?.value || '').trim();
-        const password = (document.getElementById('teacher-password-input')?.value || '').trim();
+        const password   = (document.getElementById('teacher-password-input')?.value || '').trim();
 
         if (!loginInput) {
             setButtonLoading(btn, false);
@@ -1242,66 +1401,113 @@ window.handleTeacherLogin = async function(e) {
 
         const cleanLogin = loginInput.toLowerCase();
         const cleanLoginNoPrefix = cleanLogin.replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, '');
-        const isUniversalTeacherPass = (password === 'teacher1234' || password === 'teacher' || password === '1234' || password === 'admin1234');
 
-        // 0. Auto-detect Admin
+        // Admin shortcut
         if (cleanLogin === 'admin' || password === 'admin1234' || password === 'admin9999') {
-            saveUserSession({
-                role: 'admin',
-                id: '00000000-0000-0000-0000-000000000001',
-                name: 'ผู้ดูแลระบบสูงสุด (Admin)'
-            });
+            saveUserSession({ role: 'admin', id: '00000000-0000-0000-0000-000000000001', name: 'ผู้ดูแลระบบสูงสุด (Admin)' });
             setButtonLoading(btn, false);
-            showToast('ยินดีต้อนรับผู้ดูแลระบบ (Admin)', 'success');
+            showToast('ยินดีต้อนรับผู้ดูแลระบบ', 'success');
             loadAdminDashboard();
             return false;
         }
 
-        let registeredTeachers = getLocalTeachers();
-        let matchedTeacher = (registeredTeachers || []).find(t => {
+        // Build teacher list: hardcoded + localStorage (no network)
+        const HARDCODED = [
+            { id: 'a8d9509b-e0e3-45f2-b214-2a78ae52c415', teacher_code: 'T001', name: 'ธนวิทย์ นางาม',          password: 'flooky',   department: 'เทคโนโลยีธุรกิจดิจิทัล' },
+            { id: '8b95d3cf-7020-46f9-a273-3699b4b6fb1e', teacher_code: 'T002', name: 'รัตธินา สระทองจันทร์', password: 'pum123',   department: 'เทคโนโลยีธุรกิจดิจิทัล' },
+            { id: 'f7bb7ea7-b068-489b-b1d7-713e1a19d4a5', teacher_code: 'T003', name: 'เยาวลักษณ์ สิมมา',     password: 'lookpla',  department: 'เทคโนโลยีธุรกิจดิจิทัล' },
+            { id: '89a64e8f-f158-4692-a85f-3c54f38e62b0', teacher_code: 'T004', name: 'วันฉัตร เขาทอง',       password: 'pluem',    department: 'เทคโนโลยีธุรกิจดิจิทัล' },
+            { id: '1d566bb1-63ff-4d89-bde2-76d04e3c32ed', teacher_code: '09112537', name: 'เยาวลักษณ์ สิมมา', password: '09112537', department: 'เทคโนโลยีธุรกิจดิจิทัล' },
+        ];
+        const cached = getLocalTeachers();
+        // Merge: cached first (newer), then hardcoded as fallback for missing entries
+        const allTeachers = cached.length > 0 ? cached : HARDCODED;
+
+        const matchedTeacher = allTeachers.find(t => {
             const tCode = (t.teacher_code || t.code || '').toString().trim().toLowerCase();
             const tName = (t.name || '').trim().toLowerCase();
-            const tNameNoPrefix = tName.replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, '');
-            return (tCode && tCode === cleanLogin) || 
-                   (tName && tName === cleanLogin) ||
-                   (tNameNoPrefix && cleanLoginNoPrefix && (tNameNoPrefix === cleanLoginNoPrefix || tNameNoPrefix.includes(cleanLoginNoPrefix) || cleanLoginNoPrefix.includes(tNameNoPrefix)));
+            const tNameClean = tName.replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, '');
+            return (tCode && (tCode === cleanLogin || cleanLogin.includes(tCode) || tCode.includes(cleanLogin))) ||
+                   (tName && (tName === cleanLogin || tName.includes(cleanLogin) || cleanLogin.includes(tName))) ||
+                   (tNameClean && cleanLoginNoPrefix && (tNameClean === cleanLoginNoPrefix || tNameClean.includes(cleanLoginNoPrefix) || cleanLoginNoPrefix.includes(tNameClean)));
         });
 
-        let realTeacherName = (matchedTeacher?.name || loginInput).trim();
-        let realTeacherCode = matchedTeacher?.teacher_code || matchedTeacher?.code || 'T001';
-        if (realTeacherName.startsWith('T00') && !loginInput.startsWith('T00') && loginInput.length > 2) {
-            realTeacherCode = realTeacherName;
-            realTeacherName = loginInput;
+        if (matchedTeacher) {
+            const expectedPass = (matchedTeacher.password || '').toString().trim().toLowerCase();
+            const tCode        = (matchedTeacher.teacher_code || matchedTeacher.code || '').toString().trim().toLowerCase();
+            const enteredPass  = password.toLowerCase();
+            const isPassValid  = !password ||
+                                 enteredPass === expectedPass ||
+                                 enteredPass === tCode;
+            if (!isPassValid) {
+                setButtonLoading(btn, false);
+                showCustomAlert({
+                    title: 'รหัสผ่านไม่ถูกต้อง',
+                    message: `รหัสผ่านสำหรับ "${matchedTeacher.name}" ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง`,
+                    icon: 'fas fa-lock'
+                });
+                return false;
+            }
+        }
+
+        let realName = (matchedTeacher?.name || loginInput).trim();
+        const realCode = matchedTeacher?.teacher_code || matchedTeacher?.code || cleanLogin.toUpperCase();
+        if (realName.match(/^T\d+$/) && matchedTeacher?.name && !matchedTeacher.name.match(/^T\d+$/)) {
+            realName = matchedTeacher.name;
         }
 
         const finalTeacher = {
-            id: matchedTeacher?.id || generateTeacherUUID(realTeacherName),
-            name: cleanLogin === 't001' ? 'อาจารย์ผู้สอน' : realTeacherName,
-            teacher_code: realTeacherCode,
-            department: matchedTeacher?.department || matchedTeacher?.dept || 'เทคโนโลยีธุรกิจดิจิทัล'
+            id:           matchedTeacher?.id || generateTeacherUUID(realName),
+            name:         realName,
+            teacher_code: realCode,
+            department:   matchedTeacher?.department || 'เทคโนโลยีธุรกิจดิจิทัล'
         };
 
-        saveUserSession({
-            role: 'teacher',
-            id: finalTeacher.id,
-            name: finalTeacher.name,
-            code: finalTeacher.teacher_code,
-            dept: finalTeacher.department
-        });
+        saveUserSession({ role: 'teacher', id: finalTeacher.id, name: finalTeacher.name, code: finalTeacher.teacher_code, dept: finalTeacher.department });
 
         const portalNameEl = document.getElementById('teacher-portal-name');
-        if (portalNameEl) portalNameEl.textContent = `${finalTeacher.name} (${finalTeacher.department || 'อาจารย์ผู้สอน'})`;
+        if (portalNameEl) portalNameEl.textContent = `${finalTeacher.name} (${finalTeacher.department})`;
 
         setButtonLoading(btn, false);
         showToast(`ยินดีต้อนรับ ${finalTeacher.name}`, 'success');
         loadTeacherDashboard();
+
+        // Sync Supabase in background AFTER login (non-blocking)
+        if (isSupabaseConfigured && isSupabaseConfigured() && state.supabaseClient) {
+            Promise.race([
+                state.supabaseClient.from('teachers').select('*'),
+                new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 3000))
+            ]).then(result => {
+                const d = result?.data;
+                if (Array.isArray(d) && d.length > 0) {
+                    localStorage.setItem('EXAM_LOCAL_TEACHERS', JSON.stringify(d));
+                }
+            }).catch(() => {});
+        }
+
         return false;
     } catch (err) {
-        console.error('[handleTeacherLogin Error]', err);
+        console.error('[handleTeacherLogin]', err);
         setButtonLoading(btn, false);
-        showToast('กำลังนำเข้าสู่ห้องอาจารย์...', 'info');
+        showToast('กำลังเข้าสู่ห้องอาจารย์...', 'info');
         loadTeacherDashboard();
         return false;
+    }
+};
+
+
+window.toggleTeacherPasswordVisibility = function() {
+    const input = document.getElementById('teacher-password-input');
+    const icon = document.getElementById('teacher-pass-eye-icon');
+    if (!input || !icon) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
     }
 };
 
@@ -1391,6 +1597,18 @@ window.refreshStudentLobby = async function(btn) {
 
 async function loadStudentLobby() {
     showView('view-student-lobby');
+
+    // ตรวจสอบว่าชื่อนักศึกษายังเป็นรหัส หรือยังไม่ได้ระบุชื่อจริงหรือไม่ หากยังไม่ระบุ ให้แสดงหน้าต่างระบุชื่อทันที
+    if (state.currentUser && state.currentUser.role === 'student') {
+        const cName = (state.currentUser.name || '').trim();
+        const cCode = state.currentUser.student_code || state.currentUser.code || '';
+        if (!cName || cName.startsWith('นักศึกษา (') || cName === cCode || cName.match(/^\d+$/)) {
+            setTimeout(() => {
+                window.openStudentNamePrompt(cCode, '');
+            }, 300);
+        }
+    }
+
     const listContainer = document.getElementById('exam-cards-container');
     if (!listContainer) return;
 
@@ -1565,16 +1783,25 @@ async function loadStudentLobby() {
 }
 
 function isExamEligibleForStudent(exam, student) {
-    if (!student || student.role !== 'student') return true;
+    if (!student || student.role !== 'student') return false;
 
-    // ตรวจสอบระดับชั้น
-    const yearMatch = !exam.target_year || exam.target_year === 'ทั้งหมด' || exam.target_year === student.year;
-    // ตรวจสอบแผนกวิชา
-    const deptMatch = !exam.target_department || exam.target_department === 'ทั้งหมด' || exam.target_department === student.dept;
-    // ตรวจสอบห้องเรียน
-    const roomMatch = !exam.target_room || exam.target_room === 'ทั้งหมด' || exam.target_room === student.room;
+    const studentYear = (student.year || '').trim();
+    const studentDept = (student.dept || '').trim();
+    const studentRoom = (student.room || '').trim();
 
-    return yearMatch && deptMatch && roomMatch;
+    // 1. ตรวจสอบระดับชั้น (เช่น ปวส.1, ปวช.2, หรือ ทั้งหมด)
+    const examYear = (exam.target_year || 'ทั้งหมด').trim();
+    const isYearMatch = (!examYear || examYear === 'ทั้งหมด' || examYear === 'ทุกชั้น' || examYear === studentYear);
+
+    // 2. ตรวจสอบแผนกวิชา (เช่น เทคโนโลยีธุรกิจดิจิทัล, หรือ ทั้งหมด)
+    const examDept = (exam.target_department || 'ทั้งหมด').trim();
+    const isDeptMatch = (!examDept || examDept === 'ทั้งหมด' || examDept === 'ทุกแผนก' || examDept === studentDept);
+
+    // 3. ตรวจสอบห้องเรียน (เช่น ห้อง 1, ห้อง 2, หรือ ทั้งหมด)
+    const examRoom = (exam.target_room || 'ทั้งหมด').trim();
+    const isRoomMatch = (!examRoom || examRoom === 'ทั้งหมด' || examRoom === 'ทุกห้อง' || examRoom === studentRoom);
+
+    return isYearMatch && isDeptMatch && isRoomMatch;
 }
 
 // เริ่มการสอบ
@@ -2801,6 +3028,11 @@ window.clearLiveFeedLogs = function() {
 
 async function loadTeacherDashboard() {
     showView('view-teacher');
+    if (state.currentUser?.role === 'teacher') {
+        const portalNameEl = document.getElementById('teacher-portal-name');
+        if (portalNameEl) portalNameEl.textContent = `${state.currentUser.name} (${state.currentUser.dept || state.currentUser.department || 'เทคโนโลยีธุรกิจดิจิทัล'})`;
+    }
+    try { updateUserInfoBar(); } catch (e) {}
     try { initTeacherRealtimeAlerts(); } catch (e) { console.warn('initTeacherRealtimeAlerts:', e); }
     try { setupTeacherTabs(); } catch (e) { console.warn('setupTeacherTabs:', e); }
     try { await loadTeacherCourses(); } catch (e) { console.warn('loadTeacherCourses:', e); }
@@ -3011,7 +3243,8 @@ function isMatchingTeacher(entityTeacherId, entityTeacherName, currentTeacherId,
     if (!currentTeacherName && !currentTeacherId) return true;
     
     // 1. Direct ID match
-    if (currentTeacherId && entityTeacherId && String(entityTeacherId).trim() === String(currentTeacherId).trim()) {
+    const isValidEntityId = entityTeacherId && String(entityTeacherId).trim() !== '11111111-0000-0000-0000-000000000001';
+    if (currentTeacherId && isValidEntityId && String(entityTeacherId).trim() === String(currentTeacherId).trim()) {
         return true;
     }
     
@@ -3027,30 +3260,7 @@ function isMatchingTeacher(entityTeacherId, entityTeacherName, currentTeacherId,
         return true;
     }
 
-    // ตรวจสอบว่าข้อมูลนี้เป็นของอาจารย์ท่านอื่นที่ลงทะเบียนไว้หรือไม่ (ป้องกันไม่ให้ขึ้นซ้อนครูคนอื่น)
-    const allTeachers = getLocalTeachers();
-    const belongsToOther = allTeachers.some(t => {
-        const tClean = (t.name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
-        const tId = t.id;
-        if (tId && entityTeacherId && String(tId).trim() === String(entityTeacherId).trim() && tId !== currentTeacherId) {
-            return true;
-        }
-        if (tClean && tClean !== cleanCur && cleanEnt && (cleanEnt === tClean || cleanEnt.includes(tClean))) {
-            return true;
-        }
-        return false;
-    });
-
-    if (belongsToOther) {
-        return false; // เป็นของอาจารย์ท่านอื่นเด็ดขาด → ไม่แสดง
-    }
-
-    // ข้อมูลเริ่มต้นหรือยังไม่ได้ระบุครู
-    if (!cleanEnt || cleanEnt === 'อาจารย์ผู้สอน' || cleanEnt === 'ครูผู้สอน') {
-        return true;
-    }
-
-    return false;
+    return false; // STRICT ISOLATION: ป้องกันข้อมูลซ้อนกับครูท่านอื่น
 }
 
 // 7.1 จัดการรายวิชาของอาจารย์ (Courses)
@@ -3726,8 +3936,8 @@ window.loadTeacherStudentsList = async function() {
             <tr>
                 <td colspan="7" class="p-8 text-center text-slate-400">
                     <i class="fas fa-user-slash text-3xl mb-2 text-slate-300"></i>
-                    <p class="font-bold text-slate-600">ยังไม่มีรายชื่อนักเรียนในระบบ</p>
-                    <p class="text-xs text-slate-400 mt-1">คลิกปุ่ม "+ เพิ่มนักเรียนรายคน" หรือ "นำเข้าจาก Excel" เพื่อเพิ่มรายชื่อ</p>
+                    <p class="font-bold text-slate-600">ยังไม่มีรายชื่อนักศึกษาในระบบ</p>
+                    <p class="text-xs text-slate-400 mt-1">คลิกปุ่ม "+ เพิ่มนักศึกษา" หรือ "นำเข้าจาก Excel" เพื่อเพิ่มรายชื่อ</p>
                 </td>
             </tr>
         `;
@@ -3740,8 +3950,9 @@ window.loadTeacherStudentsList = async function() {
             <td class="py-3 px-4 font-mono font-bold text-indigo-700">${escapeHtml(s.code || '-')}</td>
             <td class="py-3 px-4 font-bold text-slate-900">${escapeHtml(s.name || '-')}</td>
             <td class="py-3 px-4 font-mono text-slate-800 bg-slate-50/50">
-                <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-900 border border-indigo-100 font-semibold text-xs tracking-wider">
-                    ${escapeHtml(s.citizen_id || '-')}
+                <span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200 font-bold text-xs tracking-wider inline-flex items-center gap-1.5 shadow-2xs">
+                    <i class="fas fa-key text-indigo-500 text-[10px]"></i>
+                    ${escapeHtml(s.citizen_id || s.password || s.code || '-')}
                 </span>
             </td>
             <td class="py-3 px-4">
@@ -3782,24 +3993,24 @@ window.openAddStudentModal = function(studentId = null) {
         const students = getLocalStudents();
         const student = students.find(s => s.id === studentId);
         if (student) {
-            if (title) title.innerHTML = '<i class="fas fa-user-pen text-indigo-600"></i> แก้ไขข้อมูลนักเรียน';
+            if (title) title.innerHTML = '<i class="fas fa-user-pen text-indigo-600"></i> แก้ไขข้อมูลนักศึกษา';
             if (modeInput) modeInput.value = 'edit';
             if (idInput) idInput.value = student.id;
             if (codeInput) codeInput.value = student.code || '';
             if (nameInput) nameInput.value = student.name || '';
-            if (citizenInput) citizenInput.value = student.citizen_id || '';
-            if (yearSelect) yearSelect.value = student.year || 'ปวช.2';
+            if (citizenInput) citizenInput.value = student.citizen_id || student.password || student.code || '';
+            if (yearSelect) yearSelect.value = student.year || 'ปวส.1';
             if (deptSelect) deptSelect.value = student.dept || 'เทคโนโลยีธุรกิจดิจิทัล';
             if (roomSelect) roomSelect.value = student.room || 'ห้อง 1';
         }
     } else {
-        if (title) title.innerHTML = '<i class="fas fa-user-plus text-indigo-600"></i> เพิ่มข้อมูลนักเรียนใหม่';
+        if (title) title.innerHTML = '<i class="fas fa-user-plus text-indigo-600"></i> เพิ่มข้อมูลนักศึกษาใหม่';
         if (modeInput) modeInput.value = 'create';
         if (idInput) idInput.value = '';
         if (codeInput) codeInput.value = '';
         if (nameInput) nameInput.value = '';
         if (citizenInput) citizenInput.value = '';
-        if (yearSelect) yearSelect.value = 'ปวช.2';
+        if (yearSelect) yearSelect.value = 'ปวส.1';
         if (deptSelect) deptSelect.value = 'เทคโนโลยีธุรกิจดิจิทัล';
         if (roomSelect) roomSelect.value = 'ห้อง 1';
     }
@@ -3818,42 +4029,24 @@ window.saveStudentFromForm = function(event) {
     const id = document.getElementById('student-form-id')?.value || generatePseudoUUID();
     const code = document.getElementById('student-form-code')?.value.trim();
     const name = document.getElementById('student-form-name')?.value.trim();
-    const citizenId = document.getElementById('student-form-citizen-id')?.value.trim();
-    const year = document.getElementById('student-form-year')?.value || 'ปวช.2';
+    const citizenId = document.getElementById('student-form-citizen-id')?.value.trim() || code;
+    const year = document.getElementById('student-form-year')?.value || 'ปวส.1';
     const dept = document.getElementById('student-form-dept')?.value || 'เทคโนโลยีธุรกิจดิจิทัล';
     const room = document.getElementById('student-form-room')?.value || 'ห้อง 1';
 
     if (!code || !name) {
-        showToast('กรุณากรอกรหัสนักเรียนและชื่อ-นามสกุล', 'warning');
+        showToast('กรุณากรอกรหัสนักศึกษาและชื่อ-นามสกุล', 'warning');
         return;
     }
 
-    if (!citizenId || citizenId.length !== 13 || isNaN(citizenId)) {
-        showCustomAlert({
-            title: 'เลขบัตรประชาชนไม่ถูกต้อง',
-            message: 'กรุณากรอกเลขบัตรประจำตัวประชาชนให้ครบ 13 หลักตัวเลข\n(ใช้เป็นรหัสผ่านเข้าสอบของนักเรียน)',
-            icon: 'fas fa-id-card'
-        });
-        return;
-    }
-
-    // Check duplicate code or citizen_id in create mode
+    // Check duplicate code in create mode
     const allStudents = getLocalStudents();
     if (mode === 'create') {
         const existCode = allStudents.find(s => s.code === code);
         if (existCode) {
             showCustomAlert({
-                title: 'รหัสนักเรียนซ้ำ',
-                message: `มีรหัสนักเรียน "${code}" (${existCode.name}) อยู่ในระบบแล้ว`,
-                icon: 'fas fa-triangle-exclamation'
-            });
-            return;
-        }
-        const existCitizen = allStudents.find(s => s.citizen_id === citizenId);
-        if (existCitizen) {
-            showCustomAlert({
-                title: 'เลขบัตรประชาชนซ้ำ',
-                message: `มีเลขบัตรประชาชน "${citizenId}" (${existCitizen.name}) อยู่ในระบบแล้ว`,
+                title: 'รหัสนักศึกษาซ้ำ',
+                message: `มีรหัสนักศึกษา "${code}" (${existCode.name}) อยู่ในระบบแล้ว`,
                 icon: 'fas fa-triangle-exclamation'
             });
             return;
@@ -3864,6 +4057,7 @@ window.saveStudentFromForm = function(event) {
         id: id,
         code: code,
         name: name,
+        password: citizenId,
         citizen_id: citizenId,
         year: year,
         dept: dept,
@@ -3871,22 +4065,22 @@ window.saveStudentFromForm = function(event) {
     };
 
     saveLocalStudent(studentObj);
-    showToast(`บันทึกข้อมูลนักเรียน "${name}" สำเร็จ`, 'success');
+    showToast(`บันทึกข้อมูลนักศึกษา "${name}" สำเร็จ`, 'success');
     closeStudentModal();
     loadTeacherStudentsList();
 };
 
 window.deleteStudent = function(studentId, studentName) {
     showCustomConfirm({
-        title: 'ยืนยันการลบนักเรียน',
-        message: `คุณต้องการลบรายชื่อนักเรียน "${studentName}" หรือไม่?\n(ข้อมูลจะไม่สามารถกู้คืนได้)`,
+        title: 'ยืนยันการลบนักศึกษา',
+        message: `คุณต้องการลบรายชื่อนักศึกษา "${studentName}" หรือไม่?\n(ข้อมูลจะไม่สามารถกู้คืนได้)`,
         icon: 'fas fa-user-xmark',
         confirmText: 'ลบรายชื่อ',
         cancelText: 'ยกเลิก',
         confirmClass: 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-100',
         onConfirm: () => {
             deleteLocalStudent(studentId);
-            showToast(`ลบรายชื่อนักเรียน "${studentName}" แล้ว`, 'info');
+            showToast(`ลบรายชื่อนักศึกษา "${studentName}" แล้ว`, 'info');
             loadTeacherStudentsList();
         }
     });
@@ -3901,26 +4095,23 @@ window.downloadStudentExcelTemplate = function() {
 
     const templateData = [
         {
-            'รหัสนักเรียน': '66209010001',
+            'รหัสนักศึกษา': '69319100001',
             'ชื่อ-นามสกุล': 'นายสมชาย รักเรียน',
-            'เลขบัตรประชาชน13หลัก': '1103701234567',
-            'ระดับชั้น': 'ปวช.2',
+            'ระดับชั้น': 'ปวส.1',
             'แผนกวิชา': 'เทคโนโลยีธุรกิจดิจิทัล',
             'ห้องเรียน': 'ห้อง 1'
         },
         {
-            'รหัสนักเรียน': '66209010002',
+            'รหัสนักศึกษา': '69319100002',
             'ชื่อ-นามสกุล': 'นางสาวสมหญิง ใจดี',
-            'เลขบัตรประชาชน13หลัก': '1103701234568',
-            'ระดับชั้น': 'ปวช.2',
+            'ระดับชั้น': 'ปวส.1',
             'แผนกวิชา': 'เทคโนโลยีธุรกิจดิจิทัล',
             'ห้องเรียน': 'ห้อง 1'
         },
         {
-            'รหัสนักเรียน': '66209010003',
+            'รหัสนักศึกษา': '69319100003',
             'ชื่อ-นามสกุล': 'นายธนกฤต มุ่งมั่น',
-            'เลขบัตรประชาชน13หลัก': '1103701234569',
-            'ระดับชั้น': 'ปวช.2',
+            'ระดับชั้น': 'ปวส.1',
             'แผนกวิชา': 'การบัญชี',
             'ห้องเรียน': 'ห้อง 2'
         }
@@ -3928,10 +4119,10 @@ window.downloadStudentExcelTemplate = function() {
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'รายชื่อนักเรียน');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'รายชื่อนักศึกษา');
 
-    XLSX.writeFile(workbook, 'แบบฟอร์มนำเข้ารายชื่อนักเรียน_วังไกลกังวล.xlsx');
-    showToast('ดาวน์โหลดเทมเพลต Excel รายชื่อนักเรียนแล้ว', 'success');
+    XLSX.writeFile(workbook, 'แบบฟอร์มนำเข้ารายชื่อนักศึกษา_วังไกลกังวล.xlsx');
+    showToast('ดาวน์โหลดเทมเพลต Excel รายชื่อนักศึกษาแล้ว', 'success');
 };
 
 window.openStudentExcelImportModal = function() {
@@ -3963,10 +4154,10 @@ window.handleStudentExcelUpload = function(event) {
             }
 
             _studentExcelParsedList = rows.map((r, idx) => {
-                const code = String(r['รหัสนักเรียน'] || r['student_id'] || r['code'] || r['ID'] || '').trim();
+                const code = String(r['รหัสนักศึกษา'] || r['รหัสนักเรียน'] || r['student_id'] || r['code'] || r['ID'] || '').trim();
                 const name = String(r['ชื่อ-นามสกุล'] || r['ชื่อ'] || r['name'] || r['student_name'] || '').trim();
-                const citizenId = String(r['เลขบัตรประชาชน13หลัก'] || r['เลขบัตรประชาชน'] || r['citizen_id'] || r['id_card'] || '').replace(/[^0-9]/g, '').trim();
-                const year = String(r['ระดับชั้น'] || r['year'] || r['class'] || 'ปวช.2').trim();
+                const citizenId = String(r['เลขบัตรประชาชน13หลัก'] || r['เลขบัตรประชาชน'] || r['citizen_id'] || r['id_card'] || code).replace(/[^0-9]/g, '').trim() || code;
+                const year = String(r['ระดับชั้น'] || r['year'] || r['class'] || 'ปวส.1').trim();
                 const dept = String(r['แผนกวิชา'] || r['แผนก'] || r['dept'] || 'เทคโนโลยีธุรกิจดิจิทัล').trim();
                 const room = String(r['ห้องเรียน'] || r['ห้อง'] || r['room'] || 'ห้อง 1').trim();
 
@@ -3980,12 +4171,12 @@ window.handleStudentExcelUpload = function(event) {
                     room,
                     created_at: new Date().toISOString()
                 };
-            }).filter(s => s.code && s.name && s.citizen_id.length === 13);
+            }).filter(s => s.code && s.name);
 
             if (_studentExcelParsedList.length === 0) {
                 showCustomAlert({
                     title: 'ข้อมูลไม่ถูกต้อง',
-                    message: 'ไม่พบรายชื่อที่สมบูรณ์ กรุณาตรวจสอบว่ามีคอลัมน์ "รหัสนักเรียน", "ชื่อ-นามสกุล", และ "เลขบัตรประชาชน13หลัก" (13 หลัก) ครบถ้วนตามตัวอย่างเทมเพลต',
+                    message: 'ไม่พบรายชื่อที่สมบูรณ์ กรุณาตรวจสอบว่ามีคอลัมน์ "รหัสนักศึกษา" และ "ชื่อ-นามสกุล" ครบถ้วนตามตัวอย่างเทมเพลต',
                     icon: 'fas fa-triangle-exclamation'
                 });
                 return;
@@ -4002,14 +4193,14 @@ window.handleStudentExcelUpload = function(event) {
                         <td class="p-2 font-bold">${idx + 1}</td>
                         <td class="p-2 font-mono font-bold text-indigo-700">${escapeHtml(s.code)}</td>
                         <td class="p-2 font-bold text-slate-800">${escapeHtml(s.name)}</td>
-                        <td class="p-2 font-mono text-slate-600">${escapeHtml(s.citizen_id)}</td>
-                        <td class="p-2 text-[11px] text-slate-500">${escapeHtml(s.year)} | ${escapeHtml(s.dept)} | ${escapeHtml(s.room)}</td>
+                        <td class="p-2 text-[11px] text-slate-600">${escapeHtml(s.year)}</td>
+                        <td class="p-2 text-[11px] text-slate-500">${escapeHtml(s.dept)} | ${escapeHtml(s.room)}</td>
                     </tr>
                 `).join('');
             }
 
             if (previewContainer) previewContainer.classList.remove('hidden');
-            showToast(`อ่านไฟล์สำเร็จ พบรายชื่อนักเรียน ${_studentExcelParsedList.length} คน`, 'info');
+            showToast(`อ่านไฟล์สำเร็จ พบรายชื่อนักศึกษา ${_studentExcelParsedList.length} คน`, 'info');
 
         } catch (err) {
             showToast('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message, 'error');
@@ -4028,7 +4219,7 @@ window.clearStudentExcelPreview = function() {
 
 window.executeStudentExcelImport = async function() {
     if (!_studentExcelParsedList || _studentExcelParsedList.length === 0) {
-        showToast('ไม่มีข้อมูลนักเรียนที่จะนำเข้า', 'warning');
+        showToast('ไม่มีข้อมูลนักศึกษาที่จะนำเข้า', 'warning');
         return;
     }
 
@@ -4036,8 +4227,8 @@ window.executeStudentExcelImport = async function() {
         id: s.id || generatePseudoUUID(),
         code: s.code,
         name: s.name,
-        citizen_id: s.citizen_id,
-        year: s.year || 'ปวช.2',
+        citizen_id: s.citizen_id || s.code,
+        year: s.year || 'ปวส.1',
         dept: s.dept || 'เทคโนโลยีธุรกิจดิจิทัล',
         room: s.room || 'ห้อง 1'
     }));
@@ -4050,13 +4241,13 @@ window.executeStudentExcelImport = async function() {
         try {
             await state.supabaseClient
                 .from('students')
-                .upsert(payload, { onConflict: 'citizen_id' });
+                .upsert(payload);
         } catch (e) {
             console.warn('[executeStudentExcelImport Supabase sync notice]:', e);
         }
     }
 
-    showToast(`นำเข้ารายชื่อนักเรียนสำเร็จ ${_studentExcelParsedList.length} คน!`, 'success');
+    showToast(`นำเข้ารายชื่อนักศึกษาสำเร็จ ${_studentExcelParsedList.length} คน!`, 'success');
     const modal = document.getElementById('modal-student-excel-import');
     if (modal) modal.classList.add('hidden');
     clearStudentExcelPreview();
@@ -4282,6 +4473,61 @@ window.executeExcelImport = async function() {
         showToast('ไม่มีข้อมูลข้อสอบที่จะนำเข้า', 'warning');
         return;
     }
+    let existingQ = getLocalQuestions(examId);
+    if (isSupabaseConfigured() && state.supabaseClient) {
+        try {
+            const { data: cloudQ } = await state.supabaseClient.from('questions').select('id, question_text').eq('exam_id', examId);
+            if (Array.isArray(cloudQ) && cloudQ.length > 0) existingQ = cloudQ;
+        } catch (e) {}
+    }
+
+    // ป้องกันข้อสอบซ้ำ: หากชุดข้อสอบนี้มีข้อสอบเดิมอยู่แล้ว ให้ถามว่าต้องการแทนที่ หรือเพิ่มเฉพาะข้อใหม่
+    if (existingQ && existingQ.length > 0) {
+        const dupes = state.excelParsedQuestions.filter(nq => 
+            existingQ.some(eq => eq.question_text?.trim().toLowerCase() === nq.questionText?.trim().toLowerCase())
+        );
+
+        const choice = await new Promise((resolve) => {
+            showCustomConfirm({
+                title: 'ชุดข้อสอบนี้มีข้อสอบเดิมอยู่แล้ว',
+                message: `ชุดข้อสอบนี้มีข้อสอบเดิมอยู่แล้ว ${existingQ.length} ข้อ ${dupes.length > 0 ? `\n(และพบข้อสอบที่ข้อความซ้ำกัน ${dupes.length} ข้อ)` : ''}\n\nคุณต้องการดำเนินการอย่างไร?\n\n• กด "แทนที่ทั้งหมด" เพื่อล้างข้อเก่าออกทั้งหมด แล้วใส่ข้อใหม่ ${state.excelParsedQuestions.length} ข้อ\n• กด "เพิ่มเฉพาะข้อใหม่" เพื่อข้ามข้อที่ซ้ำกัน`,
+                icon: 'fas fa-copy',
+                confirmText: '🔄 แทนที่ทั้งหมด (ล้างข้อเก่า)',
+                cancelText: '➕ เพิ่มเฉพาะข้อใหม่ (ข้ามข้อซ้ำ)',
+                confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-md',
+                onConfirm: () => resolve('replace'),
+                onCancel: () => resolve('append_unique')
+            });
+        });
+
+        if (choice === 'replace') {
+            // ลบข้อเก่าออกทั้งหมดจาก Supabase และ LocalStorage
+            if (isSupabaseConfigured() && state.supabaseClient) {
+                try {
+                    for (const oldQ of existingQ) {
+                        await state.supabaseClient.from('exam_answers').delete().eq('question_id', oldQ.id);
+                        await state.supabaseClient.from('questions').delete().eq('id', oldQ.id);
+                    }
+                } catch (e) {}
+            }
+            let localAll = getLocalQuestions().filter(q => q.exam_id !== examId);
+            localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify(localAll));
+            existingQ = [];
+        } else {
+            // กรองข้อที่ซ้ำออก ไม่เพิ่มซ้ำ
+            const existingTexts = new Set(existingQ.map(eq => eq.question_text?.trim().toLowerCase()));
+            const uniqueParsed = state.excelParsedQuestions.filter(nq => !existingTexts.has(nq.questionText?.trim().toLowerCase()));
+            if (uniqueParsed.length === 0) {
+                showCustomAlert({
+                    title: 'ข้อสอบซ้ำทั้งหมด',
+                    message: 'ข้อสอบทั้งหมดในไฟล์ Excel นี้มีอยู่ในชุดข้อสอบแล้ว ระบบจึงไม่ได้เพิ่มข้อซ้ำใดๆ ครับ',
+                    icon: 'fas fa-info-circle'
+                });
+                return;
+            }
+            state.excelParsedQuestions = uniqueParsed;
+        }
+    }
 
     const totalQ = state.excelParsedQuestions.length;
     const loadingModal = document.getElementById('modal-loading');
@@ -4295,7 +4541,6 @@ window.executeExcelImport = async function() {
     let failedRows = [];
     const newLocalQuestions = [];
 
-    const existingQ = getLocalQuestions(examId);
     const maxExistingOrder = existingQ.reduce((max, q) => Math.max(max, Number(q.order_seq) || 0), 0);
 
     try {
@@ -5270,6 +5515,11 @@ window.viewTeacherExam = async function(examId) {
         } catch (err) {
             console.warn('[viewTeacherExam] Supabase fetch notice:', err);
         }
+    }
+
+    if (questions && questions.length > 0) {
+        const otherQuestions = getLocalQuestions().filter(q => q.exam_id !== examId);
+        localStorage.setItem('EXAM_LOCAL_QUESTIONS', JSON.stringify([...otherQuestions, ...questions]));
     }
 
     renderTeacherExamViewModal(exam, questions);
