@@ -3802,6 +3802,27 @@ window.exportTeacherScoresToExcel = async function() {
         });
     }
 
+    // เรียงลำดับตามเลขประจำตัว (Student Code) จากน้อยไปมาก
+    filtered.sort((a, b) => {
+        const linkedA = resolveStudentFromRoster(a, localStudents);
+        const linkedB = resolveStudentFromRoster(b, localStudents);
+        
+        let codeA = a.student_code || linkedA?.code || '';
+        if (!codeA || String(codeA).includes('-') || codeA === 'undefined') {
+            codeA = linkedA?.code || (a.student_id && !String(a.student_id).includes('-') ? a.student_id : (linkedA?.citizen_id || ''));
+        }
+        
+        let codeB = b.student_code || linkedB?.code || '';
+        if (!codeB || String(codeB).includes('-') || codeB === 'undefined') {
+            codeB = linkedB?.code || (b.student_id && !String(b.student_id).includes('-') ? b.student_id : (linkedB?.citizen_id || ''));
+        }
+        
+        codeA = String(codeA).trim().toLowerCase();
+        codeB = String(codeB).trim().toLowerCase();
+        
+        return codeA.localeCompare(codeB, 'th', { numeric: true });
+    });
+
     const excelRows = filtered.map((d, index) => {
         // 🔗 เชื่อมโยงรหัสและข้อมูลนักเรียนจากทะเบียนรายชื่อแบบอัจฉริยะ
         const linkedStudent = resolveStudentFromRoster(d, localStudents);
