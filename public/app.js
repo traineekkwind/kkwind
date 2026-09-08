@@ -3552,6 +3552,15 @@ async function loadTeacherSubmissions() {
         });
     }
 
+    // เรียงลำดับตามเลขประจำตัว (Student Code) จากน้อยไปมาก
+    filtered.sort((a, b) => {
+        const linkedA = resolveStudentFromRoster(a, localStudents);
+        const linkedB = resolveStudentFromRoster(b, localStudents);
+        const codeA = String(a.student_code || linkedA?.code || a.student_id || '').trim().toLowerCase();
+        const codeB = String(b.student_code || linkedB?.code || b.student_id || '').trim().toLowerCase();
+        return codeA.localeCompare(codeB, 'th', { numeric: true });
+    });
+
     if (!filtered || filtered.length === 0) {
         tableBody.innerHTML = `
             <tr>
