@@ -3929,6 +3929,13 @@ window.loadTeacherStudentsList = async function() {
         );
     }
 
+    // เรียงลำดับจากน้อยไปมากตามรหัสนักศึกษา (Ascending by Code)
+    students.sort((a, b) => {
+        const codeA = String(a.code || '').trim().toLowerCase();
+        const codeB = String(b.code || '').trim().toLowerCase();
+        return codeA.localeCompare(codeB, 'th', { numeric: true });
+    });
+
     if (badgeCount) badgeCount.textContent = `${students.length} คน`;
 
     if (students.length === 0) {
@@ -5039,13 +5046,6 @@ async function loadTeacherExamsList() {
                         <button onclick="toggleExamActive('${exam.id}')" class="px-3.5 py-2 ${isActive ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'} rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs" title="คลิกสลับเปิดหรือปิดสอบ">
                             <i class="fas ${isActive ? 'fa-toggle-on text-emerald-600 text-sm' : 'fa-toggle-off text-slate-400 text-sm'}"></i>
                             <span>${isActive ? 'ขอปิดสอบ' : 'เปิดสอบ'}</span>
-                        </button>
-
-                        <button onclick="openAddQuestionForExam('${exam.id}')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium transition flex items-center gap-1.5 shadow-xs">
-                            <i class="fas fa-plus"></i> เพิ่มโจทย์
-                        </button>
-                        <button onclick="openExcelImportForExam('${exam.id}')" class="px-3 py-2 btn-excel rounded-xl text-xs font-medium transition flex items-center gap-1.5 shadow-xs">
-                            <i class="fas fa-file-excel"></i> นำเข้า Excel
                         </button>
                         <button onclick="deleteExam('${exam.id}', '${escapeHtml(exam.title)}')" class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-medium transition flex items-center gap-1.5" title="ลบชุดข้อสอบ">
                             <i class="fas fa-trash-can"></i> ลบ
