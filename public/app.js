@@ -17,6 +17,7 @@ function isValidUUID(str) {
 
 // Global App State
 const state = {
+    teacherSubSortMode: 'code',
     currentAddQuestionImage: null,
     supabaseClient: null,
     currentUser: null, // { role, id, name, year, dept, room }
@@ -3552,26 +3553,44 @@ async function loadTeacherSubmissions() {
         });
     }
 
-    // เรียงลำดับตามเลขประจำตัว (Student Code) จากน้อยไปมาก
-    filtered.sort((a, b) => {
-        const linkedA = resolveStudentFromRoster(a, localStudents);
-        const linkedB = resolveStudentFromRoster(b, localStudents);
+    if (state.teacherSubSortMode === 'time') {
+        filtered.sort((a, b) => new Date(b.graded_at || 0) - new Date(a.graded_at || 0));
         
-        let codeA = a.student_code || linkedA?.code || '';
-        if (!codeA || String(codeA).includes('-') || codeA === 'undefined') {
-            codeA = linkedA?.code || (a.student_id && !String(a.student_id).includes('-') ? a.student_id : (linkedA?.citizen_id || ''));
+        const btnSort = document.getElementById('btn-sort-submissions');
+        if (btnSort) {
+            btnSort.innerHTML = '<i class="fas fa-clock"></i>';
+            btnSort.title = 'เรียงตาม: เวลาส่งล่าสุด';
+            btnSort.className = 'px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-xs font-bold transition whitespace-nowrap';
         }
+    } else {
+        // เรียงลำดับตามเลขประจำตัว (Student Code) จากน้อยไปมาก
+        filtered.sort((a, b) => {
+            const linkedA = resolveStudentFromRoster(a, localStudents);
+            const linkedB = resolveStudentFromRoster(b, localStudents);
+            
+            let codeA = a.student_code || linkedA?.code || '';
+            if (!codeA || String(codeA).includes('-') || codeA === 'undefined') {
+                codeA = linkedA?.code || (a.student_id && !String(a.student_id).includes('-') ? a.student_id : (linkedA?.citizen_id || ''));
+            }
+            
+            let codeB = b.student_code || linkedB?.code || '';
+            if (!codeB || String(codeB).includes('-') || codeB === 'undefined') {
+                codeB = linkedB?.code || (b.student_id && !String(b.student_id).includes('-') ? b.student_id : (linkedB?.citizen_id || ''));
+            }
+            
+            codeA = String(codeA).trim().toLowerCase();
+            codeB = String(codeB).trim().toLowerCase();
+            
+            return codeA.localeCompare(codeB, 'th', { numeric: true });
+        });
         
-        let codeB = b.student_code || linkedB?.code || '';
-        if (!codeB || String(codeB).includes('-') || codeB === 'undefined') {
-            codeB = linkedB?.code || (b.student_id && !String(b.student_id).includes('-') ? b.student_id : (linkedB?.citizen_id || ''));
+        const btnSort = document.getElementById('btn-sort-submissions');
+        if (btnSort) {
+            btnSort.innerHTML = '<i class="fas fa-arrow-down-1-9"></i>';
+            btnSort.title = 'เรียงตาม: รหัสนักศึกษา';
+            btnSort.className = 'px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition whitespace-nowrap';
         }
-        
-        codeA = String(codeA).trim().toLowerCase();
-        codeB = String(codeB).trim().toLowerCase();
-        
-        return codeA.localeCompare(codeB, 'th', { numeric: true });
-    });
+    }
 
     if (!filtered || filtered.length === 0) {
         tableBody.innerHTML = `
@@ -3672,6 +3691,11 @@ async function loadTeacherSubmissions() {
         `;
     }).join('');
 }
+
+window.toggleTeacherSubmissionSort = function() {
+    state.teacherSubSortMode = state.teacherSubSortMode === 'time' ? 'code' : 'time';
+    loadTeacherSubmissions();
+};
 
 window.resetTeacherSubmissionFilters = function() {
     const searchInput = document.getElementById('teacher-sub-filter-search');

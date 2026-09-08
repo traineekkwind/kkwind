@@ -543,7 +543,7 @@
                                 </select>
                             </div>
 
-                            <!-- 5. เลือกห้องเรียน & ปุ่มรีเซ็ต -->
+                                <!-- 5. เลือกห้องเรียน & ปุ่มรีเซ็ต -->
                             <div class="flex items-center gap-1.5">
                                 <select id="teacher-sub-filter-room" onchange="loadTeacherSubmissions()" class="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
                                     <option value="ทั้งหมด">ห้อง: ทั้งหมด</option>
@@ -553,6 +553,9 @@
                                     <option value="ห้อง 4">ห้อง 4</option>
                                     <option value="ห้อง 5">ห้อง 5</option>
                                 </select>
+                                <button type="button" onclick="toggleTeacherSubmissionSort()" id="btn-sort-submissions" class="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition whitespace-nowrap" title="เรียงตาม: รหัสนักศึกษา">
+                                    <i class="fas fa-arrow-down-1-9"></i>
+                                </button>
                                 <button type="button" onclick="resetTeacherSubmissionFilters()" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition whitespace-nowrap" title="ล้างตัวกรองทั้งหมด">
                                     <i class="fas fa-rotate-left"></i>
                                 </button>
@@ -1763,7 +1766,7 @@
     </div>
 
     <!-- Application Main Script -->
-    <script src="./public/app.js?v=2.8.51"></script>
+    <script src="./public/app.js?v=2.8.52"></script>
 </body>
 </html>
 
