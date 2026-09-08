@@ -3556,8 +3556,20 @@ async function loadTeacherSubmissions() {
     filtered.sort((a, b) => {
         const linkedA = resolveStudentFromRoster(a, localStudents);
         const linkedB = resolveStudentFromRoster(b, localStudents);
-        const codeA = String(a.student_code || linkedA?.code || a.student_id || '').trim().toLowerCase();
-        const codeB = String(b.student_code || linkedB?.code || b.student_id || '').trim().toLowerCase();
+        
+        let codeA = a.student_code || linkedA?.code || '';
+        if (!codeA || String(codeA).includes('-') || codeA === 'undefined') {
+            codeA = linkedA?.code || (a.student_id && !String(a.student_id).includes('-') ? a.student_id : (linkedA?.citizen_id || ''));
+        }
+        
+        let codeB = b.student_code || linkedB?.code || '';
+        if (!codeB || String(codeB).includes('-') || codeB === 'undefined') {
+            codeB = linkedB?.code || (b.student_id && !String(b.student_id).includes('-') ? b.student_id : (linkedB?.citizen_id || ''));
+        }
+        
+        codeA = String(codeA).trim().toLowerCase();
+        codeB = String(codeB).trim().toLowerCase();
+        
         return codeA.localeCompare(codeB, 'th', { numeric: true });
     });
 
