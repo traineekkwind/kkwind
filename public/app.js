@@ -1243,10 +1243,14 @@ window.handleStudentLogin = async function(e) {
         const realStudentCode = candidate?.code || (inputPass.match(/^\d+$/) ? inputPass : (inputMain.match(/^\d+$/) ? inputMain : inputPass));
         let realStudentName = candidate?.name || (inputMain !== realStudentCode && !inputMain.match(/^\d+$/) ? inputMain : '');
 
-        // หากไม่พบในทะเบียน และยังไม่มีชื่อจริง ให้แสดงหน้าต่างระบุชื่อ-นามสกุลทันที
-        if (!candidate && !realStudentName) {
+        // หากไม่พบในทะเบียน ให้แจ้งเตือน ไม่ให้สมัครใหม่ตามที่ผู้ใช้ร้องขอ
+        if (!candidate) {
             setButtonLoading(btn, false);
-            window.openStudentNamePrompt(realStudentCode, '');
+            showCustomAlert({
+                title: 'ไม่พบข้อมูลนักศึกษา',
+                message: 'ไม่พบชื่อ หรือรหัสนักศึกษานี้ในระบบ\n\nกรุณาตรวจสอบความถูกต้อง หรือติดต่ออาจารย์ผู้สอน',
+                icon: 'fas fa-user-xmark'
+            });
             return false;
         }
 
