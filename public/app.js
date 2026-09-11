@@ -1404,7 +1404,7 @@ window.handleTeacherLogin = function(e) {
         const cleanLoginNoPrefix = cleanLogin.replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, '');
 
         // Admin shortcut
-        if (cleanLogin === 'admin' || password === 'admin1234' || password === 'admin9999') {
+        if (password === 'Kkwind@Admin2024') {
             saveUserSession({ role: 'admin', id: '00000000-0000-0000-0000-000000000001', name: 'ผู้ดูแลระบบสูงสุด (Admin)' });
             setButtonLoading(btn, false);
             showToast('ยินดีต้อนรับผู้ดูแลระบบ', 'success');
@@ -1521,7 +1521,7 @@ window.handleAdminLogin = function(e) {
     try {
         const password = (document.getElementById('admin-password-input')?.value || '').trim();
 
-        if (!password || ['admin9999', 'admin1234', 'admin', '1234', '9999', 'admin123'].includes(password.toLowerCase())) {
+        if (password === 'Kkwind@Admin2024') {
             saveUserSession({
                 role: 'admin',
                 id: '00000000-0000-0000-0000-000000000001',
@@ -1533,7 +1533,7 @@ window.handleAdminLogin = function(e) {
             return false;
         } else {
             setButtonLoading(btn, false);
-            showToast('รหัสผ่านแอดมินไม่ถูกต้อง (รหัสเริ่มต้น: admin1234)', 'warning');
+            showToast('รหัสผ่านแอดมินไม่ถูกต้อง', 'error');
             return false;
         }
     } catch (err) {
