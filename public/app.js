@@ -2218,11 +2218,12 @@ function startAntiCheatMonitor() {
         const hasDocFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
 
         if (isHidden || !hasDocFocus) {
-            if (!focusLostStartTime) {
+            if (focusLostStartTime === 0) {
                 focusLostStartTime = Date.now();
-            } else if (Date.now() - focusLostStartTime >= 300) {
+            } else if (focusLostStartTime > 0 && Date.now() - focusLostStartTime >= 300) {
                 // หลุดโฟกัสเกิน 300ms (กำลังแตะหรือแชทใน Messenger Bubble หรือแถบแจ้งเตือน)
                 registerTabSwitch('ตรวจพบการเปิดหน้าต่างแชทลอย (Messenger Bubble) / แถบแจ้งเตือน / สลับโฟกัสออกจากข้อสอบ');
+                focusLostStartTime = -1; // ป้องกันการนับซ้ำแบบรัวๆ จนกว่าจะโฟกัสกลับมา
             }
         } else {
             focusLostStartTime = 0;
@@ -2303,17 +2304,11 @@ function handleDocumentFocusOut(e) {
 
 function handleDocumentFocusIn() {
     if (!state.antiCheat.isMonitoring) return;
-    if (focusLostStartTime && Date.now() - focusLostStartTime >= 350) {
-        registerTabSwitch('ตรวจพบการกลับเข้าสู่ห้องสอบหลังสลับโฟกัส');
-    }
     focusLostStartTime = 0;
 }
 
 function handleWindowFocus() {
     if (!state.antiCheat.isMonitoring) return;
-    if (focusLostStartTime && Date.now() - focusLostStartTime >= 350) {
-        registerTabSwitch('ตรวจพบการสลับกลับมาจากหน้าต่างอื่น / แชทลอย');
-    }
     focusLostStartTime = 0;
 }
 
