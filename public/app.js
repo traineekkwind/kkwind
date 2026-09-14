@@ -2895,20 +2895,23 @@ function handleIncomingCheatingAlert(data) {
         const exams = getLocalExams();
         const targetExam = exams.find(e => e.id === data.exam_id || e.title === data.exam_title);
         
-        if (targetExam) {
-            const currentTeacherId = state.currentUser.id;
-            const currentTeacherName = (state.currentUser.name || '').trim();
-            const isOwner = isMatchingTeacher(targetExam.teacher_id, targetExam.teacher_name, currentTeacherId, currentTeacherName);
-            
-            // ตรวจสอบกับรายวิชาด้วย เผื่อข้อสอบผูกกับรายวิชาของอาจารย์
-            const allCourses = getLocalCourses();
-            const myCourseIds = allCourses.filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName)).map(c => c.id);
-            const isCourseOwner = targetExam.course_id && myCourseIds.includes(targetExam.course_id);
+        if (!targetExam) {
+            console.log('[Cheating Alert ignored - Exam not found in local cache (likely belongs to another teacher)]');
+            return;
+        }
 
-            if (!isOwner && !isCourseOwner) {
-                console.log('[Cheating Alert ignored - Exam belongs to another teacher]');
-                return; // ข้ามการแจ้งเตือนนี้
-            }
+        const currentTeacherId = state.currentUser.id;
+        const currentTeacherName = (state.currentUser.name || '').trim();
+        const isOwner = isMatchingTeacher(targetExam.teacher_id, targetExam.teacher_name, currentTeacherId, currentTeacherName);
+        
+        // ตรวจสอบกับรายวิชาด้วย เผื่อข้อสอบผูกกับรายวิชาของอาจารย์
+        const allCourses = getLocalCourses();
+        const myCourseIds = allCourses.filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName)).map(c => c.id);
+        const isCourseOwner = targetExam.course_id && myCourseIds.includes(targetExam.course_id);
+
+        if (!isOwner && !isCourseOwner) {
+            console.log('[Cheating Alert ignored - Exam belongs to another teacher]');
+            return; // ข้ามการแจ้งเตือนนี้
         }
     }
 
