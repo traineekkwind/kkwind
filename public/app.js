@@ -2890,6 +2890,28 @@ function handleIncomingCheatingAlert(data) {
         return;
     }
 
+    // กรองการแจ้งเตือน: ถ้าเป็นครู (ไม่ใช่แอดมิน) จะดูได้เฉพาะแจ้งเตือนสำหรับชุดข้อสอบตัวเองเท่านั้น
+    if (state.currentUser?.role === 'teacher') {
+        const exams = getLocalExams();
+        const targetExam = exams.find(e => e.id === data.exam_id || e.title === data.exam_title);
+        
+        if (targetExam) {
+            const currentTeacherId = state.currentUser.id;
+            const currentTeacherName = (state.currentUser.name || '').trim();
+            const isOwner = isMatchingTeacher(targetExam.teacher_id, targetExam.teacher_name, currentTeacherId, currentTeacherName);
+            
+            // ตรวจสอบกับรายวิชาด้วย เผื่อข้อสอบผูกกับรายวิชาของอาจารย์
+            const allCourses = getLocalCourses();
+            const myCourseIds = allCourses.filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName)).map(c => c.id);
+            const isCourseOwner = targetExam.course_id && myCourseIds.includes(targetExam.course_id);
+
+            if (!isOwner && !isCourseOwner) {
+                console.log('[Cheating Alert ignored - Exam belongs to another teacher]');
+                return; // ข้ามการแจ้งเตือนนี้
+            }
+        }
+    }
+
     const studentName = data.student_name || 'นักเรียน';
     const studentYear = data.student_year || 'ปวช./ปวส.';
     const studentDept = data.student_department || 'ไม่ระบุแผนก';
