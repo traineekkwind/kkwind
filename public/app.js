@@ -2288,9 +2288,6 @@ function handlePageHide() {
 
 function handlePageShow() {
     if (!state.antiCheat.isMonitoring) return;
-    if (focusLostStartTime && Date.now() - focusLostStartTime >= 300) {
-        registerTabSwitch('ตรวจพบการกลับเข้าสู่ห้องสอบหลังสลับไปแอปอื่น');
-    }
     focusLostStartTime = 0;
 }
 
@@ -2361,9 +2358,10 @@ function preventSelectStart(e) {
 function registerTabSwitch(reason) {
     if (!state.antiCheat.isMonitoring) return;
     const now = Date.now();
-    // Debounce 600ms เพื่อป้องกัน event ซ้ำซ้อนตอนสลับหน้าต่างพร้อมกัน
+    // Debounce 600ms เพื่อป้องกัน event ซ้ำซ้อนตอนสลับหน้าต่างกัน
     if (now - lastCheatWarningTime < 600) return;
     lastCheatWarningTime = now;
+    focusLostStartTime = -1; // ป้องกัน watchdog ทำงานซ้ำเมื่อกลับมา
 
     state.antiCheat.tabSwitches++;
     triggerCheatWarning(reason);
@@ -2898,13 +2896,8 @@ function handleIncomingCheatingAlert(data) {
         const currentTeacherId = state.currentUser.id;
         const currentTeacherName = (state.currentUser.name || '').trim();
         const isOwner = isMatchingTeacher(targetExam.teacher_id, targetExam.teacher_name, currentTeacherId, currentTeacherName);
-        
-        // ตรวจสอบกับรายวิชาด้วย เผื่อข้อสอบผูกกับรายวิชาของอาจารย์
-        const allCourses = getLocalCourses();
-        const myCourseIds = allCourses.filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName)).map(c => c.id);
-        const isCourseOwner = targetExam.course_id && myCourseIds.includes(targetExam.course_id);
 
-        if (!isOwner && !isCourseOwner) {
+        if (!isOwner) {
             console.log('[Cheating Alert ignored - Exam belongs to another teacher]');
             return; // ข้ามการแจ้งเตือนนี้
         }
@@ -3414,7 +3407,6 @@ function getTeacherIsolatedExams() {
     const myCourseIds = myCourses.map(c => c.id);
 
     return allExams.filter(e => 
-        (e.course_id && myCourseIds.includes(e.course_id)) ||
         isMatchingTeacher(e.teacher_id, e.teacher_name, currentTeacherId, currentTeacherName)
     );
 }
@@ -3427,14 +3419,10 @@ function filterTeacherIsolatedSubmissions(subs) {
     const currentTeacherName = (state.currentUser?.name || '').trim();
     const myExams = getTeacherIsolatedExams();
     const myExamIds = myExams.map(e => e.id);
-    const myCourseIds = (getLocalCourses() || [])
-        .filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName))
-        .map(c => c.id);
 
     return (subs || []).filter(sub => {
         if (sub.exam_id && myExamIds.includes(sub.exam_id)) return true;
         if (sub.exam) {
-            if (sub.exam.course_id && myCourseIds.includes(sub.exam.course_id)) return true;
             if (isMatchingTeacher(sub.exam.teacher_id, sub.exam.teacher_name, currentTeacherId, currentTeacherName)) return true;
         }
         return false;
@@ -5016,7 +5004,6 @@ async function loadTeacherExamsList() {
         const currentTeacherId = state.currentUser.id;
         const currentTeacherName = (state.currentUser.name || '').trim();
         exams = exams.filter(e => 
-            (e.course_id && myCourseIds.includes(e.course_id)) ||
             isMatchingTeacher(e.teacher_id, e.teacher_name, currentTeacherId, currentTeacherName)
         );
     }
@@ -6060,11 +6047,10 @@ window.populateTeacherExamSelects = async function(showToastFeedback = false) {
 
     // 🔒 Teacher Isolation: แสดงเฉพาะชุดข้อสอบของตนเอง
     if (state.currentUser?.role === 'teacher') {
-        const myCourseIds = (state.courses || []).map(c => c.id);
-        const currentTeacherName = (state.currentUser.name || '').trim().toLowerCase();
+        const currentTeacherId = state.currentUser.id;
+        const currentTeacherName = (state.currentUser.name || '').trim();
         exams = exams.filter(e => 
-            (e.teacher_name && e.teacher_name.trim().toLowerCase() === currentTeacherName) ||
-            (e.course_id && myCourseIds.includes(e.course_id))
+            isMatchingTeacher(e.teacher_id, e.teacher_name, currentTeacherId, currentTeacherName)
         );
     }
 
