@@ -2895,7 +2895,10 @@ function handleIncomingCheatingAlert(data) {
 
         const currentTeacherId = state.currentUser.id;
         const currentTeacherName = (state.currentUser.name || '').trim();
-        const isOwner = isMatchingTeacher(targetExam.teacher_id, targetExam.teacher_name, currentTeacherId, currentTeacherName);
+        const allCourses = getLocalCourses();
+        const myCourseIds = allCourses.filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName)).map(c => c.id);
+        
+        const isOwner = isExamOwnedByTeacher(targetExam, currentTeacherId, currentTeacherName, myCourseIds);
 
         if (!isOwner) {
             console.log('[Cheating Alert ignored - Exam belongs to another teacher]');
@@ -3281,6 +3284,25 @@ function isMatchingTeacher(entityTeacherId, entityTeacherName, currentTeacherId,
     return false; // STRICT ISOLATION: ป้องกันข้อมูลซ้อนกับครูท่านอื่น
 }
 
+function isExamOwnedByTeacher(e, currentTeacherId, currentTeacherName, myCourseIds) {
+    if (isMatchingTeacher(e.teacher_id, e.teacher_name, currentTeacherId, currentTeacherName)) {
+        return true;
+    }
+
+    if (e.course_id && myCourseIds && myCourseIds.includes(e.course_id)) {
+        const cleanCur = (currentTeacherName || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
+        const cleanEnt = (e.teacher_name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
+        
+        if (cleanEnt && cleanEnt !== 'อาจารย์ผู้สอน' && cleanCur && !cleanEnt.includes(cleanCur) && !cleanCur.includes(cleanEnt)) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    return false;
+}
+
 // 7.1 จัดการรายวิชาของอาจารย์ (Courses)
 async function loadTeacherCourses() {
     const container = document.getElementById('teacher-courses-list-container');
@@ -3407,7 +3429,7 @@ function getTeacherIsolatedExams() {
     const myCourseIds = myCourses.map(c => c.id);
 
     return allExams.filter(e => 
-        isMatchingTeacher(e.teacher_id, e.teacher_name, currentTeacherId, currentTeacherName)
+        isExamOwnedByTeacher(e, currentTeacherId, currentTeacherName, myCourseIds)
     );
 }
 
@@ -3419,11 +3441,14 @@ function filterTeacherIsolatedSubmissions(subs) {
     const currentTeacherName = (state.currentUser?.name || '').trim();
     const myExams = getTeacherIsolatedExams();
     const myExamIds = myExams.map(e => e.id);
+    
+    const allCourses = getLocalCourses();
+    const myCourseIds = allCourses.filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName)).map(c => c.id);
 
     return (subs || []).filter(sub => {
         if (sub.exam_id && myExamIds.includes(sub.exam_id)) return true;
         if (sub.exam) {
-            if (isMatchingTeacher(sub.exam.teacher_id, sub.exam.teacher_name, currentTeacherId, currentTeacherName)) return true;
+            if (isExamOwnedByTeacher(sub.exam, currentTeacherId, currentTeacherName, myCourseIds)) return true;
         }
         return false;
     });
@@ -5004,7 +5029,7 @@ async function loadTeacherExamsList() {
         const currentTeacherId = state.currentUser.id;
         const currentTeacherName = (state.currentUser.name || '').trim();
         exams = exams.filter(e => 
-            isMatchingTeacher(e.teacher_id, e.teacher_name, currentTeacherId, currentTeacherName)
+            isExamOwnedByTeacher(e, currentTeacherId, currentTeacherName, myCourseIds)
         );
     }
 
@@ -6047,10 +6072,11 @@ window.populateTeacherExamSelects = async function(showToastFeedback = false) {
 
     // 🔒 Teacher Isolation: แสดงเฉพาะชุดข้อสอบของตนเอง
     if (state.currentUser?.role === 'teacher') {
+        const myCourseIds = (state.courses || []).map(c => c.id);
         const currentTeacherId = state.currentUser.id;
         const currentTeacherName = (state.currentUser.name || '').trim();
         exams = exams.filter(e => 
-            isMatchingTeacher(e.teacher_id, e.teacher_name, currentTeacherId, currentTeacherName)
+            isExamOwnedByTeacher(e, currentTeacherId, currentTeacherName, myCourseIds)
         );
     }
 
