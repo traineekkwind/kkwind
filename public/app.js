@@ -3268,7 +3268,8 @@ function isMatchingTeacher(entityTeacherId, entityTeacherName, currentTeacherId,
 
     // 0. STRICT ANTI-COLLISION: If the entity has a name, and it explicitly doesn't match the current teacher, REJECT IT.
     // This prevents Yaowaluk's new courses from showing up for Daychat even if they share an ID by mistake.
-    if (cleanEnt && cleanEnt !== 'อาจารย์ผู้สอน' && cleanEnt !== 'ครูผู้สอน') {
+    const genericNames = ['อาจารย์ผู้สอน', 'ครูผู้สอน', 'ผู้ดูแลระบบ', 'admin', 'administrator', 'system'];
+    if (cleanEnt && !genericNames.includes(cleanEnt)) {
         if (cleanCur && !cleanEnt.includes(cleanCur) && !cleanCur.includes(cleanEnt)) {
             return false; // Explicitly belongs to someone else!
         }
@@ -3289,9 +3290,9 @@ function isMatchingTeacher(entityTeacherId, entityTeacherName, currentTeacherId,
         return true;
     }
 
-    // 3. BACKWARD COMPATIBILITY: If it's an old entity without teacher data, let it through.
+    // 3. BACKWARD COMPATIBILITY: If it's an old entity without teacher data (or created by admin), let it through.
     // Yes, this means old unassigned courses will show up for everyone, but it prevents DATA LOSS.
-    if (!cleanEnt || cleanEnt === 'อาจารย์ผู้สอน' || cleanEnt === 'ครูผู้สอน') {
+    if (!cleanEnt || genericNames.includes(cleanEnt)) {
         return true;
     }
 
@@ -3304,13 +3305,8 @@ function isExamOwnedByTeacher(e, currentTeacherId, currentTeacherName, myCourseI
     }
 
     if (e.course_id && myCourseIds && myCourseIds.includes(e.course_id)) {
-        const cleanCur = (currentTeacherName || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
-        const cleanEnt = (e.teacher_name || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
-        
-        if (cleanEnt && cleanEnt !== 'อาจารย์ผู้สอน' && cleanCur && !cleanEnt.includes(cleanCur) && !cleanCur.includes(cleanEnt)) {
-            return false;
-        }
-        
+        // If the exam explicitly belongs to a course that I own, then I own the exam!
+        // No need to check name collision here, because the course ownership is already strictly validated.
         return true;
     }
 
