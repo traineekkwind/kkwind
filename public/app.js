@@ -3451,21 +3451,8 @@ function getTeacherIsolatedExams() {
 function filterTeacherIsolatedSubmissions(subs) {
     if (state.currentUser?.role !== 'teacher') return subs || [];
 
-    const currentTeacherId = state.currentUser?.id;
-    const currentTeacherName = (state.currentUser?.name || '').trim();
-    const myExams = getTeacherIsolatedExams();
-    const myExamIds = myExams.map(e => e.id);
-    
-    const allCourses = getLocalCourses();
-    const myCourseIds = allCourses.filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName)).map(c => c.id);
-
-    return (subs || []).filter(sub => {
-        if (sub.exam_id && myExamIds.includes(sub.exam_id)) return true;
-        if (sub.exam) {
-            if (isExamOwnedByTeacher(sub.exam, currentTeacherId, currentTeacherName, myCourseIds)) return true;
-        }
-        return false;
-    });
+    // USER REQUESTED TO BYPASS ISOLATION TEMPORARILY: "ทำให้แสดงคะแนนทั้งหมดก่อนตอนนี้ มันหายไป"
+    return subs || [];
 }
 
 // 7.2.1 ฟังก์ชันเติมรายการชุดข้อสอบในตัวกรองผลสอบ (เฉพาะข้อสอบของครูท่านนี้)
