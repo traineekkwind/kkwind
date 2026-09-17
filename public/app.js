@@ -3263,16 +3263,24 @@ window.resolveStudentFromRoster = resolveStudentFromRoster;
 function isMatchingTeacher(entityTeacherId, entityTeacherName, currentTeacherId, currentTeacherName) {
     if (!currentTeacherName && !currentTeacherId) return true;
     
+    const cleanCur = (currentTeacherName || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
+    const cleanEnt = (entityTeacherName || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
+
+    // 0. STRICT ANTI-COLLISION: If the entity has a name, and it explicitly doesn't match the current teacher, REJECT IT.
+    // This prevents Yaowaluk's new courses from showing up for Daychat even if they share an ID by mistake.
+    if (cleanEnt && cleanEnt !== 'อาจารย์ผู้สอน' && cleanEnt !== 'ครูผู้สอน') {
+        if (cleanCur && !cleanEnt.includes(cleanCur) && !cleanCur.includes(cleanEnt)) {
+            return false; // Explicitly belongs to someone else!
+        }
+    }
+
     // 1. Direct ID match
     const isValidEntityId = entityTeacherId && String(entityTeacherId).trim() !== '11111111-0000-0000-0000-000000000001';
     if (currentTeacherId && isValidEntityId && String(entityTeacherId).trim() === String(currentTeacherId).trim()) {
         return true;
     }
     
-    // ล้างคำนำหน้าและช่องว่าง
-    const cleanCur = (currentTeacherName || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
-    const cleanEnt = (entityTeacherName || '').trim().toLowerCase().replace(/^(อ\.|ครู|อาจารย์|นาย|นางสาว|นาง)\s*/, '').replace(/\s+/g, ' ');
-    
+    // 2. Name match fallback
     if (cleanCur && cleanEnt && (cleanCur === cleanEnt || cleanEnt === cleanCur)) {
         return true;
     }
@@ -3281,7 +3289,13 @@ function isMatchingTeacher(entityTeacherId, entityTeacherName, currentTeacherId,
         return true;
     }
 
-    return false; // STRICT ISOLATION: ป้องกันข้อมูลซ้อนกับครูท่านอื่น
+    // 3. BACKWARD COMPATIBILITY: If it's an old entity without teacher data, let it through.
+    // Yes, this means old unassigned courses will show up for everyone, but it prevents DATA LOSS.
+    if (!cleanEnt || cleanEnt === 'อาจารย์ผู้สอน' || cleanEnt === 'ครูผู้สอน') {
+        return true;
+    }
+
+    return false; // STRICT ISOLATION
 }
 
 function isExamOwnedByTeacher(e, currentTeacherId, currentTeacherName, myCourseIds) {
