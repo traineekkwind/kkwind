@@ -3447,12 +3447,25 @@ function getTeacherIsolatedExams() {
     );
 }
 
-// 7.2.0 ฟังก์ชันกรองเฉพาะผลสอบของอาจารย์ท่านนี้ (Strict Teacher Submission Isolation)
+// 7.2.0 ฟังก์ชันกรองเฉพาะผลสอบของอาจารย์ท่านนี้// 7.2.0 ป้องกันของเพื่อนครูมาปน (Strict Teacher Submission Isolation)
 function filterTeacherIsolatedSubmissions(subs) {
     if (state.currentUser?.role !== 'teacher') return subs || [];
 
-    // USER REQUESTED TO BYPASS ISOLATION TEMPORARILY: "ทำให้แสดงคะแนนทั้งหมดก่อนตอนนี้ มันหายไป"
-    return subs || [];
+    const currentTeacherId = state.currentUser?.id;
+    const currentTeacherName = (state.currentUser?.name || '').trim();
+    const myExams = getTeacherIsolatedExams();
+    const myExamIds = myExams.map(e => e.id);
+    
+    const allCourses = getLocalCourses();
+    const myCourseIds = allCourses.filter(c => isMatchingTeacher(c.teacher_id, c.teacher_name, currentTeacherId, currentTeacherName)).map(c => c.id);
+
+    return (subs || []).filter(sub => {
+        if (sub.exam_id && myExamIds.includes(sub.exam_id)) return true;
+        if (sub.exam) {
+            if (isExamOwnedByTeacher(sub.exam, currentTeacherId, currentTeacherName, myCourseIds)) return true;
+        }
+        return false;
+    });
 }
 
 // 7.2.1 ฟังก์ชันเติมรายการชุดข้อสอบในตัวกรองผลสอบ (เฉพาะข้อสอบของครูท่านนี้)
@@ -3463,7 +3476,7 @@ function populateTeacherSubmissionExamFilter() {
     const myExams = getTeacherIsolatedExams();
     const currentVal = select.value;
     select.innerHTML = `<option value="ทั้งหมด">ชุดข้อสอบ: ทั้งหมด</option>` + myExams.map(e => `
-        <option value="${e.id}">[${escapeHtml(e.title)}] (${escapeHtml(e.target_year || 'ทุกชั้น')} ${escapeHtml(e.target_room || 'ทุกห้อง')})</option>
+        <option value="${e.id}">[${escapeHtml(e.title)}] (${escapeHtml(e.target_year || 'ทุกปี')} ${escapeHtml(e.target_room || 'ทุกห้อง')})</option>
     `).join('');
 
     if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
@@ -3471,7 +3484,7 @@ function populateTeacherSubmissionExamFilter() {
     }
 }
 
-// 7.2.2 โหลดตารางผลสอบอาจารย์ (พร้อมตัวกรองแยกชุดข้อสอบ/ระดับชั้น/แผนก/ห้องเรียน)
+// 7.2.2 โหลดตารางคะแนนสอบของอาจารย์ (กรองเฉพาะชุดข้อสอบ/ระดับชั้น/แผนก/ห้องเรียน)
 async function loadTeacherSubmissions() {
     const tableBody = document.getElementById('teacher-submissions-table-body');
     const statTotal = document.getElementById('teacher-stat-total-submissions');
@@ -3487,11 +3500,27 @@ async function loadTeacherSubmissions() {
 
     if (isSupabaseConfigured() && state.supabaseClient) {
         try {
+            let subsQuery = state.supabaseClient
+                .from('exam_results')
+                .select('*, exam:exams(title, duration_minutes, max_tab_switches_allowed, target_year, target_department, target_room, teacher_name, course_id)')
+                .order('graded_at', { ascending: false })
+                .limit(3000); // เพิ่มลิมิตเพื่อความชัวร์
+
+            // OPTIMIZATION: ดึงเฉพาะคะแนนของข้อสอบเรา ป้องกันปัญหา Supabase 1000 row limit ดันคะแนนเก่าหาย
+            if (state.currentUser?.role === 'teacher') {
+                const myExams = getTeacherIsolatedExams();
+                const myExamIds = myExams.map(e => e.id).filter(Boolean);
+                if (myExamIds.length > 0) {
+                    // ขอทีละ 200 ID เพื่อป้องกัน URL ยาวเกินไป (414 URI Too Long)
+                    const chunkedIds = myExamIds.slice(0, 200);
+                    subsQuery = subsQuery.in('exam_id', chunkedIds);
+                } else {
+                    subsQuery = subsQuery.in('exam_id', ['11111111-1111-1111-1111-111111111111']);
+                }
+            }
+
             const [subsRes, stdRes, examsRes, coursesRes] = await Promise.all([
-                state.supabaseClient
-                    .from('exam_results')
-                    .select('*, exam:exams(title, duration_minutes, max_tab_switches_allowed, target_year, target_department, target_room, teacher_name, course_id)')
-                    .order('graded_at', { ascending: false }),
+                subsQuery,
                 state.supabaseClient
                     .from('students')
                     .select('*')
