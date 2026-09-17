@@ -3521,6 +3521,7 @@ async function loadTeacherSubmissions() {
 
             if (!subsRes.error && Array.isArray(subsRes.data) && subsRes.data.length > 0) {
                 subs = subsRes.data;
+                localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(subsRes.data));
             }
             if (!stdRes.error && Array.isArray(stdRes.data) && stdRes.data.length > 0) {
                 localStudents = stdRes.data;
@@ -3798,6 +3799,7 @@ window.exportTeacherScoresToExcel = async function() {
 
             if (!subsRes.error && Array.isArray(subsRes.data) && subsRes.data.length > 0) {
                 subs = subsRes.data;
+                localStorage.setItem('EXAM_LOCAL_SUBMISSIONS', JSON.stringify(subsRes.data));
             }
             if (!stdRes.error && Array.isArray(stdRes.data) && stdRes.data.length > 0) {
                 localStudents = stdRes.data;
